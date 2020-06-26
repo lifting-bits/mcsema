@@ -1,18 +1,21 @@
 /*
- * Copyright (c) 2017 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include "Lift.h"
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
@@ -55,7 +58,6 @@
 #include "mcsema/BC/External.h"
 #include "mcsema/BC/Function.h"
 #include "mcsema/BC/Legacy.h"
-#include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Optimize.h"
 #include "mcsema/BC/Segment.h"
 #include "mcsema/BC/Util.h"
@@ -70,22 +72,32 @@ namespace {
 
 // Add entrypoint functions for any exported functions.
 static void ExportFunctions(const NativeModule *cfg_module) {
-  for (auto ea : cfg_module->exported_funcs) {
-    auto cfg_func = cfg_module->ea_to_func.at(ea)->Get();
-    CHECK(gModule->getFunction(cfg_func->lifted_name) != nullptr)
-        << "Cannot find lifted version of exported function "
-        << cfg_func->lifted_name;
+  for (auto [ea, cfg_func] : cfg_module->ea_to_func) {
+    (void) ea;
 
-    LOG(INFO)
-        << "Exporting function " << cfg_func->name;
+    if (cfg_func->function) {
+      cfg_func->function = gModule->getFunction(cfg_func->name);
+    }
 
-    auto ep = GetNativeToLiftedEntryPoint(cfg_func);
-    ep->setLinkage(llvm::GlobalValue::ExternalLinkage);
-    ep->setVisibility(llvm::GlobalValue::DefaultVisibility);
+    if (auto ep = cfg_func->function; ep) {
+      if (cfg_func->is_exported) {
+        LOG(INFO)
+            << "Exporting function " << cfg_func->name;
+        //    remill::TieFunctions(ep, gModule->getFunction(cfg_func->lifted_name));
+        remill::Annotate<remill::EntrypointFunction>(ep);
+        ep->setLinkage(llvm::GlobalValue::ExternalLinkage);
+        ep->setVisibility(llvm::GlobalValue::DefaultVisibility);
 
-    remill::TieFunctions(ep, gModule->getFunction(cfg_func->lifted_name));
-    remill::Annotate<remill::EntrypointFunction>(ep);
-
+      } else {
+        ep->setVisibility(llvm::GlobalValue::HiddenVisibility);
+        ep->setLinkage(llvm::GlobalValue::PrivateLinkage);
+        if (!ep->hasNUsesOrMore(1)) {
+          LOG(INFO)
+              << "Removing function " << cfg_func->name;
+          ep->eraseFromParent();
+        }
+      }
+    }
   }
 }
 
@@ -134,7 +146,8 @@ static void DefineDebugGetRegState(void) {
 
   auto state_ptr_type = reg_state->getType();
   auto reg_func_type = llvm::FunctionType::get(state_ptr_type, false);
-  // ExternalWeakLinkage causes crash with --explicit_args. The function is not available in the library
+  // ExternalWeakLinkage causes crash with --explicit_args. The function is not
+  // available in the library
   get_reg_state = llvm::Function::Create(
       reg_func_type, llvm::GlobalValue::ExternalLinkage,
       "__mcsema_debug_get_reg_state", gModule.get());
@@ -146,43 +159,81 @@ static void DefineDebugGetRegState(void) {
   get_reg_state->addFnAttr(llvm::Attribute::OptimizeNone);
 }
 
-// Define some of the remill error intrinsics.
-static void DefineErrorIntrinsics(llvm::FunctionType *lifted_func_type) {
-  const char *func_names[] = {"__remill_error", "__remill_missing_block"};
-  auto trap = llvm::Intrinsic::getDeclaration(gModule.get(), llvm::Intrinsic::trap);
-  for (auto func_name : func_names) {
-    auto func = gModule->getFunction(func_name);
-    if (!func) {
-      continue;
-    }
-    if (func->isDeclaration()) {
-      llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", func));
-      ir.CreateCall(trap);
-      ir.CreateUnreachable();
-    }
+// Remove calls to error-related intrinsics.
+static void ImplementErrorIntrinsic(const char *name) {
+  auto func = gModule->getFunction(name);
+  if (!func || !func->isDeclaration()) {
+    return;
   }
+
+  auto void_type = llvm::Type::getVoidTy(*gContext);
+  auto abort_func = gModule->getFunction("abort");
+  if (!abort_func) {
+    abort_func = llvm::Function::Create(
+        llvm::FunctionType::get(void_type, false),
+        llvm::GlobalValue::ExternalLinkage,
+        "abort",
+        gModule.get());
+
+    abort_func->addFnAttr(llvm::Attribute::NoReturn);
+
+  // Might be an externally-defined function :-/
+  } else if (abort_func->getFunctionType()->getNumParams() ||
+             !abort_func->getFunctionType()->getReturnType()->isVoidTy()) {
+    abort_func = llvm::Intrinsic::getDeclaration(
+        gModule.get(), llvm::Intrinsic::trap);
+  }
+
+  func->setLinkage(llvm::GlobalValue::InternalLinkage);
+  func->removeFnAttr(llvm::Attribute::NoInline);
+  func->removeFnAttr(llvm::Attribute::OptimizeNone);
+  func->addFnAttr(llvm::Attribute::NoReturn);
+  func->addFnAttr(llvm::Attribute::InlineHint);
+  func->addFnAttr(llvm::Attribute::AlwaysInline);
+
+  llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", func));
+
+  ir.CreateCall(abort_func);
+  ir.CreateUnreachable();
+}
+
+// Define some of the remill error intrinsics.
+static void DefineErrorIntrinsics(void) {
+  ImplementErrorIntrinsic("__remill_error");
+  ImplementErrorIntrinsic("__remill_missing_block");
 }
 
 }  // namespace
 
-bool LiftCodeIntoModule(const NativeModule *cfg_module) {
+TranslationContext::TranslationContext(void) {}
 
-  DeclareExternals(cfg_module);
+TranslationContext::~TranslationContext(void) {}
+
+bool LiftCodeIntoModule(const NativeModule *cfg_module) {
   DeclareLiftedFunctions(cfg_module);
 
-  DeclareDataSegments(cfg_module);
+  // Lift the blocks of instructions into the declared functions.
+  if (!DefineLiftedFunctions(cfg_module)) {
+    return false;
+  }
+
+  DefineErrorIntrinsics();
+
+  // Optimize the lifted bitcode.
+  OptimizeModule(cfg_module);
 
   // Segments are only filled in after the lifted function declarations,
   // external vars, and segments are declared so that cross-references to
   // lifted things can be resolved.
   DefineDataSegments(cfg_module);
 
-  auto lifted_func_type = remill::LiftedFunctionType(gModule.get());
+  // Generate code to call pre-`main` function static object constructors, and
+  // post-`main` functions destructors.
+  CallInitFiniCode(cfg_module);
 
-  // Lift the blocks of instructions into the declared functions.
-  if (!DefineLiftedFunctions(cfg_module)) {
-    return false;
-  }
+  // Remove leftover Remill intrinsics, and lower memory access intrincis into
+  // `load` and `store` instructions.
+  CleanUpModule(cfg_module);
 
   // Add entrypoint functions for any exported functions.
   ExportFunctions(cfg_module);
@@ -190,20 +241,9 @@ bool LiftCodeIntoModule(const NativeModule *cfg_module) {
   // Export any variables that should be externally visible.
   ExportVariables(cfg_module);
 
-  // Generate code to call pre-`main` function static object constructors, and
-  // post-`main` functions destructors.
-  CallInitFiniCode(cfg_module);
-
-  if (FLAGS_legacy_mode) {
-    legacy::DowngradeModule();
-  }
-
-  OptimizeModule();
-
   if (FLAGS_explicit_args) {
     DefineGCCStackGuard();
     DefineDebugGetRegState();
-    DefineErrorIntrinsics(lifted_func_type);
   }
 
   if (!FLAGS_pc_annotation.empty()) {

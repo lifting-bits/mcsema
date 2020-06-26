@@ -3,6 +3,7 @@
 
 import sys
 _b=sys.version_info[0]<3 and (lambda x:x) or (lambda x:x.encode('latin1'))
+from google.protobuf.internal import enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
@@ -18,33 +19,71 @@ _sym_db = _symbol_database.Default()
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='CFG.proto',
   package='mcsema',
-  serialized_pb=_b('\n\tCFG.proto\x12\x06mcsema\"\xaf\x03\n\rCodeReference\x12\x35\n\x0btarget_type\x18\x01 \x02(\x0e\x32 .mcsema.CodeReference.TargetType\x12\x37\n\x0coperand_type\x18\x02 \x02(\x0e\x32!.mcsema.CodeReference.OperandType\x12\x30\n\x08location\x18\x03 \x02(\x0e\x32\x1e.mcsema.CodeReference.Location\x12\n\n\x02\x65\x61\x18\x04 \x02(\x03\x12\x0c\n\x04mask\x18\x05 \x01(\x03\x12\x0c\n\x04name\x18\x06 \x01(\t\",\n\nTargetType\x12\x0e\n\nCodeTarget\x10\x00\x12\x0e\n\nDataTarget\x10\x01\"~\n\x0bOperandType\x12\x14\n\x10ImmediateOperand\x10\x00\x12\x11\n\rMemoryOperand\x10\x01\x12\x1d\n\x19MemoryDisplacementOperand\x10\x02\x12\x16\n\x12\x43ontrolFlowOperand\x10\x03\x12\x0f\n\x0bOffsetTable\x10\x04\"&\n\x08Location\x12\x0c\n\x08Internal\x10\x00\x12\x0c\n\x08\x45xternal\x10\x01\"u\n\x0bInstruction\x12\n\n\x02\x65\x61\x18\x01 \x02(\x03\x12\r\n\x05\x62ytes\x18\x02 \x02(\x0c\x12$\n\x05xrefs\x18\x03 \x03(\x0b\x32\x15.mcsema.CodeReference\x12\x16\n\x0elocal_noreturn\x18\x04 \x01(\x08\x12\r\n\x05lp_ea\x18\x05 \x01(\x04\"U\n\x05\x42lock\x12\n\n\x02\x65\x61\x18\x01 \x02(\x03\x12)\n\x0cinstructions\x18\x02 \x03(\x0b\x32\x13.mcsema.Instruction\x12\x15\n\rsuccessor_eas\x18\x03 \x03(\x03\"\xaf\x01\n\x08\x46unction\x12\n\n\x02\x65\x61\x18\x01 \x02(\x03\x12\x1d\n\x06\x62locks\x18\x02 \x03(\x0b\x32\r.mcsema.Block\x12\x15\n\ris_entrypoint\x18\x03 \x02(\x08\x12\x0c\n\x04name\x18\x04 \x01(\t\x12)\n\nstack_vars\x18\x05 \x03(\x0b\x32\x15.mcsema.StackVariable\x12(\n\x08\x65h_frame\x18\x06 \x03(\x0b\x32\x16.mcsema.ExceptionFrame\"\x90\x02\n\x10\x45xternalFunction\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\n\n\x02\x65\x61\x18\x02 \x02(\x03\x12\x36\n\x02\x63\x63\x18\x03 \x02(\x0e\x32*.mcsema.ExternalFunction.CallingConvention\x12\x12\n\nhas_return\x18\x04 \x02(\x08\x12\x11\n\tno_return\x18\x05 \x02(\x08\x12\x16\n\x0e\x61rgument_count\x18\x06 \x02(\x05\x12\x0f\n\x07is_weak\x18\x07 \x02(\x08\x12\x11\n\tsignature\x18\x08 \x01(\t\"G\n\x11\x43\x61llingConvention\x12\x11\n\rCallerCleanup\x10\x00\x12\x11\n\rCalleeCleanup\x10\x01\x12\x0c\n\x08\x46\x61stCall\x10\x02\"d\n\x10\x45xternalVariable\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\n\n\x02\x65\x61\x18\x02 \x02(\x03\x12\x0c\n\x04size\x18\x03 \x02(\x05\x12\x0f\n\x07is_weak\x18\x04 \x02(\x08\x12\x17\n\x0fis_thread_local\x18\x05 \x02(\x08\"\xe7\x01\n\rDataReference\x12\n\n\x02\x65\x61\x18\x01 \x02(\x03\x12\r\n\x05width\x18\x02 \x02(\x05\x12\x11\n\ttarget_ea\x18\x04 \x02(\x03\x12\x13\n\x0btarget_name\x18\x05 \x02(\t\x12\x16\n\x0etarget_is_code\x18\x06 \x02(\x08\x12@\n\x11target_fixup_kind\x18\x08 \x02(\x0e\x32%.mcsema.DataReference.TargetFixupKind\"9\n\x0fTargetFixupKind\x12\x0c\n\x08\x41\x62solute\x10\x00\x12\x18\n\x14OffsetFromThreadBase\x10\x01\"$\n\x08Variable\x12\n\n\x02\x65\x61\x18\x01 \x02(\x03\x12\x0c\n\x04name\x18\x02 \x02(\t\",\n\tReference\x12\x0f\n\x07inst_ea\x18\x01 \x02(\x04\x12\x0e\n\x06offset\x18\x02 \x02(\x03\"\xcc\x01\n\x0e\x45xceptionFrame\x12\x0f\n\x07\x66unc_ea\x18\x01 \x02(\x04\x12\x10\n\x08start_ea\x18\x03 \x02(\x04\x12\x0e\n\x06\x65nd_ea\x18\x04 \x02(\x04\x12\r\n\x05lp_ea\x18\x05 \x02(\x04\x12-\n\x06\x61\x63tion\x18\x06 \x02(\x0e\x32\x1d.mcsema.ExceptionFrame.Action\x12\'\n\x05ttype\x18\x07 \x03(\x0b\x32\x18.mcsema.ExternalVariable\" \n\x06\x41\x63tion\x12\x0b\n\x07\x43leanup\x10\x00\x12\t\n\x05\x43\x61tch\x10\x01\"\x87\x01\n\rStackVariable\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x0c\n\x04size\x18\x02 \x02(\x04\x12\x11\n\tsp_offset\x18\x03 \x02(\x03\x12\x11\n\thas_frame\x18\x04 \x01(\x08\x12\x10\n\x08reg_name\x18\x05 \x01(\t\x12\"\n\x07ref_eas\x18\x06 \x03(\x0b\x32\x11.mcsema.Reference\"8\n\x0eGlobalVariable\x12\n\n\x02\x65\x61\x18\x01 \x02(\x03\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\x0c\n\x04size\x18\x03 \x02(\x03\"\xe4\x01\n\x07Segment\x12\n\n\x02\x65\x61\x18\x01 \x02(\x03\x12\x0c\n\x04\x64\x61ta\x18\x02 \x02(\x0c\x12\x11\n\tread_only\x18\x03 \x02(\x08\x12\x13\n\x0bis_external\x18\x04 \x02(\x08\x12\x0c\n\x04name\x18\x05 \x02(\t\x12\x15\n\rvariable_name\x18\x06 \x01(\t\x12\x13\n\x0bis_exported\x18\x07 \x02(\x08\x12\x17\n\x0fis_thread_local\x18\x08 \x02(\x08\x12$\n\x05xrefs\x18\t \x03(\x0b\x32\x15.mcsema.DataReference\x12\x1e\n\x04vars\x18\n \x03(\x0b\x32\x10.mcsema.Variable\"\xea\x01\n\x06Module\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x1f\n\x05\x66uncs\x18\x02 \x03(\x0b\x32\x10.mcsema.Function\x12!\n\x08segments\x18\x03 \x03(\x0b\x32\x0f.mcsema.Segment\x12\x30\n\x0e\x65xternal_funcs\x18\x04 \x03(\x0b\x32\x18.mcsema.ExternalFunction\x12/\n\rexternal_vars\x18\x05 \x03(\x0b\x32\x18.mcsema.ExternalVariable\x12+\n\x0bglobal_vars\x18\x08 \x03(\x0b\x32\x16.mcsema.GlobalVariable')
+  serialized_pb=_b('\n\tCFG.proto\x12\x06mcsema\"5\n\x11PreservationRange\x12\x10\n\x08\x62\x65gin_ea\x18\x01 \x02(\x03\x12\x0e\n\x06\x65nd_ea\x18\x02 \x01(\x03\"R\n\x12PreservedRegisters\x12\x11\n\tregisters\x18\x01 \x03(\t\x12)\n\x06ranges\x18\x02 \x03(\x0b\x32\x19.mcsema.PreservationRange\"\xe2\x01\n\rCodeReference\x12\x37\n\x0coperand_type\x18\x01 \x02(\x0e\x32!.mcsema.CodeReference.OperandType\x12\n\n\x02\x65\x61\x18\x02 \x02(\x03\x12\x0c\n\x04mask\x18\x03 \x01(\x03\"~\n\x0bOperandType\x12\x14\n\x10ImmediateOperand\x10\x00\x12\x11\n\rMemoryOperand\x10\x01\x12\x1d\n\x19MemoryDisplacementOperand\x10\x02\x12\x16\n\x12\x43ontrolFlowOperand\x10\x03\x12\x0f\n\x0bOffsetTable\x10\x04\"N\n\x0bInstruction\x12\n\n\x02\x65\x61\x18\x01 \x02(\x03\x12$\n\x05xrefs\x18\x02 \x03(\x0b\x32\x15.mcsema.CodeReference\x12\r\n\x05lp_ea\x18\x03 \x01(\x04\"t\n\x05\x42lock\x12\n\n\x02\x65\x61\x18\x01 \x02(\x03\x12)\n\x0cinstructions\x18\x02 \x03(\x0b\x32\x13.mcsema.Instruction\x12\x15\n\rsuccessor_eas\x18\x03 \x03(\x03\x12\x1d\n\x15is_referenced_by_data\x18\x04 \x02(\x08\"2\n\x0eMemoryLocation\x12\x10\n\x08register\x18\x01 \x02(\t\x12\x0e\n\x06offset\x18\x02 \x01(\x03\"a\n\tValueDecl\x12\x0c\n\x04type\x18\x01 \x02(\t\x12&\n\x06memory\x18\x02 \x01(\x0b\x32\x16.mcsema.MemoryLocation\x12\x10\n\x08register\x18\x03 \x01(\t\x12\x0c\n\x04name\x18\x04 \x01(\t\"\x9c\x02\n\x0c\x46unctionDecl\x12%\n\nparameters\x18\x01 \x03(\x0b\x32\x11.mcsema.ValueDecl\x12(\n\rreturn_values\x18\x02 \x03(\x0b\x32\x11.mcsema.ValueDecl\x12)\n\x0ereturn_address\x18\x03 \x02(\x0b\x32\x11.mcsema.ValueDecl\x12/\n\x14return_stack_pointer\x18\x04 \x02(\x0b\x32\x11.mcsema.ValueDecl\x12\x13\n\x0bis_variadic\x18\x05 \x02(\x08\x12\x13\n\x0bis_noreturn\x18\x06 \x02(\x08\x12\x35\n\x12\x63\x61lling_convention\x18\x07 \x02(\x0e\x32\x19.mcsema.CallingConvention\"\xa8\x01\n\x08\x46unction\x12\n\n\x02\x65\x61\x18\x01 \x02(\x03\x12\x1d\n\x06\x62locks\x18\x02 \x03(\x0b\x32\r.mcsema.Block\x12\x15\n\ris_entrypoint\x18\x03 \x02(\x08\x12\x0c\n\x04name\x18\x04 \x01(\t\x12(\n\x08\x65h_frame\x18\x05 \x03(\x0b\x32\x16.mcsema.ExceptionFrame\x12\"\n\x04\x64\x65\x63l\x18\x06 \x01(\x0b\x32\x14.mcsema.FunctionDecl\"\xa1\x02\n\x10\x45xternalFunction\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\n\n\x02\x65\x61\x18\x02 \x02(\x03\x12\x36\n\x02\x63\x63\x18\x03 \x02(\x0e\x32*.mcsema.ExternalFunction.CallingConvention\x12\x12\n\nhas_return\x18\x04 \x02(\x08\x12\x11\n\tno_return\x18\x05 \x02(\x08\x12\x16\n\x0e\x61rgument_count\x18\x06 \x02(\x05\x12\x0f\n\x07is_weak\x18\x07 \x02(\x08\x12\"\n\x04\x64\x65\x63l\x18\x08 \x01(\x0b\x32\x14.mcsema.FunctionDecl\"G\n\x11\x43\x61llingConvention\x12\x11\n\rCallerCleanup\x10\x00\x12\x11\n\rCalleeCleanup\x10\x01\x12\x0c\n\x08\x46\x61stCall\x10\x02\"d\n\x10\x45xternalVariable\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\n\n\x02\x65\x61\x18\x02 \x02(\x03\x12\x0c\n\x04size\x18\x03 \x02(\x05\x12\x0f\n\x07is_weak\x18\x04 \x02(\x08\x12\x17\n\x0fis_thread_local\x18\x05 \x02(\x08\"\xba\x01\n\rDataReference\x12\n\n\x02\x65\x61\x18\x01 \x02(\x03\x12\r\n\x05width\x18\x02 \x02(\x05\x12\x11\n\ttarget_ea\x18\x03 \x02(\x03\x12@\n\x11target_fixup_kind\x18\x04 \x02(\x0e\x32%.mcsema.DataReference.TargetFixupKind\"9\n\x0fTargetFixupKind\x12\x0c\n\x08\x41\x62solute\x10\x00\x12\x18\n\x14OffsetFromThreadBase\x10\x01\"$\n\x08Variable\x12\n\n\x02\x65\x61\x18\x01 \x02(\x03\x12\x0c\n\x04name\x18\x02 \x02(\t\",\n\tReference\x12\x0f\n\x07inst_ea\x18\x01 \x02(\x04\x12\x0e\n\x06offset\x18\x02 \x02(\x03\"\xcc\x01\n\x0e\x45xceptionFrame\x12\x0f\n\x07\x66unc_ea\x18\x01 \x02(\x04\x12\x10\n\x08start_ea\x18\x03 \x02(\x04\x12\x0e\n\x06\x65nd_ea\x18\x04 \x02(\x04\x12\r\n\x05lp_ea\x18\x05 \x02(\x04\x12-\n\x06\x61\x63tion\x18\x06 \x02(\x0e\x32\x1d.mcsema.ExceptionFrame.Action\x12\'\n\x05ttype\x18\x07 \x03(\x0b\x32\x18.mcsema.ExternalVariable\" \n\x06\x41\x63tion\x12\x0b\n\x07\x43leanup\x10\x00\x12\t\n\x05\x43\x61tch\x10\x01\"8\n\x0eGlobalVariable\x12\n\n\x02\x65\x61\x18\x01 \x02(\x03\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\x0c\n\x04size\x18\x03 \x02(\x03\"\xe4\x01\n\x07Segment\x12\n\n\x02\x65\x61\x18\x01 \x02(\x03\x12\x0c\n\x04\x64\x61ta\x18\x02 \x02(\x0c\x12\x11\n\tread_only\x18\x03 \x02(\x08\x12\x13\n\x0bis_external\x18\x04 \x02(\x08\x12\x0c\n\x04name\x18\x05 \x02(\t\x12\x15\n\rvariable_name\x18\x06 \x01(\t\x12\x13\n\x0bis_exported\x18\x07 \x02(\x08\x12\x17\n\x0fis_thread_local\x18\x08 \x02(\x08\x12$\n\x05xrefs\x18\t \x03(\x0b\x32\x15.mcsema.DataReference\x12\x1e\n\x04vars\x18\n \x03(\x0b\x32\x10.mcsema.Variable\"\xcd\x02\n\x06Module\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x1f\n\x05\x66uncs\x18\x02 \x03(\x0b\x32\x10.mcsema.Function\x12!\n\x08segments\x18\x03 \x03(\x0b\x32\x0f.mcsema.Segment\x12\x30\n\x0e\x65xternal_funcs\x18\x04 \x03(\x0b\x32\x18.mcsema.ExternalFunction\x12/\n\rexternal_vars\x18\x05 \x03(\x0b\x32\x18.mcsema.ExternalVariable\x12+\n\x0bglobal_vars\x18\x08 \x03(\x0b\x32\x16.mcsema.GlobalVariable\x12\x32\n\x0epreserved_regs\x18\t \x03(\x0b\x32\x1a.mcsema.PreservedRegisters\x12-\n\tdead_regs\x18\n \x03(\x0b\x32\x1a.mcsema.PreservedRegisters*\xa8\x01\n\x11\x43\x61llingConvention\x12\x05\n\x01\x43\x10\x00\x12\x0f\n\x0bX86_StdCall\x10@\x12\x10\n\x0cX86_FastCall\x10\x41\x12\x10\n\x0cX86_ThisCall\x10\x46\x12\x0f\n\x0bX86_64_SysV\x10N\x12\t\n\x05Win64\x10O\x12\x12\n\x0eX86_VectorCall\x10P\x12\x0f\n\x0bX86_RegCall\x10\\\x12\x16\n\x12\x41\x41rch64_VectorCall\x10\x61')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
-
-
-_CODEREFERENCE_TARGETTYPE = _descriptor.EnumDescriptor(
-  name='TargetType',
-  full_name='mcsema.CodeReference.TargetType',
+_CALLINGCONVENTION = _descriptor.EnumDescriptor(
+  name='CallingConvention',
+  full_name='mcsema.CallingConvention',
   filename=None,
   file=DESCRIPTOR,
   values=[
     _descriptor.EnumValueDescriptor(
-      name='CodeTarget', index=0, number=0,
+      name='C', index=0, number=0,
       options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
-      name='DataTarget', index=1, number=1,
+      name='X86_StdCall', index=1, number=64,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='X86_FastCall', index=2, number=65,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='X86_ThisCall', index=3, number=70,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='X86_64_SysV', index=4, number=78,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='Win64', index=5, number=79,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='X86_VectorCall', index=6, number=80,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='X86_RegCall', index=7, number=92,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='AArch64_VectorCall', index=8, number=97,
       options=None,
       type=None),
   ],
   containing_type=None,
   options=None,
-  serialized_start=241,
-  serialized_end=285,
+  serialized_start=2696,
+  serialized_end=2864,
 )
-_sym_db.RegisterEnumDescriptor(_CODEREFERENCE_TARGETTYPE)
+_sym_db.RegisterEnumDescriptor(_CALLINGCONVENTION)
+
+CallingConvention = enum_type_wrapper.EnumTypeWrapper(_CALLINGCONVENTION)
+C = 0
+X86_StdCall = 64
+X86_FastCall = 65
+X86_ThisCall = 70
+X86_64_SysV = 78
+Win64 = 79
+X86_VectorCall = 80
+X86_RegCall = 92
+AArch64_VectorCall = 97
+
 
 _CODEREFERENCE_OPERANDTYPE = _descriptor.EnumDescriptor(
   name='OperandType',
@@ -75,32 +114,10 @@ _CODEREFERENCE_OPERANDTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=287,
-  serialized_end=413,
+  serialized_start=261,
+  serialized_end=387,
 )
 _sym_db.RegisterEnumDescriptor(_CODEREFERENCE_OPERANDTYPE)
-
-_CODEREFERENCE_LOCATION = _descriptor.EnumDescriptor(
-  name='Location',
-  full_name='mcsema.CodeReference.Location',
-  filename=None,
-  file=DESCRIPTOR,
-  values=[
-    _descriptor.EnumValueDescriptor(
-      name='Internal', index=0, number=0,
-      options=None,
-      type=None),
-    _descriptor.EnumValueDescriptor(
-      name='External', index=1, number=1,
-      options=None,
-      type=None),
-  ],
-  containing_type=None,
-  options=None,
-  serialized_start=415,
-  serialized_end=453,
-)
-_sym_db.RegisterEnumDescriptor(_CODEREFERENCE_LOCATION)
 
 _EXTERNALFUNCTION_CALLINGCONVENTION = _descriptor.EnumDescriptor(
   name='CallingConvention',
@@ -123,8 +140,8 @@ _EXTERNALFUNCTION_CALLINGCONVENTION = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=1041,
-  serialized_end=1112,
+  serialized_start=1415,
+  serialized_end=1486,
 )
 _sym_db.RegisterEnumDescriptor(_EXTERNALFUNCTION_CALLINGCONVENTION)
 
@@ -145,8 +162,8 @@ _DATAREFERENCE_TARGETFIXUPKIND = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=1391,
-  serialized_end=1448,
+  serialized_start=1720,
+  serialized_end=1777,
 )
 _sym_db.RegisterEnumDescriptor(_DATAREFERENCE_TARGETFIXUPKIND)
 
@@ -167,10 +184,84 @@ _EXCEPTIONFRAME_ACTION = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=1707,
-  serialized_end=1739,
+  serialized_start=2036,
+  serialized_end=2068,
 )
 _sym_db.RegisterEnumDescriptor(_EXCEPTIONFRAME_ACTION)
+
+
+_PRESERVATIONRANGE = _descriptor.Descriptor(
+  name='PreservationRange',
+  full_name='mcsema.PreservationRange',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='begin_ea', full_name='mcsema.PreservationRange.begin_ea', index=0,
+      number=1, type=3, cpp_type=2, label=2,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='end_ea', full_name='mcsema.PreservationRange.end_ea', index=1,
+      number=2, type=3, cpp_type=2, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=21,
+  serialized_end=74,
+)
+
+
+_PRESERVEDREGISTERS = _descriptor.Descriptor(
+  name='PreservedRegisters',
+  full_name='mcsema.PreservedRegisters',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='registers', full_name='mcsema.PreservedRegisters.registers', index=0,
+      number=1, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='ranges', full_name='mcsema.PreservedRegisters.ranges', index=1,
+      number=2, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=76,
+  serialized_end=158,
+)
 
 
 _CODEREFERENCE = _descriptor.Descriptor(
@@ -181,44 +272,23 @@ _CODEREFERENCE = _descriptor.Descriptor(
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='target_type', full_name='mcsema.CodeReference.target_type', index=0,
+      name='operand_type', full_name='mcsema.CodeReference.operand_type', index=0,
       number=1, type=14, cpp_type=8, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='operand_type', full_name='mcsema.CodeReference.operand_type', index=1,
-      number=2, type=14, cpp_type=8, label=2,
+      name='ea', full_name='mcsema.CodeReference.ea', index=1,
+      number=2, type=3, cpp_type=2, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='location', full_name='mcsema.CodeReference.location', index=2,
-      number=3, type=14, cpp_type=8, label=2,
+      name='mask', full_name='mcsema.CodeReference.mask', index=2,
+      number=3, type=3, cpp_type=2, label=1,
       has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='ea', full_name='mcsema.CodeReference.ea', index=3,
-      number=4, type=3, cpp_type=2, label=2,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='mask', full_name='mcsema.CodeReference.mask', index=4,
-      number=5, type=3, cpp_type=2, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='name', full_name='mcsema.CodeReference.name', index=5,
-      number=6, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -227,17 +297,15 @@ _CODEREFERENCE = _descriptor.Descriptor(
   ],
   nested_types=[],
   enum_types=[
-    _CODEREFERENCE_TARGETTYPE,
     _CODEREFERENCE_OPERANDTYPE,
-    _CODEREFERENCE_LOCATION,
   ],
   options=None,
   is_extendable=False,
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=22,
-  serialized_end=453,
+  serialized_start=161,
+  serialized_end=387,
 )
 
 
@@ -256,29 +324,15 @@ _INSTRUCTION = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='bytes', full_name='mcsema.Instruction.bytes', index=1,
-      number=2, type=12, cpp_type=9, label=2,
-      has_default_value=False, default_value=_b(""),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='xrefs', full_name='mcsema.Instruction.xrefs', index=2,
-      number=3, type=11, cpp_type=10, label=3,
+      name='xrefs', full_name='mcsema.Instruction.xrefs', index=1,
+      number=2, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='local_noreturn', full_name='mcsema.Instruction.local_noreturn', index=3,
-      number=4, type=8, cpp_type=7, label=1,
-      has_default_value=False, default_value=False,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='lp_ea', full_name='mcsema.Instruction.lp_ea', index=4,
-      number=5, type=4, cpp_type=4, label=1,
+      name='lp_ea', full_name='mcsema.Instruction.lp_ea', index=2,
+      number=3, type=4, cpp_type=4, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -294,8 +348,8 @@ _INSTRUCTION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=455,
-  serialized_end=572,
+  serialized_start=389,
+  serialized_end=467,
 )
 
 
@@ -327,6 +381,13 @@ _BLOCK = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='is_referenced_by_data', full_name='mcsema.Block.is_referenced_by_data', index=3,
+      number=4, type=8, cpp_type=7, label=2,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -338,8 +399,168 @@ _BLOCK = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=574,
-  serialized_end=659,
+  serialized_start=469,
+  serialized_end=585,
+)
+
+
+_MEMORYLOCATION = _descriptor.Descriptor(
+  name='MemoryLocation',
+  full_name='mcsema.MemoryLocation',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='register', full_name='mcsema.MemoryLocation.register', index=0,
+      number=1, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='offset', full_name='mcsema.MemoryLocation.offset', index=1,
+      number=2, type=3, cpp_type=2, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=587,
+  serialized_end=637,
+)
+
+
+_VALUEDECL = _descriptor.Descriptor(
+  name='ValueDecl',
+  full_name='mcsema.ValueDecl',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='type', full_name='mcsema.ValueDecl.type', index=0,
+      number=1, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='memory', full_name='mcsema.ValueDecl.memory', index=1,
+      number=2, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='register', full_name='mcsema.ValueDecl.register', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='name', full_name='mcsema.ValueDecl.name', index=3,
+      number=4, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=639,
+  serialized_end=736,
+)
+
+
+_FUNCTIONDECL = _descriptor.Descriptor(
+  name='FunctionDecl',
+  full_name='mcsema.FunctionDecl',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='parameters', full_name='mcsema.FunctionDecl.parameters', index=0,
+      number=1, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='return_values', full_name='mcsema.FunctionDecl.return_values', index=1,
+      number=2, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='return_address', full_name='mcsema.FunctionDecl.return_address', index=2,
+      number=3, type=11, cpp_type=10, label=2,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='return_stack_pointer', full_name='mcsema.FunctionDecl.return_stack_pointer', index=3,
+      number=4, type=11, cpp_type=10, label=2,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='is_variadic', full_name='mcsema.FunctionDecl.is_variadic', index=4,
+      number=5, type=8, cpp_type=7, label=2,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='is_noreturn', full_name='mcsema.FunctionDecl.is_noreturn', index=5,
+      number=6, type=8, cpp_type=7, label=2,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='calling_convention', full_name='mcsema.FunctionDecl.calling_convention', index=6,
+      number=7, type=14, cpp_type=8, label=2,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=739,
+  serialized_end=1023,
 )
 
 
@@ -379,16 +600,16 @@ _FUNCTION = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='stack_vars', full_name='mcsema.Function.stack_vars', index=4,
+      name='eh_frame', full_name='mcsema.Function.eh_frame', index=4,
       number=5, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='eh_frame', full_name='mcsema.Function.eh_frame', index=5,
-      number=6, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
+      name='decl', full_name='mcsema.Function.decl', index=5,
+      number=6, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -403,8 +624,8 @@ _FUNCTION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=662,
-  serialized_end=837,
+  serialized_start=1026,
+  serialized_end=1194,
 )
 
 
@@ -465,9 +686,9 @@ _EXTERNALFUNCTION = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='signature', full_name='mcsema.ExternalFunction.signature', index=7,
-      number=8, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
+      name='decl', full_name='mcsema.ExternalFunction.decl', index=7,
+      number=8, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -483,8 +704,8 @@ _EXTERNALFUNCTION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=840,
-  serialized_end=1112,
+  serialized_start=1197,
+  serialized_end=1486,
 )
 
 
@@ -541,8 +762,8 @@ _EXTERNALVARIABLE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1114,
-  serialized_end=1214,
+  serialized_start=1488,
+  serialized_end=1588,
 )
 
 
@@ -569,28 +790,14 @@ _DATAREFERENCE = _descriptor.Descriptor(
       options=None),
     _descriptor.FieldDescriptor(
       name='target_ea', full_name='mcsema.DataReference.target_ea', index=2,
-      number=4, type=3, cpp_type=2, label=2,
+      number=3, type=3, cpp_type=2, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='target_name', full_name='mcsema.DataReference.target_name', index=3,
-      number=5, type=9, cpp_type=9, label=2,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='target_is_code', full_name='mcsema.DataReference.target_is_code', index=4,
-      number=6, type=8, cpp_type=7, label=2,
-      has_default_value=False, default_value=False,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='target_fixup_kind', full_name='mcsema.DataReference.target_fixup_kind', index=5,
-      number=8, type=14, cpp_type=8, label=2,
+      name='target_fixup_kind', full_name='mcsema.DataReference.target_fixup_kind', index=3,
+      number=4, type=14, cpp_type=8, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -607,8 +814,8 @@ _DATAREFERENCE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1217,
-  serialized_end=1448,
+  serialized_start=1591,
+  serialized_end=1777,
 )
 
 
@@ -644,8 +851,8 @@ _VARIABLE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1450,
-  serialized_end=1486,
+  serialized_start=1779,
+  serialized_end=1815,
 )
 
 
@@ -681,8 +888,8 @@ _REFERENCE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1488,
-  serialized_end=1532,
+  serialized_start=1817,
+  serialized_end=1861,
 )
 
 
@@ -747,73 +954,8 @@ _EXCEPTIONFRAME = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1535,
-  serialized_end=1739,
-)
-
-
-_STACKVARIABLE = _descriptor.Descriptor(
-  name='StackVariable',
-  full_name='mcsema.StackVariable',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='name', full_name='mcsema.StackVariable.name', index=0,
-      number=1, type=9, cpp_type=9, label=2,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='size', full_name='mcsema.StackVariable.size', index=1,
-      number=2, type=4, cpp_type=4, label=2,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='sp_offset', full_name='mcsema.StackVariable.sp_offset', index=2,
-      number=3, type=3, cpp_type=2, label=2,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='has_frame', full_name='mcsema.StackVariable.has_frame', index=3,
-      number=4, type=8, cpp_type=7, label=1,
-      has_default_value=False, default_value=False,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='reg_name', full_name='mcsema.StackVariable.reg_name', index=4,
-      number=5, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='ref_eas', full_name='mcsema.StackVariable.ref_eas', index=5,
-      number=6, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=1742,
-  serialized_end=1877,
+  serialized_start=1864,
+  serialized_end=2068,
 )
 
 
@@ -856,8 +998,8 @@ _GLOBALVARIABLE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1879,
-  serialized_end=1935,
+  serialized_start=2070,
+  serialized_end=2126,
 )
 
 
@@ -949,8 +1091,8 @@ _SEGMENT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1938,
-  serialized_end=2166,
+  serialized_start=2129,
+  serialized_end=2357,
 )
 
 
@@ -1003,6 +1145,20 @@ _MODULE = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='preserved_regs', full_name='mcsema.Module.preserved_regs', index=6,
+      number=9, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='dead_regs', full_name='mcsema.Module.dead_regs', index=7,
+      number=10, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -1014,29 +1170,32 @@ _MODULE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2169,
-  serialized_end=2403,
+  serialized_start=2360,
+  serialized_end=2693,
 )
 
-_CODEREFERENCE.fields_by_name['target_type'].enum_type = _CODEREFERENCE_TARGETTYPE
+_PRESERVEDREGISTERS.fields_by_name['ranges'].message_type = _PRESERVATIONRANGE
 _CODEREFERENCE.fields_by_name['operand_type'].enum_type = _CODEREFERENCE_OPERANDTYPE
-_CODEREFERENCE.fields_by_name['location'].enum_type = _CODEREFERENCE_LOCATION
-_CODEREFERENCE_TARGETTYPE.containing_type = _CODEREFERENCE
 _CODEREFERENCE_OPERANDTYPE.containing_type = _CODEREFERENCE
-_CODEREFERENCE_LOCATION.containing_type = _CODEREFERENCE
 _INSTRUCTION.fields_by_name['xrefs'].message_type = _CODEREFERENCE
 _BLOCK.fields_by_name['instructions'].message_type = _INSTRUCTION
+_VALUEDECL.fields_by_name['memory'].message_type = _MEMORYLOCATION
+_FUNCTIONDECL.fields_by_name['parameters'].message_type = _VALUEDECL
+_FUNCTIONDECL.fields_by_name['return_values'].message_type = _VALUEDECL
+_FUNCTIONDECL.fields_by_name['return_address'].message_type = _VALUEDECL
+_FUNCTIONDECL.fields_by_name['return_stack_pointer'].message_type = _VALUEDECL
+_FUNCTIONDECL.fields_by_name['calling_convention'].enum_type = _CALLINGCONVENTION
 _FUNCTION.fields_by_name['blocks'].message_type = _BLOCK
-_FUNCTION.fields_by_name['stack_vars'].message_type = _STACKVARIABLE
 _FUNCTION.fields_by_name['eh_frame'].message_type = _EXCEPTIONFRAME
+_FUNCTION.fields_by_name['decl'].message_type = _FUNCTIONDECL
 _EXTERNALFUNCTION.fields_by_name['cc'].enum_type = _EXTERNALFUNCTION_CALLINGCONVENTION
+_EXTERNALFUNCTION.fields_by_name['decl'].message_type = _FUNCTIONDECL
 _EXTERNALFUNCTION_CALLINGCONVENTION.containing_type = _EXTERNALFUNCTION
 _DATAREFERENCE.fields_by_name['target_fixup_kind'].enum_type = _DATAREFERENCE_TARGETFIXUPKIND
 _DATAREFERENCE_TARGETFIXUPKIND.containing_type = _DATAREFERENCE
 _EXCEPTIONFRAME.fields_by_name['action'].enum_type = _EXCEPTIONFRAME_ACTION
 _EXCEPTIONFRAME.fields_by_name['ttype'].message_type = _EXTERNALVARIABLE
 _EXCEPTIONFRAME_ACTION.containing_type = _EXCEPTIONFRAME
-_STACKVARIABLE.fields_by_name['ref_eas'].message_type = _REFERENCE
 _SEGMENT.fields_by_name['xrefs'].message_type = _DATAREFERENCE
 _SEGMENT.fields_by_name['vars'].message_type = _VARIABLE
 _MODULE.fields_by_name['funcs'].message_type = _FUNCTION
@@ -1044,9 +1203,16 @@ _MODULE.fields_by_name['segments'].message_type = _SEGMENT
 _MODULE.fields_by_name['external_funcs'].message_type = _EXTERNALFUNCTION
 _MODULE.fields_by_name['external_vars'].message_type = _EXTERNALVARIABLE
 _MODULE.fields_by_name['global_vars'].message_type = _GLOBALVARIABLE
+_MODULE.fields_by_name['preserved_regs'].message_type = _PRESERVEDREGISTERS
+_MODULE.fields_by_name['dead_regs'].message_type = _PRESERVEDREGISTERS
+DESCRIPTOR.message_types_by_name['PreservationRange'] = _PRESERVATIONRANGE
+DESCRIPTOR.message_types_by_name['PreservedRegisters'] = _PRESERVEDREGISTERS
 DESCRIPTOR.message_types_by_name['CodeReference'] = _CODEREFERENCE
 DESCRIPTOR.message_types_by_name['Instruction'] = _INSTRUCTION
 DESCRIPTOR.message_types_by_name['Block'] = _BLOCK
+DESCRIPTOR.message_types_by_name['MemoryLocation'] = _MEMORYLOCATION
+DESCRIPTOR.message_types_by_name['ValueDecl'] = _VALUEDECL
+DESCRIPTOR.message_types_by_name['FunctionDecl'] = _FUNCTIONDECL
 DESCRIPTOR.message_types_by_name['Function'] = _FUNCTION
 DESCRIPTOR.message_types_by_name['ExternalFunction'] = _EXTERNALFUNCTION
 DESCRIPTOR.message_types_by_name['ExternalVariable'] = _EXTERNALVARIABLE
@@ -1054,10 +1220,24 @@ DESCRIPTOR.message_types_by_name['DataReference'] = _DATAREFERENCE
 DESCRIPTOR.message_types_by_name['Variable'] = _VARIABLE
 DESCRIPTOR.message_types_by_name['Reference'] = _REFERENCE
 DESCRIPTOR.message_types_by_name['ExceptionFrame'] = _EXCEPTIONFRAME
-DESCRIPTOR.message_types_by_name['StackVariable'] = _STACKVARIABLE
 DESCRIPTOR.message_types_by_name['GlobalVariable'] = _GLOBALVARIABLE
 DESCRIPTOR.message_types_by_name['Segment'] = _SEGMENT
 DESCRIPTOR.message_types_by_name['Module'] = _MODULE
+DESCRIPTOR.enum_types_by_name['CallingConvention'] = _CALLINGCONVENTION
+
+PreservationRange = _reflection.GeneratedProtocolMessageType('PreservationRange', (_message.Message,), dict(
+  DESCRIPTOR = _PRESERVATIONRANGE,
+  __module__ = 'CFG_pb2'
+  # @@protoc_insertion_point(class_scope:mcsema.PreservationRange)
+  ))
+_sym_db.RegisterMessage(PreservationRange)
+
+PreservedRegisters = _reflection.GeneratedProtocolMessageType('PreservedRegisters', (_message.Message,), dict(
+  DESCRIPTOR = _PRESERVEDREGISTERS,
+  __module__ = 'CFG_pb2'
+  # @@protoc_insertion_point(class_scope:mcsema.PreservedRegisters)
+  ))
+_sym_db.RegisterMessage(PreservedRegisters)
 
 CodeReference = _reflection.GeneratedProtocolMessageType('CodeReference', (_message.Message,), dict(
   DESCRIPTOR = _CODEREFERENCE,
@@ -1079,6 +1259,27 @@ Block = _reflection.GeneratedProtocolMessageType('Block', (_message.Message,), d
   # @@protoc_insertion_point(class_scope:mcsema.Block)
   ))
 _sym_db.RegisterMessage(Block)
+
+MemoryLocation = _reflection.GeneratedProtocolMessageType('MemoryLocation', (_message.Message,), dict(
+  DESCRIPTOR = _MEMORYLOCATION,
+  __module__ = 'CFG_pb2'
+  # @@protoc_insertion_point(class_scope:mcsema.MemoryLocation)
+  ))
+_sym_db.RegisterMessage(MemoryLocation)
+
+ValueDecl = _reflection.GeneratedProtocolMessageType('ValueDecl', (_message.Message,), dict(
+  DESCRIPTOR = _VALUEDECL,
+  __module__ = 'CFG_pb2'
+  # @@protoc_insertion_point(class_scope:mcsema.ValueDecl)
+  ))
+_sym_db.RegisterMessage(ValueDecl)
+
+FunctionDecl = _reflection.GeneratedProtocolMessageType('FunctionDecl', (_message.Message,), dict(
+  DESCRIPTOR = _FUNCTIONDECL,
+  __module__ = 'CFG_pb2'
+  # @@protoc_insertion_point(class_scope:mcsema.FunctionDecl)
+  ))
+_sym_db.RegisterMessage(FunctionDecl)
 
 Function = _reflection.GeneratedProtocolMessageType('Function', (_message.Message,), dict(
   DESCRIPTOR = _FUNCTION,
@@ -1128,13 +1329,6 @@ ExceptionFrame = _reflection.GeneratedProtocolMessageType('ExceptionFrame', (_me
   # @@protoc_insertion_point(class_scope:mcsema.ExceptionFrame)
   ))
 _sym_db.RegisterMessage(ExceptionFrame)
-
-StackVariable = _reflection.GeneratedProtocolMessageType('StackVariable', (_message.Message,), dict(
-  DESCRIPTOR = _STACKVARIABLE,
-  __module__ = 'CFG_pb2'
-  # @@protoc_insertion_point(class_scope:mcsema.StackVariable)
-  ))
-_sym_db.RegisterMessage(StackVariable)
 
 GlobalVariable = _reflection.GeneratedProtocolMessageType('GlobalVariable', (_message.Message,), dict(
   DESCRIPTOR = _GLOBALVARIABLE,

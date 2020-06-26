@@ -1,21 +1,21 @@
 /*
- * Copyright (c) 2017 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef MCSEMA_BC_INSTRUCTION_H_
-#define MCSEMA_BC_INSTRUCTION_H_
+#pragma once
 
 #include <cstdint>
 
@@ -36,7 +36,7 @@ class IntrinsicTable;
 
 namespace mcsema {
 
-struct NativeXref;
+struct NativeInstructionXref;
 struct TranslationContext;
 
 class InstructionLifter : public remill::InstructionLifter {
@@ -48,7 +48,8 @@ class InstructionLifter : public remill::InstructionLifter {
 
   // Lift a single instruction into a basic block.
   remill::LiftStatus LiftIntoBlock(remill::Instruction &inst,
-                                   llvm::BasicBlock *block) override;
+                                   llvm::BasicBlock *block,
+                                   bool is_delayed) override;
 
  protected:
 
@@ -62,15 +63,9 @@ class InstructionLifter : public remill::InstructionLifter {
       remill::Instruction &inst, llvm::BasicBlock *block,
       llvm::Argument *arg, remill::Operand &mem) override;
 
-  // Lift a register operand to a value.
-  llvm::Value *LiftRegisterOperand(
-      remill::Instruction &inst, llvm::BasicBlock *block,
-      llvm::Argument *arg, remill::Operand &reg) override;
-
  private:
 
-  llvm::Value *GetAddress(const NativeXref *cfg_xref);
-  llvm::Value *GetMaskedAddress(const NativeXref *cfg_xref);
+  llvm::Value *GetAddress(const NativeInstructionXref *cfg_xref);
 
   TranslationContext &ctx;
 
@@ -87,5 +82,3 @@ class InstructionLifter : public remill::InstructionLifter {
 };
 
 }  // namespace mcsema
-
-#endif  // MCSEMA_BC_INSTRUCTION_H_

@@ -1,16 +1,18 @@
-// Copyright (c) 2017 Trail of Bits, Inc.
+// Copyright (c) 2020 Trail of Bits, Inc.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as
+// published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version.
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 
 syntax = "proto2";
 
@@ -29,16 +31,25 @@ syntax = "proto2";
 
 package mcsema;
 
+message PreservationRange {
+  required int64 begin_ea = 1;
+  optional int64 end_ea = 2;
+}
+
+message PreservedRegisters {
+  // List of registers that are preserved.
+  repeated string registers = 1;
+
+  // Address of a call instruction around which the registers are preserved,
+  // or of function bodies. In the case of function bodies, we will have
+  // one range per (entry, exit) pair, i.e. if a function has N returns,
+  // then we'll have N ranges.
+  repeated PreservationRange ranges = 2;
+}
+
 // A cross-reference contained within an instruction.
 // Similar to reference from Segment
 message CodeReference {
-  enum TargetType {
-    // Examples: callq  8c0 <_ZN1AC2EPKc>
-    CodeTarget = 0;
-    // Example: lea  0x20094a(%rip),%rdi  # 201049 <global>
-    DataTarget = 1;
-  }
-
   enum OperandType {
     // Example: mov    $0x617400,%r8d
     ImmediateOperand = 0;
@@ -59,32 +70,21 @@ message CodeReference {
     OffsetTable = 4;
   }
 
-  enum Location {
-    Internal = 0;
-    // Is it to external symbol?
-    External = 1;
-  }
+  required  OperandType operand_type = 1;
+  required  int64       ea = 2;
 
-  required  TargetType  target_type = 1;
-  required  OperandType operand_type = 2;
-  required  Location    location = 3;
-  required  int64       ea = 4;
-
-  // For aarch64, since instruction are 32-bit and there may be the need to
-  // build up 64-bit address
-  optional  int64       mask = 5;
-  optional  string      name = 6;
+  // For aarch64 since instruction are 32-bit and there may be the need to build
+  // up 64-bit address across multiple instructions using immediate/displacement operands.
+  optional  int64       mask = 3;
 }
 
 // An instruction inside of a block.
 message Instruction {
   required  int64           ea = 1;
-  required  bytes           bytes = 2;
-  repeated  CodeReference   xrefs = 3;
-  optional  bool            local_noreturn = 4;
+  repeated  CodeReference   xrefs = 2;
 
   // Address of the landing pad
-  optional  uint64          lp_ea = 5;
+  optional  uint64          lp_ea = 3;
 }
 
 // A basic block of instructions inside of a function.
@@ -92,6 +92,45 @@ message Block {
   required  int64       ea = 1;
   repeated  Instruction instructions = 2;
   repeated  int64       successor_eas = 3;
+  required  bool        is_referenced_by_data = 4;
+}
+
+// The location of something stored in a relative position in memory.
+message MemoryLocation {
+  required string register = 1;  // Base register.
+  optional int64  offset = 2;  // Displacement from the base register.
+}
+
+message ValueDecl {
+  required  string type = 1;
+
+  // The value is either resident in memory or in a register.
+  optional  MemoryLocation memory = 2;
+  optional  string register = 3;
+
+  optional  string name = 4;
+}
+
+enum CallingConvention {
+  C = 0;
+  X86_StdCall = 64;
+  X86_FastCall = 65;
+  X86_ThisCall = 70;
+  X86_64_SysV = 78;
+  Win64 = 79;
+  X86_VectorCall = 80;
+  X86_RegCall = 92;
+  AArch64_VectorCall = 97;
+}
+
+message FunctionDecl {
+  repeated ValueDecl parameters = 1;
+  repeated ValueDecl return_values = 2;
+  required ValueDecl return_address = 3;
+  required ValueDecl return_stack_pointer = 4;
+  required bool is_variadic = 5;
+  required bool is_noreturn = 6;
+  required CallingConvention calling_convention = 7;
 }
 
 // A function with an implementation inside of the binary.
@@ -102,8 +141,10 @@ message Function {
   // Can someone else link against the code and use this function?
   required  bool        is_entrypoint = 3;
   optional  string      name = 4;
-  repeated  StackVariable      stack_vars = 5;
-  repeated  ExceptionFrame     eh_frame = 6;
+  repeated  ExceptionFrame     eh_frame = 5;
+
+  // Anvill specification of this function.
+  optional  FunctionDecl decl = 6;
 }
 
 /* A function that is used or referenced within binary, but not implemented
@@ -121,17 +162,22 @@ message ExternalFunction {
   }
 
   required  string            name = 1;
+
   // Address of relocation. Other entry with ea of thunk can be added as well
   required  int64             ea = 2;
 
   required  CallingConvention cc = 3;
+  
   // Does this function return?
   required  bool              has_return = 4;
   required  bool              no_return = 5;
   required  int32             argument_count = 6;
+
   // Linkage information
   required  bool              is_weak = 7;
-  optional  string            signature = 8;
+
+  // Anvill specification of this function.
+  optional  FunctionDecl decl = 8;
 }
 
 // A named symbol defined outside of the binary. For example, `stderr`.
@@ -174,11 +220,8 @@ message DataReference {
   required  int32               width = 2;
 
   // Information about the target of the cross-reference.
-  required  int64               target_ea = 4;
-  required  string              target_name = 5;
-  required  bool                target_is_code = 6;
-
-  required  TargetFixupKind     target_fixup_kind = 8;
+  required  int64               target_ea = 3;
+  required  TargetFixupKind     target_fixup_kind = 4;
 }
 
 /* Represents a named location within a data segment. Variables will often
@@ -216,16 +259,6 @@ message ExceptionFrame {
   required uint64     lp_ea = 5;
   required Action     action = 6;
   repeated ExternalVariable ttype = 7;
-}
-
-// This is optional information, but leads to better lift
-message StackVariable {
-  required string     name = 1;
-  required uint64     size = 2;
-  required int64      sp_offset = 3;
-  optional bool       has_frame = 4;
-  optional string     reg_name = 5;
-  repeated Reference  ref_eas = 6;
 }
 
 // Global variable from original binary
@@ -280,4 +313,7 @@ message Module {
   repeated  ExternalVariable    external_vars = 5;
 
   repeated  GlobalVariable      global_vars = 8;
+
+  repeated  PreservedRegisters  preserved_regs = 9;
+  repeated  PreservedRegisters  dead_regs = 10;
 }

@@ -1,18 +1,21 @@
 /*
- * Copyright (c) 2017 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include "mcsema/BC/Lift.h"
 
 #include <glog/logging.h>
 #include <gflags/gflags.h>
@@ -27,6 +30,7 @@
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/Support/CommandLine.h>
 
 #include <remill/Arch/Arch.h>
 #include <remill/BC/Annotate.h>
@@ -34,7 +38,6 @@
 #include <remill/BC/Version.h>
 
 #include "mcsema/Arch/Arch.h"
-#include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Util.h"
 
 #ifndef LLVM_VERSION_STRING
@@ -56,6 +59,10 @@ DEFINE_string(cfg, "", "Path to the CFG file containing code to lift.");
 
 DEFINE_string(output, "", "Output bitcode file name.");
 
+DEFINE_string(log, "", "Output log filename for lifter.");
+
+DEFINE_int32(loglevel, 2, "Minimum log level for GLOG" );
+
 // Using ',' as it will work well enough on Windows and Linux
 // Other suggestions were ':', which is a path character on Windows
 // and ';', which is an end of statement escape on Linux shells
@@ -65,11 +72,10 @@ DEFINE_string(abi_libraries, "", "Path to one or more bitcode files that contain
 
 DECLARE_bool(version);
 
-DECLARE_bool(disable_optimizer);
 DECLARE_bool(keep_memops);
 DECLARE_bool(explicit_args);
 DECLARE_string(pc_annotation);
-DECLARE_uint64(explicit_args_count);
+DECLARE_uint32(explicit_args_count);
 
 DEFINE_bool(list_supported, false,
             "List instructions that can be lifted.");
@@ -123,7 +129,7 @@ struct ABILibsLoader {
   llvm::Module &module;
   llvm::LLVMContext &ctx;
 
-  Options opts;
+  const Options &opts;
 
   static constexpr const char * g_var_kind = "mcsema.abi.libraries";
 
@@ -151,13 +157,6 @@ struct ABILibsLoader {
       return true;
     }
 
-    // We simply cannot handle va_args properly yet. (Issue #599)
-    if (func.isVarArg() && !opts.explicit_args) {
-        LOG(WARNING) << "Skipped " << func.getName().str()
-                     << ": va_args. (See Issue #599)";
-        return true;
-    }
-
     // There are some problems related to native <-> lifted synchronization
     // without explicit args and function ptrs (entrypoint behaviour)
     if (!FLAGS_explicit_args) {
@@ -176,8 +175,8 @@ struct ABILibsLoader {
   }
 
   void Load(const std::string &path) {
-      LOG(INFO) << "Loading ABI Library: " << path;
-      LoadLibraryIntoModule(path);
+    LOG(INFO) << "Loading ABI Library: " << path;
+    LoadLibraryIntoModule(path);
   }
 
   void Load(const std::vector<std::string> &files) {
@@ -186,10 +185,9 @@ struct ABILibsLoader {
     }
   }
 
-  // Note(lukas): Not sure, which util file this belongs to
+  // NOTE(lukas): Not sure, which util file this belongs to
   bool HasFunctionPtrArg(const llvm::Function &func) {
     for (auto &arg : func.args()) {
-
       auto ptr = llvm::dyn_cast<llvm::PointerType>(arg.getType());
       if(!ptr || !ptr->getElementType()->isFunctionTy()) {
         return true;
@@ -200,7 +198,8 @@ struct ABILibsLoader {
 
 
   // Copy function into module with `name` as it's name (useful if there are aliases)
-  void Copy(llvm::Function &func, llvm::FunctionType *fn_t, const std::string &name) {
+  void Copy(llvm::Function &func, llvm::FunctionType *fn_t,
+            const std::string &name) {
 
     auto dest_func = llvm::Function::Create(fn_t, func.getLinkage(),
                                             name, &module);
@@ -211,9 +210,10 @@ struct ABILibsLoader {
     remill::Annotate<remill::AbiLibraries>(dest_func);
   }
 
-
   bool ShouldCopy(llvm::Function &func, const std::string &name) {
-    return !mcsema::gModule->getFunction(name) && !IsBlacklisted(func) && name != "main";
+    return !mcsema::gModule->getFunction(name) &&
+           !IsBlacklisted(func) &&
+           (name != "main" && name != "_main" && name != "DllMain");
   }
 
   // If function is variadic, mcsema uses generic prototype in form
@@ -231,7 +231,6 @@ struct ABILibsLoader {
       args.push_back( llvm::Type::getInt64Ty( ctx ) );
 
     return llvm::FunctionType::get(ret_type, args, false);
-
   }
 
   void CloneFunction(llvm::Function &func, const std::string &name="") {
@@ -250,7 +249,8 @@ struct ABILibsLoader {
   std::unique_ptr<llvm::Module> LoadABILib(const std::string &path,
                                            const C &search_paths) {
 
-    std::unique_ptr<llvm::Module> abi_lib(remill::LoadModuleFromFile(&ctx, path, true));
+    std::unique_ptr<llvm::Module> abi_lib(
+        remill::LoadModuleFromFile(&ctx, path, true));
     if (abi_lib) {
       return abi_lib;
     }
@@ -297,7 +297,8 @@ struct ABILibsLoader {
     // Declare the global variables from the library in McSema's target module.
     for (auto &var : abi_lib->globals()) {
       auto var_name = var.getName();
-      if (var_name.startswith("__mcsema") || var_name.startswith("__remill")) {
+      if (var_name.startswith("__mcsema") ||
+          var_name.startswith("__remill")) {
         continue;
       }
 
@@ -308,7 +309,6 @@ struct ABILibsLoader {
       if (module.getGlobalVariable(var_name)) {
         continue;
       }
-
 
       auto dest_var = new llvm::GlobalVariable(
           module, var.getType()->getElementType(),
@@ -322,7 +322,7 @@ struct ABILibsLoader {
     }
   }
 
-  void RemoveUnused() {
+  void RemoveUnused(void) {
     UnloadLibraryFromModule(module);
   }
 
@@ -332,8 +332,9 @@ struct ABILibsLoader {
     auto copied_funcs = remill::GetFunctionsByOrigin<
       std::vector<llvm::Function *>,remill::AbiLibraries>(module);
     for (auto func : copied_funcs) {
-      if (!func->hasNUsesOrMore(1))
+      if (!func->hasNUsesOrMore(1)) {
         func->eraseFromParent();
+      }
     }
 
     for (auto &var : module.globals()) {
@@ -351,9 +352,298 @@ struct ABILibsLoader {
       }
     }
   }
-
-
 };
+
+static void FiniBaselineDecls(void) {
+  if (auto gmon_start = mcsema::gModule->getFunction("__gmon_start__");
+      gmon_start && gmon_start->isDeclaration()) {
+    gmon_start->setLinkage(llvm::GlobalValue::WeakAnyLinkage);
+    llvm::ReturnInst::Create(
+        *mcsema::gContext,
+        llvm::BasicBlock::Create(*mcsema::gContext, "", gmon_start));
+  }
+
+  for (auto &func : *mcsema::gModule) {
+    if (func.isDeclaration() && func.hasLocalLinkage()) {
+      func.setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
+    }
+  }
+}
+
+static void InitBaselineDecls(void) {
+  auto &context = *mcsema::gContext;
+  auto module = mcsema::gModule.get();
+
+  auto i8_type = llvm::Type::getInt8Ty(context);
+  auto i32_type = llvm::Type::getInt32Ty(context);
+  auto void_type = llvm::Type::getVoidTy(context);
+  auto argv_type = llvm::PointerType::get(llvm::PointerType::get(i8_type, 0), 0);
+  llvm::Type *param_types_3[3];
+  param_types_3[0] = i32_type;
+  param_types_3[1] = argv_type;
+  param_types_3[2] = argv_type;  // envp.
+
+  const auto main_func_type = llvm::FunctionType::get(
+      i32_type, param_types_3, false);
+
+  auto main_func = llvm::Function::Create(
+      main_func_type,
+      llvm::GlobalValue::ExternalLinkage,
+      "main",
+      module);
+
+  llvm::Function::Create(
+      main_func_type,
+      llvm::GlobalValue::InternalLinkage,
+      "__libc_init",
+      module);
+
+  llvm::Function::Create(
+      main_func_type,
+      llvm::GlobalValue::InternalLinkage,
+      "__libc_first",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "_start",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "__libc_csu_init",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "__libc_csu_fini",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "init",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "fini",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "frame_dummy",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "call_frame_dummy",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "__do_global_dtors",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "__do_global_dtors_aux",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "call___do_global_dtors_aux",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "__do_global_ctors",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "__do_global_ctors_1",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "__do_global_ctors_aux",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "call___do_global_ctors_aux",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::ExternalWeakLinkage,
+      "__gmon_start__",
+      module);
+
+  auto init_func = llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "_init_proc",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      ".init_proc",
+      module);
+
+  auto term_func = llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      "_term_proc",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::InternalLinkage,
+      ".term_proc",
+      module);
+
+  llvm::Type *param_types_7[7];
+  param_types_7[0] = main_func->getType();
+  param_types_7[1] = i32_type;
+  param_types_7[2] = argv_type;
+  param_types_7[3] = init_func->getType();
+  param_types_7[4] = term_func->getType();
+  param_types_7[5] = term_func->getType();
+  param_types_7[6] = llvm::PointerType::get(i32_type, 0);  // Stack end.
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, param_types_7, false),
+      llvm::GlobalValue::ExternalLinkage,
+      "__uClibc_main",
+      module);
+
+  llvm::Type *param_types_8[8];
+  param_types_8[0] = main_func->getType();
+  param_types_8[1] = i32_type;
+  param_types_8[2] = argv_type;
+  param_types_8[3] = llvm::PointerType::get(i8_type, 0); // ELF auxv.
+  param_types_8[4] = main_func->getType();
+  param_types_8[5] = term_func->getType();
+  param_types_8[6] = term_func->getType();
+  param_types_8[7] = llvm::PointerType::get(i32_type, 0);  // Stack end.
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, param_types_8, false),
+      llvm::GlobalValue::ExternalLinkage,
+      "__libc_start_main",
+      module);
+
+  auto abort_func = llvm::Function::Create(
+      llvm::FunctionType::get(void_type, false),
+      llvm::GlobalValue::ExternalLinkage,
+      "abort",
+      module);
+  abort_func->addFnAttr(llvm::Attribute::NoReturn);
+
+  llvm::Type *param_types_1[1];
+  param_types_1[0] = i32_type;
+  auto exit_func = llvm::Function::Create(
+      llvm::FunctionType::get(void_type, param_types_1, false),
+      llvm::GlobalValue::ExternalLinkage,
+      "exit",
+      module);
+  exit_func->addFnAttr(llvm::Attribute::NoReturn);
+
+  exit_func = llvm::Function::Create(
+      llvm::FunctionType::get(void_type, param_types_1, false),
+      llvm::GlobalValue::ExternalLinkage,
+      "_Exit",
+      module);
+  exit_func->addFnAttr(llvm::Attribute::NoReturn);
+
+  param_types_1[0] = llvm::PointerType::get(i8_type, 0);
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, param_types_1, false),
+      llvm::GlobalValue::ExternalWeakLinkage,
+      "_Jv_RegisterClasses",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, param_types_1, false),
+      llvm::GlobalValue::ExternalWeakLinkage,
+      "__deregister_frame_info_bases",
+      module);
+
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, param_types_1, false),
+      llvm::GlobalValue::ExternalWeakLinkage,
+      "__deregister_frame_info",
+      module);
+
+  param_types_1[0] = llvm::PointerType::get(i8_type, 0);
+  llvm::Function::Create(
+      llvm::FunctionType::get(i32_type, param_types_1, true),
+      llvm::GlobalValue::ExternalLinkage,
+      "printf",
+      module);
+
+  llvm::Type *param_types_2[2];
+  param_types_2[0] = llvm::PointerType::get(i8_type, 0);
+  param_types_2[1] = i32_type;
+
+  auto longjmp_func = llvm::Function::Create(
+      llvm::FunctionType::get(void_type, param_types_2, false),
+      llvm::GlobalValue::ExternalLinkage,
+      "longjmp",
+      module);
+  longjmp_func->addFnAttr(llvm::Attribute::NoReturn);
+
+  longjmp_func = llvm::Function::Create(
+      llvm::FunctionType::get(void_type, param_types_2, false),
+      llvm::GlobalValue::ExternalLinkage,
+      "siglongjmp",
+      module);
+  longjmp_func->addFnAttr(llvm::Attribute::NoReturn);
+
+  param_types_2[1] = param_types_2[0];
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, param_types_1, false),
+      llvm::GlobalValue::ExternalWeakLinkage,
+      "__register_frame_info",
+      module);
+
+  llvm::Type *param_types_4[4];
+  param_types_4[0] = llvm::PointerType::get(i8_type, 0);
+  param_types_4[1] = param_types_4[0];
+  param_types_4[2] = param_types_4[0];
+  param_types_4[3] = param_types_4[0];
+  llvm::Function::Create(
+      llvm::FunctionType::get(void_type, param_types_1, false),
+      llvm::GlobalValue::ExternalWeakLinkage,
+      "__register_frame_info_bases",
+      module);
+
+  param_types_4[1] = param_types_4[0];
+  param_types_4[2] = i32_type;
+  param_types_4[3] = param_types_4[0];
+  auto assert_func = llvm::Function::Create(
+      llvm::FunctionType::get(void_type, param_types_4, false),
+      llvm::GlobalValue::ExternalLinkage,
+      "__assert_fail",
+      module);
+  assert_func->addFnAttr(llvm::Attribute::NoReturn);
+}
 
 }  // namespace
 
@@ -377,11 +667,11 @@ int main(int argc, char *argv[]) {
      // This option injects a function call before every lifted instruction.
      // This function is implemented in the McSema runtime and it prints the
      // values of the general purpose registers to `stderr`.
-     << "    [--add_reg_tracer] \\" << std::endl
+     << "    [--add_state_tracer] \\" << std::endl
+     << "    [--add_func_state_tracer] \\" << std::endl
+     << "    [--add_pc_tracer] \\" << std::endl
 
-     // This option tells McSema not to optimize the bitcode. This is useful
-     // for debugging, especially in conjunction with `--add_breakpoints`.
-     << "    [--disable_optimizer] \\" << std::endl
+     << "    [--trace_reg_values=reg1[,reg2[,...]]] \\" << std::endl
 
      // This option tells McSema not to lower Remill's memory access intrinsic
      // functions into LLVM `load` and `store` instructions.
@@ -433,7 +723,7 @@ int main(int argc, char *argv[]) {
      << "    [--legacy_mode] \\" << std::endl
      
      // Print a list of the instructions that can be lifted.
-     << "    [--list-supported]" << std::endl
+     << "    [--list_supported]" << std::endl
 
      // Assign the personality function for exception handling ABIs. It is
      // `__gxx_personality_v0` for libstdc++ and `__gnat_personality_v0` for ADA ABIs.
@@ -441,11 +731,30 @@ int main(int argc, char *argv[]) {
 
      // Print the version and exit.
      << "    [--version]" << std::endl
+
+     // Log file name for the lifter.
+     << "    [--log]" << std::endl
+
+     << "    [--loglevel]" << std::endl
      << std::endl;
 
-  google::InitGoogleLogging(argv[0]);
+  const char * const llvm_argv[] = {
+      "-memdep-block-scan-limit=500",
+      nullptr
+  };
+
+  llvm::cl::ParseCommandLineOptions(1, llvm_argv);
+
   google::SetUsageMessage(ss.str());
   google::ParseCommandLineFlags(&argc, &argv, true);
+
+  if (FLAGS_log.empty()){
+    google::InitGoogleLogging(argv[0]);
+  } else {
+    google::InitGoogleLogging(FLAGS_log.c_str());
+  }
+
+  FLAGS_minloglevel = FLAGS_loglevel;
 
   if (FLAGS_version) {
     PrintVersion();
@@ -484,14 +793,17 @@ int main(int argc, char *argv[]) {
     LOG_IF(WARNING, !FLAGS_pc_annotation.empty())
         << "Changing --pc_annotation to mcsema_real_eip in legacy mode.";
     FLAGS_pc_annotation = "mcsema_real_eip";
-
-    LOG_IF(WARNING, FLAGS_disable_optimizer)
-        << "Re-enabling the optimizer in legacy mode.";
-    FLAGS_disable_optimizer = false;
   }
 
-  mcsema::gModule = remill::LoadTargetSemantics(*mcsema::gContext);
-  mcsema::gArch->PrepareModule(mcsema::gModule.get());
+  mcsema::gModule = remill::LoadArchSemantics(mcsema::gArch);
+
+  InitBaselineDecls();
+
+  const auto zero_var = new llvm::GlobalVariable(
+      *mcsema::gModule, llvm::Type::getInt8Ty(*mcsema::gContext),
+      true, llvm::GlobalValue::ExternalLinkage,
+      nullptr, "__anvill_pc");
+  mcsema::gZero = llvm::ConstantExpr::getPtrToInt(zero_var, mcsema::gWordType);
 
   // Load in a special library before CFG processing. This affects the
   // renaming of exported functions.
@@ -510,7 +822,13 @@ int main(int argc, char *argv[]) {
 
   abi_loader.RemoveUnused();
 
+  FiniBaselineDecls();
+
   remill::StoreModuleToFile(mcsema::gModule.get(), FLAGS_output);
+
+  // Don't waste time reclaiming their memory.
+  mcsema::gModule.release();
+  (void) new std::shared_ptr<llvm::LLVMContext>(mcsema::gContext);
 
   google::ShutDownCommandLineFlags();
   google::ShutdownGoogleLogging();
