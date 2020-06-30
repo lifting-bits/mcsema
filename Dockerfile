@@ -35,6 +35,7 @@ RUN curl https://bootstrap.pypa.io/get-pip.py --output get-pip.py && python2.7 g
 WORKDIR /
 COPY .remill_commit_id ./
 RUN git clone https://github.com/lifting-bits/remill.git && \
+    git clone https://github.com/lifting-bits/anvill.git remill/tools/anvill && \
     cd remill && \
     echo "Using remill commit $(cat ../.remill_commit_id)" && \
     git checkout $(cat ../.remill_commit_id)
