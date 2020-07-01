@@ -18,9 +18,13 @@ import sys
 import argparse
 import logging
 from collections import defaultdict
-import ccsyspath
-import clang.cindex
-from clang.cindex import CursorKind, TypeKind
+
+try:
+  import ccsyspath
+  import clang.cindex
+  from clang.cindex import CursorKind, TypeKind
+except ImportError:
+  exit(0)
 
 try:
   tob_path = os.environ['TRAILOFBITS_LIBRARIES']
