@@ -41,8 +41,6 @@ DEFINE_string(output, "", "Path to output file");
 DEFINE_string(binary, "", "Path to binary to be disassembled");
 DEFINE_string(entrypoint, "main", "Name of entrypoint function");
 DEFINE_bool(pie_mode, false, "Need to be true for pie binaries");
-DEFINE_string(arch, "", "NOT IMPLEMENTED YET");
-DEFINE_string(os, "", "NOT IMPLEMENTED YET");
 
 using namespace Dyninst;
 
