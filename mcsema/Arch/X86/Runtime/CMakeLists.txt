@@ -207,10 +207,19 @@ else()
   endif()
 endif()
 
+
+if(DEFINED REMILL_INCLUDE_LOCATION)
+  set(REMILL_INCLUDE "-I${REMILL_INCLUDE_LOCATION}")
+endif()
+
+if(DEFINED REMILL_SOURCE_DIR)
+  set(REMILL_SOURCE "-I${REMILL_SOURCE_DIR}")
+endif()
+
 # Create a runtime.
 add_custom_command(
   OUTPUT runtime_32.o
-  COMMAND "${CMAKE_CXX_COMPILER}" -std=gnu++11 -isystem "${REMILL_INCLUDE_LOCATION}" -isystem "${MCSEMA_SOURCE_DIR}" -m32 -fPIC -c "${CMAKE_CURRENT_SOURCE_DIR}/Runtime.cpp" -o runtime_32.o
+  COMMAND "${CMAKE_CXX_COMPILER}" -std=gnu++11 "${REMILL_INCLUDE}" "${REMILL_SOURCE}" "${REMILL_SOURCE_DIR}" -I"${MCSEMA_SOURCE_DIR}" -m32 -fPIC -c "${CMAKE_CURRENT_SOURCE_DIR}/Runtime.cpp" -o runtime_32.o
   DEPENDS Runtime.cpp
   COMMENT "Building 32-bit runtime"
 )
@@ -226,7 +235,7 @@ set_source_files_properties(
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
   add_custom_command(
     OUTPUT runtime_64.o
-    COMMAND "${CMAKE_CXX_COMPILER}" -std=gnu++11 -isystem "${REMILL_INCLUDE_LOCATION}" -isystem "${MCSEMA_SOURCE_DIR}" -m64  -fPIC -c "${CMAKE_CURRENT_SOURCE_DIR}/Runtime.cpp" -o runtime_64.o
+    COMMAND "${CMAKE_CXX_COMPILER}" -std=gnu++11 "${REMILL_INCLUDE}" "${REMILL_SOURCE}" -I"${MCSEMA_SOURCE_DIR}" -m64  -fPIC -c "${CMAKE_CURRENT_SOURCE_DIR}/Runtime.cpp" -o runtime_64.o
     DEPENDS Runtime.cpp
     COMMENT "Building 64-bit runtime"
   )

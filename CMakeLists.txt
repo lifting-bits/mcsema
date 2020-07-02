@@ -148,9 +148,11 @@ endif()
 list(APPEND PROJECT_LIBRARIES remill)
 
 # anvill
-find_package(anvill REQUIRED)
-if(NOT anvill_FOUND)
-  message(FATAL_ERROR "McSema depends upon Anvill being cloned into Remill's tools directory")
+if(NOT TARGET anvill-${REMILL_LLVM_VERSION})
+  find_package(anvill REQUIRED)
+  if(NOT anvill_FOUND)
+    message(FATAL_ERROR "McSema depends upon Anvill being cloned into Remill's tools directory")
+  endif()
 endif()
 list(APPEND PROJECT_LIBRARIES anvill-${REMILL_LLVM_VERSION})
 
