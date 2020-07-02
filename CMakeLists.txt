@@ -82,6 +82,14 @@ set_source_files_properties(${PROJECT_PROTOBUFHEADERFILES} PROPERTIES
   COMPILE_FLAGS "-Wno-sign-conversion -Wno-shorten-64-to-32 -Wno-conversion"
 )
 
+# llvm
+find_package(LLVM REQUIRED CONFIG HINTS ${FINDPACKAGE_LLVM_HINTS})
+
+string(REPLACE "." ";" LLVM_VERSION_LIST ${LLVM_PACKAGE_VERSION})
+list(GET LLVM_VERSION_LIST 0 LLVM_MAJOR_VERSION)
+list(GET LLVM_VERSION_LIST 1 LLVM_MINOR_VERSION)
+set(REMILL_LLVM_VERSION "${LLVM_MAJOR_VERSION}.${LLVM_MINOR_VERSION}")
+
 #
 # target settings
 #
@@ -128,8 +136,6 @@ add_dependencies(${MCSEMA_LIFT}
 # libraries
 #
 
-set(ANVILL anvill-${REMILL_LLVM_VERSION})
-
 # remill
 if(NOT TARGET remill)
   if("${PLATFORM_NAME}" STREQUAL "windows")
@@ -142,13 +148,11 @@ endif()
 list(APPEND PROJECT_LIBRARIES remill)
 
 # anvill
-if(NOT TARGET anvill-${REMILL_LLVM_VERSION})
-  message(WARNING "McSema depends upon Anvill being cloned into Remill's tools directory")
+find_package(anvill REQUIRED)
+if(NOT anvill_FOUND)
+  message(FATAL_ERROR "McSema depends upon Anvill being cloned into Remill's tools directory")
 endif()
 list(APPEND PROJECT_LIBRARIES anvill-${REMILL_LLVM_VERSION})
-
-# llvm
-find_package(LLVM REQUIRED CONFIG HINTS ${FINDPACKAGE_LLVM_HINTS})
 
 if (LLVM_Z3_INSTALL_DIR)
   set(need_z3 TRUE)
@@ -166,9 +170,6 @@ if(need_z3)
   endif()
 endif()
 
-string(REPLACE "." ";" LLVM_VERSION_LIST ${LLVM_PACKAGE_VERSION})
-list(GET LLVM_VERSION_LIST 0 LLVM_MAJOR_VERSION)
-list(GET LLVM_VERSION_LIST 1 LLVM_MINOR_VERSION)
 
 set(LLVM_LIBRARIES
   LLVMCore LLVMSupport LLVMAnalysis LLVMipo LLVMIRReader
