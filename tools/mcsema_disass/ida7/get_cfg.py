@@ -1176,6 +1176,13 @@ def recover_regions(M, exported_vars, global_vars=[]):
       region_name = seg_name
       if begin_ea in seg_names:
         region_name = seg_names[begin_ea]
+
+      # If the region is copy of the shared data, don't recover it
+      if is_runtime_external_data_reference(begin_ea):
+        DEBUG("WARNING: Region {} [{:x}, {:x}) in segment {} is copy of shared data".format(
+            region_name, begin_ea, end_ea, seg_name))
+        continue
+
       recover_region(M, region_name, begin_ea, end_ea, exported_vars)
 
 def recover_external_functions(M):
