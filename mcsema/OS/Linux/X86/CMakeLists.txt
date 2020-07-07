@@ -54,18 +54,18 @@ function(add_runtime_helper target_name source_file address_bit_size)
 endfunction()
 
 add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc_amd64.c ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.h
+  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.c ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.h
   DEPENDS ${source_file}
   COMMAND env TRAILOFBITS_LIBRARIES=${LIBRARY_REPOSITORY_ROOT} python3 ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py
-  		--arch "amd64" --type "c" --input ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.pph --output ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc_amd64.c 
+  		--arch "amd64" --type "c" --input ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.pph --output ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.c 
 )
 
-add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc_x86.c ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.h
-  DEPENDS ${source_file}
-  COMMAND env TRAILOFBITS_LIBRARIES=${LIBRARY_REPOSITORY_ROOT} python3 ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py 
-        --arch "x86" --type "c" --input ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.pph --output ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc_x86.c
-)
+#add_custom_command(
+#  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc_x86.c ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.h
+#  DEPENDS ${source_file}
+#  COMMAND env TRAILOFBITS_LIBRARIES=${LIBRARY_REPOSITORY_ROOT} python3 ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py 
+#        --arch "x86" --type "c" --input ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.pph --output ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc_x86.c
+#)
 
 #add_custom_command(
 #  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libcpp_amd64.c
@@ -82,11 +82,11 @@ add_custom_command(
 #)
 
 add_runtime_helper(ABI_exceptions_x86 "ABI_exceptions.cpp" 32)
-add_runtime_helper(ABI_libc_x86 "ABI_libc_x86.c" 32 "ABI_libc.h")
+add_runtime_helper(ABI_libc_x86 "ABI_libc.c" 32 "ABI_libc.h")
 #add_runtime_helper(ABI_libcpp_x86 "ABI_libcpp_x86.c" 32 "ABI_libc.h")
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
   add_runtime_helper(ABI_exceptions_amd64 "ABI_exceptions.cpp" 64)
-  add_runtime_helper(ABI_libc_amd64 "ABI_libc_amd64.c" 64 "ABI_libc.h")
+  add_runtime_helper(ABI_libc_amd64 "ABI_libc.c" 64 "ABI_libc.h")
 #  add_runtime_helper(ABI_libcpp_amd64 "ABI_libcpp_amd64.c" 32 "ABI_libc.h")
 endif()

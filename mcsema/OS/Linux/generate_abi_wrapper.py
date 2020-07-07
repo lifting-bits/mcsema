@@ -19,21 +19,17 @@ import argparse
 import logging
 from collections import defaultdict
 
+
+tob_path = os.environ['TRAILOFBITS_LIBRARIES']
+cc_path = tob_path + "/llvm/bin/clang"
+
 try:
   import ccsyspath
-  import clang.cindex
-  from clang.cindex import CursorKind, TypeKind
+  syspath = ccsyspath.system_include_paths(cc_path)
+  print(syspath)
 except ImportError:
-  exit(0)
+  syspath = list()
 
-try:
-  tob_path = os.environ['TRAILOFBITS_LIBRARIES']
-  cc_path = tob_path + "/llvm/bin/clang"
-  clang.cindex.Config.set_library_path(tob_path + "/llvm/lib/")
-except KeyError:
-  cc_path = 'clang'
-
-syspath = ccsyspath.system_include_paths(cc_path)
 
 SUPPORTED_ARCH = ["x86", "amd64"]
 
@@ -43,14 +39,7 @@ ARCH_NAME = ""
 
 ABI_LIBRARY_TYPE = "c"
 
-try:
-  if os.path.exists("debug.log"):
-    os.remove("debug.log")
-
-  logging.basicConfig(filename="debug.log",level=logging.DEBUG)
-
-except:
-  pass
+logging.basicConfig(filename="debug.log",level=logging.DEBUG)
 
 cc_pragma = """
 
@@ -109,11 +98,16 @@ def is_blacklisted_func(func_name):
     return True
   return False
 
-
 def visit_func_decl(node):
   """ Visit the function decl node and create a map of
       function name with the mangled name
   """
+  try:
+    from clang.cindex import CursorKind, TypeKind
+
+  except ImportError:
+    return
+    
   if node.kind == CursorKind.FUNCTION_DECL:
     func_name = node.spelling
     mangled_name = node.mangled_name
@@ -126,6 +120,7 @@ def visit_func_decl(node):
 
   for i in node.get_children():
     visit_func_decl(i)
+
 
 def write_cc_file(hfile, outfile):
   """ Generate ABI library source for the c headers; 
@@ -171,18 +166,26 @@ def write_cxx_file(hfile, outfile):
     print("Number of functions: {}".format(len(FUNCDECL_LIST)))
 
 def write_library_file(hfile, outfile):
-  cc_index = clang.cindex.Index.create()
-  libc_type = 'c++' if ABI_LIBRARY_TYPE == "cpp" else 'c'
-  if ARCH_NAME.lower() == 'amd64'.lower():
-    tu = cc_index.parse(hfile, args=['-x', libc_type, '-m64'])
+  """ Generate the library files """
+  try:
+    import clang.cindex
+    cc_index = clang.cindex.Index.create()
+    libc_type = 'c++' if ABI_LIBRARY_TYPE == "cpp" else 'c'
+    if ARCH_NAME.lower() == 'amd64'.lower():
+      tu = cc_index.parse(hfile, args=['-x', libc_type, '-m64'])
 
-  elif ARCH_NAME.lower() == 'x86'.lower():
-    tu = cc_index.parse(hfile, args=['-x', libc_type, '-m32'])
+    elif ARCH_NAME.lower() == 'x86'.lower():
+      tu = cc_index.parse(hfile, args=['-x', libc_type, '-m32'])
 
-  else:
-    print("Unsupported architecture")
-    
-  visit_func_decl(tu.cursor)
+    else:
+      print("Unsupported architecture")
+
+    visit_func_decl(tu.cursor)
+
+  except ImportError:
+    libc_type = 'c++' if ABI_LIBRARY_TYPE == "cpp" else 'c'
+    pass
+
   if libc_type is 'c':
     write_cc_file(hfile, outfile)
   elif libc_type is 'c++':
@@ -191,7 +194,8 @@ def write_library_file(hfile, outfile):
 def write_header_file(file, headers):
   basename = os.path.splitext(file)
   gen_filename = basename[0] + ".h"
-
+  print(gen_filename)
+  print(headers)
   with open(gen_filename, "w") as s:
     s.write("\n")
     s.write("// {}\n".format(cc_path))
@@ -220,6 +224,7 @@ def write_header_file(file, headers):
     s.flush()
     return gen_filename
 
+  
 def parse_headers(infile, outfile):
   header_files = set()
   with open(infile, "rb") as f:
@@ -233,8 +238,8 @@ def parse_headers(infile, outfile):
     hfile = write_header_file(infile, header_files)
     write_library_file(hfile, outfile)
 
+
 if __name__ == "__main__":
-  
   parser = argparse.ArgumentParser()
   
   parser.add_argument(

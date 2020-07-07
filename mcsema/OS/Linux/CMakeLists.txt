@@ -16,5 +16,5 @@
 cmake_minimum_required(VERSION 3.2)
 project(linux_abi)
 
-#add_subdirectory(X86)
+add_subdirectory(X86)
 
