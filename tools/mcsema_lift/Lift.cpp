@@ -321,37 +321,6 @@ struct ABILibsLoader {
       dest_var->setMetadata(g_var_kind, node);
     }
   }
-
-  void RemoveUnused(void) {
-    UnloadLibraryFromModule(module);
-  }
-
-  // Remove unused functions and globals brought in from the library.
-  void UnloadLibraryFromModule(llvm::Module &module) {
-
-    auto copied_funcs = remill::GetFunctionsByOrigin<
-      std::vector<llvm::Function *>,remill::AbiLibraries>(module);
-    for (auto func : copied_funcs) {
-      if (!func->hasNUsesOrMore(1)) {
-        func->eraseFromParent();
-      }
-    }
-
-    for (auto &var : module.globals()) {
-      auto md = var.getMetadata(g_var_kind);
-      if (!md) {
-        continue;
-      }
-
-      if (var.hasName() && var.getName().startswith("llvm.global")) {
-        continue;
-      }
-
-      if (!var.hasNUsesOrMore(1)) {
-        var.eraseFromParent();
-      }
-    }
-  }
 };
 
 static void FiniBaselineDecls(void) {
@@ -819,8 +788,6 @@ int main(int argc, char *argv[]) {
   CHECK(mcsema::LiftCodeIntoModule(cfg_module))
       << "Unable to lift CFG from " << FLAGS_cfg << " into module "
       << FLAGS_output;
-
-  abi_loader.RemoveUnused();
 
   FiniBaselineDecls();
 
