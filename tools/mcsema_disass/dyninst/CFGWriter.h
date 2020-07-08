@@ -55,7 +55,6 @@ private:
   void WriteGlobalVariables();
   void SweepStubs();
   void WriteInternalFunctions();
-  void WriteLocalVariables();
 
   void WriteFunctionBlocks(Dyninst::ParseAPI::Function *func,
                            mcsema::Function *cfg_internal_func);
@@ -97,9 +96,6 @@ private:
 
   bool HandleXref(mcsema::Instruction *, Dyninst::Address, bool force=true);
 
-  bool IsNoReturn(const std::string& str);
-  void GetNoReturns();
-
   void CheckDisplacement(Dyninst::InstructionAPI::Expression *,
                          mcsema::Instruction *);
   bool IsExternal(Dyninst::Address addr) const;
@@ -112,8 +108,6 @@ private:
 
   ExternalFunctionManager ext_funcs_m;
   SectionManager section_m;
-
-  std::unordered_set<std::string> no_ret_funcs;
 
   std::map<Dyninst::Address, CrossXref<mcsema::Segment>> code_xrefs_to_resolve;
   std::map<Dyninst::Address, CrossXref<mcsema::Instruction>> inst_xrefs_to_resolve;

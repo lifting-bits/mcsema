@@ -190,8 +190,8 @@ void ResolveOffsetTable(const std::set<Dyninst::Address> &successors,
     auto cfg_inst = cfg_block->mutable_instructions(
         cfg_block->instructions_size() - 1);
     if (!cfg_inst->xrefs_size()) {
-      AddCodeXref(cfg_inst, CodeReference::DataTarget, CodeReference::OffsetTable,
-                  CodeReference::Internal, table_ea.value());
+      AddCodeXref(cfg_inst, CodeReference::OffsetTable,
+                   table_ea.value());
     }
   }
 
@@ -282,8 +282,6 @@ CFGWriter::CFGWriter(mcsema::Module &m,
     }
   }
 
-  GetNoReturns();
-
   // Calculate where can magic section start without
   // potentialy overwriting part of the binary
   //TODO(lukas): Move out
@@ -359,48 +357,7 @@ void CFGWriter::Write() {
     }
   }
 
-  WriteLocalVariables();
   module.set_name(FLAGS_binary);
-}
-
-// TODO(lukas): Need to get all xrefs for local variable
-void CFGWriter::WriteLocalVariables() {
-  // We need to get SymtabAPI version of functions
-  std::vector<SymtabAPI::Function *> funcs;
-  symtab.getAllFunctions(funcs);
-  for (auto func : funcs) {
-    auto cfg_func = ctx.func_map.find(func->getOffset());
-    if (cfg_func == ctx.func_map.end()) {
-      continue;
-    }
-
-    std::vector<SymtabAPI::localVar *> locals;
-    func->getLocalVariables(locals);
-
-    // getParams resets the vector passed to it
-    std::vector<SymtabAPI::localVar *> params;
-    func->getParams(params);
-    for (auto a : params) {
-      locals.push_back(a);
-    }
-
-    for (auto local : locals) {
-      auto cfg_var = cfg_func->second->add_stack_vars();
-      cfg_var->set_name(local->getName());
-      cfg_var->set_size(local->getType()->getSize());
-      auto location_list = local->getLocationLists();
-
-      LOG(INFO)
-          << std::hex << "Found local variable with name " << local->getName()
-          << " with size: " << local->getType()->getSize();
-
-      for (auto &location : location_list) {
-        cfg_var->set_sp_offset(location.frameOffset);
-        LOG(INFO) << std::hex << "\tat sp_offset: 0x" << location.frameOffset;
-      }
-
-    }
-  }
 }
 
 void CFGWriter::WriteExternalVariables() {
@@ -682,7 +639,6 @@ void CFGWriter::WriteInstruction(InstructionAPI::Instruction *instruction,
     instBytes += (int)instruction->rawByte(offset);
   }
 
-  cfg_instruction->set_bytes(instBytes);
   cfg_instruction->set_ea(addr);
 
   std::vector<InstructionAPI::Operand> operands;
@@ -779,18 +735,6 @@ void CFGWriter::CheckDisplacement(Dyninst::InstructionAPI::Expression *expr,
   }
 }
 
-void CFGWriter::GetNoReturns() {
-  for (auto f : code_object.funcs()) {
-    if (f->retstatus() == ParseAPI::NORETURN) {
-      no_ret_funcs.insert(f->name());
-    }
-  }
-}
-
-bool CFGWriter::IsNoReturn(const std::string &name) {
-  return no_ret_funcs.find(name) != no_ret_funcs.end();
-}
-
 
 //TODO(lukas): This is hacky
 void CFGWriter::HandleCallInstruction(InstructionAPI::Instruction *instruction,
@@ -826,9 +770,6 @@ void CFGWriter::HandleCallInstruction(InstructionAPI::Instruction *instruction,
     }
   }
 
-  if (IsNoReturn(cfg_instruction->mutable_xrefs(0)->name())) {
-    cfg_instruction->set_local_noreturn(true);
-  }
 }
 
 Address CFGWriter::immediateNonCall(InstructionAPI::Immediate* imm,
@@ -839,9 +780,7 @@ Address CFGWriter::immediateNonCall(InstructionAPI::Immediate* imm,
   if (!ctx.HandleCodeXref({addr, a, cfg_instruction}, section_m, false)) {
     if (section_m.IsCode(a)) {
       AddCodeXref(cfg_instruction,
-                  CodeReference::DataTarget,
                   CodeReference::ImmediateOperand,
-                  CodeReference::Internal,
                   a);
 
       LOG(INFO) << std::hex
@@ -951,7 +890,6 @@ void CFGWriter::HandleNonCallInstruction(
           // in CrossXref<mcsema::Instruction>
           if (ctx.HandleCodeXref({0, *a, cfg_instruction}, section_m)) {
             auto cfg_xref = GetLastXref(cfg_instruction);
-            cfg_xref->set_target_type(CodeReference::CodeTarget);
             cfg_xref->set_operand_type(CodeReference::ControlFlowOperand);
           }
           direct_values[i] = *a;
