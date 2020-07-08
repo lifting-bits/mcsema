@@ -23,9 +23,8 @@ RUN apt-get update && \
 # Build-time dependencies go here
 FROM trailofbits/cxx-common:llvm${LLVM_VERSION}-${DISTRO_BASE}-${ARCH} as deps
 ARG LIBRARIES
-
 RUN apt-get update && \
-    apt-get install -qqy python2.7 python3 python3-pip libc6-dev wget liblzma-dev zlib1g-dev libtinfo-dev curl git build-essential ninja-build ccache && \
+    apt-get install -qqy python2.7 python3 python3-pip libc6-dev wget liblzma-dev zlib1g-dev libtinfo-dev curl git build-essential ninja-build libselinux1-dev libbsd-dev ccache && \
     if [ "$(uname -m)" = "x86_64" ]; then dpkg --add-architecture i386 && apt-get update && apt-get install -qqy gcc-multilib g++-multilib zip zlib1g-dev:i386; fi && \
     rm -rf /var/lib/apt/lists/* && \
     pip3 install ccsyspath
