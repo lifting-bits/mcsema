@@ -104,10 +104,6 @@ static llvm::Function *DetachCallValueFunc(void) {
 static llvm::Function *ImplementNativeToLiftedCallback(
     const NativeObject *cfg_func, const std::string &callback_name) {
 
-  if (auto cb_func = gModule->getFunction(callback_name); cb_func) {
-    return cb_func;
-  }
-
   // If the native name of the function doesn't yet exist then add it in.
   auto func = gModule->getFunction(cfg_func->lifted_name);
   CHECK(func != nullptr)
@@ -167,15 +163,17 @@ static llvm::Function *ImplementNativeToLiftedCallback(
 
   // Create the callback function that calls the inline assembly.
   auto callback_type = llvm::FunctionType::get(void_type, false);
-  auto callback_func = llvm::Function::Create(
-      callback_type, llvm::GlobalValue::InternalLinkage,  // Tentative linkage.
-      callback_name, gModule.get());
+  auto callback_func = gModule->getFunction(callback_name);
+  if (!callback_func) {
+    callback_func = llvm::Function::Create(
+        callback_type, llvm::GlobalValue::InternalLinkage,  // Tentative linkage.
+        callback_name, gModule.get());
 
+  }
   callback_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
   callback_func->addFnAttr(llvm::Attribute::Naked);
   callback_func->addFnAttr(llvm::Attribute::NoInline);
   callback_func->addFnAttr(llvm::Attribute::NoBuiltin);
-
   // Create the inline assembly. We use memory operands (
   std::vector<llvm::Type *> asm_arg_types;
   std::vector<llvm::Value *> asm_args;
@@ -236,7 +234,12 @@ static llvm::Function *ImplementNativeToLiftedCallback(
   asm_args.push_back(attach_func_ptr);
 
   ir.CreateCall(asm_func, asm_args);
-  ir.CreateRetVoid();
+
+  if (auto ret_type = callback_func->getReturnType(); ret_type->isVoidTy()) {
+    ir.CreateRetVoid();
+  } else {
+    ir.CreateRet(llvm::UndefValue::get(ret_type));
+  }
 
   if (!FLAGS_pc_annotation.empty()) {
     legacy::AnnotateInsts(callback_func, cfg_func->ea);
