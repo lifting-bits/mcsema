@@ -1,18 +1,19 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import idautils
 import idaapi
@@ -25,6 +26,8 @@ import traceback
 import collections
 import itertools
 import pprint
+
+import ida_bytes
 
 from collections import namedtuple
 # Bring in utility libraries.
@@ -65,8 +68,8 @@ def make_array(ea, size):
     flags = idc.get_full_flags(ea)
     if not idc.isByte(flags) or idc.get_item_size(ea) != 1:
       idc.del_items(ea, idc.DOUNK_SIMPLE, 1)
-      idc.MakeByte(ea)
-    idc.MakeArray(ea, size)
+      ida_bytes.create_data(ea, ida_bytes.FF_BYTE, 1, ida_idaapi.BADADDR)
+    idc.make_array(ea, size)
 
 def read_string(ea):
   s = idc.get_strlit_contents(ea, -1, idc.ASCSTR_C)

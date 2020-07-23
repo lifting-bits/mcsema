@@ -79,6 +79,8 @@ Why would anyone translate binaries *back* to bitcode?
 | [Python](https://www.python.org/) | 2.7 | 
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
+| [python-clang](https://pypi.org/project/clang/) | 3.5.0 |
+| [ccsyspath](https://pypi.org/project/ccsyspath/) | 1.1.0 |
 | [IDA Pro](https://www.hex-rays.com/products/ida) | 7.1+ |
 | [Binary Ninja](https://binary.ninja/) | Latest |
 | [Dyninst](https://www.dyninst.org/) | 9.3.2 |
@@ -87,16 +89,13 @@ Why would anyone translate binaries *back* to bitcode?
 
 ### Docker
 
-#### Step 1: Clone McSema
+#### Step 1: Download Dockerfile
 
-```sh
-git clone --depth 1 https://github.com/lifting-bits/mcsema.git
-cd mcsema
-```
+`wget https://raw.githubusercontent.com/lifting-bits/mcsema/master/tools/Dockerfile`
 
-#### Step 2: Add your disassembler (optional)
+#### Step 2: Add your disassembler
 
-Currently IDA, Binary Ninja, and Dyninst are supported for control-flow recovery, it's left as an exercise to the reader to install your disassembler of choice in a Dockerfile, but an example of installing Binary Ninja is provided (remember for Docker that paths need to be relative to where you built from):
+Currently IDA, Binary Ninja, and Dyninst are supported for control-flow recovery, it's left as an exercise to the reader to install your disassembler of choice, but an example of installing Binary Ninja is provided (remember for Docker that paths need to be relative to where you built from):
 ```
 ADD local-relative/path/to/binaryninja/ /root/binaryninja/
 ADD local-relative/path/to/.binaryninja/ /root/.binaryninja/ # <- Make sure there's no `lastrun` file

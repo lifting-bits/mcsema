@@ -15,7 +15,7 @@ project(nc_amd64)
 cmake_minimum_required(VERSION 3.2)
 
 set(PROJECT_CXXFLAGS -Wall -Werror)
-set(PROJECT_LINKERFLAGS -lm -lresolv)
+set(PROJECT_LINKERFLAGS -lm -lresolv -lbsd)
 
 AddBinaryTest(${PROJECT_NAME}
   BINARY ${PROJECT_NAME}

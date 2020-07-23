@@ -1,17 +1,18 @@
 /*
- * Copyright (c) 2018 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -39,11 +40,8 @@ auto *GetLastXref(T *cfg) {
 
 mcsema::CodeReference *AddCodeXref(
     mcsema::Instruction * instruction,
-    mcsema::CodeReference::TargetType tarTy,
     mcsema::CodeReference_OperandType opTy,
-    mcsema::CodeReference_Location location,
-    Dyninst::Address addr,
-    const std::string &name="");
+    Dyninst::Address addr);
 
 template<typename CFGUnit=mcsema::Segment>
 struct CrossXref {
@@ -61,15 +59,12 @@ struct CrossXref {
   }
 
   mcsema::DataReference *WriteDataXref(
-      bool is_code=false,
       uint64_t width=8) const {
     LOG(INFO) << "\tFound xref targeting " << std::hex << target_ea;
     auto cfg_xref = segment->add_xrefs();
     cfg_xref->set_ea(ea);
     cfg_xref->set_width(width);
     cfg_xref->set_target_ea(target_ea);
-    cfg_xref->set_target_name(target_name);
-    cfg_xref->set_target_is_code(is_code);
     // TODO(lukas): This will almost certainly cause problems once
     cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
     return cfg_xref;
@@ -102,7 +97,7 @@ struct DisassContext {
                                          bool is_code=false,
                                          uint64_t width=8) {
     width = std::min(width, 8ul);
-    auto cfg_xref = xref.WriteDataXref(is_code, width);
+    auto cfg_xref = xref.WriteDataXref(width);
     data_xrefs.insert({xref.ea, cfg_xref});
     return cfg_xref;
   }
@@ -142,22 +137,16 @@ struct DisassContext {
   bool WriteFact(const CrossXref<mcsema::Instruction> &xref,
                  mcsema::Function *fact) {
     AddCodeXref(xref.segment,
-                mcsema::CodeReference::DataTarget,
                 mcsema::CodeReference::ControlFlowOperand,
-                mcsema::CodeReference::Internal,
-                fact->ea(),
-                fact->name());
+                fact->ea());
     return true;
   }
 
   bool WriteFact(const CrossXref<mcsema::Instruction> &xref,
                  mcsema::GlobalVariable *fact) {
     AddCodeXref(xref.segment,
-                mcsema::CodeReference::DataTarget,
                 mcsema::CodeReference::MemoryOperand,
-                mcsema::CodeReference::Internal,
-                fact->ea(),
-                fact->name());
+                fact->ea());
     return true;
   }
 
@@ -165,22 +154,16 @@ struct DisassContext {
                  mcsema::ExternalFunction *fact) {
     // Mapping to magic_section
     AddCodeXref(xref.segment,
-                mcsema::CodeReference::DataTarget,
                 mcsema::CodeReference::ControlFlowOperand,
-                mcsema::CodeReference::External,
-                magic_section.GetAllocated(xref.target_ea),
-                fact->name());
+                magic_section.GetAllocated(xref.target_ea));
     return true;
   }
 
   bool WriteFact(const CrossXref<mcsema::Instruction> &xref,
                  mcsema::Variable *fact) {
     AddCodeXref(xref.segment,
-                mcsema::CodeReference::DataTarget,
                 mcsema::CodeReference::MemoryOperand,
-                mcsema::CodeReference::Internal,
-                fact->ea(),
-                fact->name());
+                fact->ea());
     return true;
   }
 
@@ -191,11 +174,8 @@ struct DisassContext {
       addr = fact->ea();
     }
     AddCodeXref(xref.segment,
-                mcsema::CodeReference::DataTarget,
                 mcsema::CodeReference::MemoryOperand,
-                mcsema::CodeReference::External,
-                addr,
-                fact->name());
+                addr);
     return true;
   }
 
@@ -203,9 +183,7 @@ struct DisassContext {
   bool WriteFact(const CrossXref<mcsema::Instruction> &xref,
                  mcsema::DataReference *fact) {
     AddCodeXref(xref.segment,
-                mcsema::CodeReference::DataTarget,
                 mcsema::CodeReference::MemoryOperand,
-                mcsema::CodeReference::Internal,
                 fact->ea());
     return true;
   }
@@ -244,9 +222,7 @@ struct DisassContext {
     if (section_m.IsInRegions({".data", ".rodata", ".bss"},
                               xref.target_ea)) {
       AddCodeXref(xref.segment,
-                  mcsema::CodeReference::DataTarget,
                   mcsema::CodeReference::MemoryOperand,
-                  mcsema::CodeReference::Internal,
                   xref.target_ea);
       return true;
     }
@@ -255,9 +231,7 @@ struct DisassContext {
     for (auto a : segment_eas) {
       if (a == xref.target_ea) {
         AddCodeXref(xref.segment,
-                    mcsema::CodeReference::DataTarget,
                     mcsema::CodeReference::MemoryOperand,
-                    mcsema::CodeReference::Internal,
                     xref.target_ea);
         return true;
       }
@@ -267,9 +241,7 @@ struct DisassContext {
       LOG(INFO) << "Could not regonize xref anywhere target_ea 0x"
                 << std::hex << xref.target_ea << " forcing it";
       AddCodeXref(xref.segment,
-                  mcsema::CodeReference::DataTarget,
                   mcsema::CodeReference::MemoryOperand,
-                  mcsema::CodeReference::Internal,
                   xref.target_ea);
       return true;
     }

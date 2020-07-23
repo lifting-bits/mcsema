@@ -1,16 +1,17 @@
-# Copyright (c) 2018 Trail of Bits, Inc.
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 project(mcsema)
 cmake_minimum_required(VERSION 3.2)
@@ -81,19 +82,79 @@ set_source_files_properties(${PROJECT_PROTOBUFHEADERFILES} PROPERTIES
   COMPILE_FLAGS "-Wno-sign-conversion -Wno-shorten-64-to-32 -Wno-conversion"
 )
 
+# llvm
+find_package(LLVM REQUIRED CONFIG HINTS ${FINDPACKAGE_LLVM_HINTS})
+
+string(REPLACE "." ";" LLVM_VERSION_LIST ${LLVM_PACKAGE_VERSION})
+list(GET LLVM_VERSION_LIST 0 LLVM_MAJOR_VERSION)
+list(GET LLVM_VERSION_LIST 1 LLVM_MINOR_VERSION)
+set(REMILL_LLVM_VERSION "${LLVM_MAJOR_VERSION}.${LLVM_MINOR_VERSION}")
+
+#
+# target settings
+#
+
+set(MCSEMA_LIFT mcsema-lift-${REMILL_LLVM_VERSION})
+
+add_executable(${MCSEMA_LIFT}
+  ${PROJECT_PROTOBUFSOURCEFILES}
+
+  mcsema/Arch/Arch.cpp
+
+  mcsema/CFG/CFG.cpp
+
+  mcsema/BC/Callback.cpp
+  mcsema/BC/External.cpp
+  mcsema/BC/Function.cpp
+  mcsema/BC/Instruction.cpp
+  mcsema/BC/Legacy.cpp
+  mcsema/BC/Lift.cpp
+  mcsema/BC/Optimize.cpp
+  mcsema/BC/Segment.cpp
+  mcsema/BC/Util.cpp
+
+  tools/mcsema_lift/Lift.cpp
+)
+
+# Copy mcsema-disass in
+add_custom_command(
+  TARGET protobuf_python_module_ida POST_BUILD
+  DEPENDS {PROJECT_PROTOBUFPYTHONMODULE}
+  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/ida7
+)
+
+# this is needed for the #include directives with absolutes paths to work correctly; it must
+# also be set to PUBLIC since mcsema-lift includes some files directly
+list(APPEND PROJECT_INCLUDEDIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_dependencies(${MCSEMA_LIFT}
+  semantics
+  protobuf_python_module_ida
+  protobuf_python_module_binja)
+
+#
+# libraries
+#
+
 # remill
 if(NOT TARGET remill)
   if("${PLATFORM_NAME}" STREQUAL "windows")
     set(REMILL_FINDPACKAGE_HINTS HINTS "${CMAKE_INSTALL_PREFIX}/remill/lib")
   endif()
+
   find_package(remill REQUIRED ${REMILL_FINDPACKAGE_HINTS})
 endif()
 
 list(APPEND PROJECT_LIBRARIES remill)
-list(APPEND PROJECT_INCLUDEDIRECTORIES ${remill_INCLUDE_DIRS})
 
-# llvm
-find_package(LLVM REQUIRED CONFIG HINTS ${FINDPACKAGE_LLVM_HINTS})
+# anvill
+if(NOT TARGET anvill-${REMILL_LLVM_VERSION})
+  find_package(anvill REQUIRED)
+  if(NOT anvill_FOUND)
+    message(FATAL_ERROR "McSema depends upon Anvill being cloned into Remill's tools directory")
+  endif()
+endif()
+list(APPEND PROJECT_LIBRARIES anvill-${REMILL_LLVM_VERSION})
 
 if (LLVM_Z3_INSTALL_DIR)
   set(need_z3 TRUE)
@@ -111,9 +172,6 @@ if(need_z3)
   endif()
 endif()
 
-string(REPLACE "." ";" LLVM_VERSION_LIST ${LLVM_PACKAGE_VERSION})
-list(GET LLVM_VERSION_LIST 0 LLVM_MAJOR_VERSION)
-list(GET LLVM_VERSION_LIST 1 LLVM_MINOR_VERSION)
 
 set(LLVM_LIBRARIES
   LLVMCore LLVMSupport LLVMAnalysis LLVMipo LLVMIRReader
@@ -137,58 +195,6 @@ list(APPEND PROJECT_LIBRARIES glog::glog)
 # gflags
 find_package(gflags REQUIRED)
 list(APPEND PROJECT_LIBRARIES gflags)
-
-
-#
-# target settings
-#
-
-set(MCSEMA_LLVM_VERSION "${LLVM_MAJOR_VERSION}.${LLVM_MINOR_VERSION}")
-set(MCSEMA_LIFT mcsema-lift-${MCSEMA_LLVM_VERSION})
-
-add_executable(${MCSEMA_LIFT}
-  ${PROJECT_PROTOBUFSOURCEFILES}
-
-  mcsema/Arch/ABI.cpp
-  mcsema/Arch/Arch.cpp
-
-  mcsema/CFG/CFG.cpp
-
-  mcsema/BC/Callback.cpp
-  mcsema/BC/External.cpp
-  mcsema/BC/Function.cpp
-  mcsema/BC/Instruction.cpp
-  mcsema/BC/Legacy.cpp
-  mcsema/BC/Lift.cpp
-  mcsema/BC/Optimize.cpp
-  mcsema/BC/Segment.cpp
-  mcsema/BC/Util.cpp
-
-  tools/mcsema_lift/Lift.cpp
-)
-
-
-# Copy mcsema-disass in
-add_custom_command(
-  TARGET protobuf_python_module_ida POST_BUILD
-  DEPENDS {PROJECT_PROTOBUFPYTHONMODULE}
-  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/ida
-)
-
-add_custom_command(
-  TARGET protobuf_python_module_binja POST_BUILD
-  DEPENDS {PROJECT_PROTOBUFPYTHONMODULE}
-  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/binja
-)
-
-# this is needed for the #include directives with absolutes paths to work correctly; it must
-# also be set to PUBLIC since mcsema-lift includes some files directly
-list(APPEND PROJECT_INCLUDEDIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR})
-
-add_dependencies(${MCSEMA_LIFT}
-  semantics protobuf_python_module_ida
-  protobuf_python_module_binja
-)
 
 #
 # target settings

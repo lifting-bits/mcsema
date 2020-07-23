@@ -1,23 +1,27 @@
 /*
- * Copyright (c) 2017 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include "mcsema/BC/Segment.h"
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include <algorithm>
+#include <iomanip>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -36,9 +40,7 @@
 #include <remill/BC/Util.h>
 
 #include "mcsema/Arch/Arch.h"
-#include "mcsema/Arch/ABI.h"
 #include "mcsema/BC/Callback.h"
-#include "mcsema/BC/Segment.h"
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
 
@@ -57,25 +59,23 @@ DEFINE_string(libc_destructor, "",
               "function returns. For example, on GNU-based systems, this is "
               "typically `__libc_csu_fini`.");
 
+DEFINE_bool(force_embed_data_refs, false,
+            "Should data-to-code and data-to-data cross-references be force-"
+            "embedded within data segments? This is a good option to enable "
+            "when using McSema-produced bitcode in KLEE, as it avoids doing "
+            "lazy cross-reference initialization.");
+
+DECLARE_bool(disable_aliases);
+
 namespace mcsema {
 namespace {
-
-// Returns `true` if all the bytes in `data` are zero.
-static bool IsZero(const std::string &data) {
-  for (auto b : data) {
-    if (b) {
-      return false;
-    }
-  }
-  return true;
-}
 
 // Lets us decide if we can use a constant aggregate zero value, i.e.
 // direct LLVM to put this data into the `.bss` segment.
 static bool IsZero(const NativeSegment *cfg_seg) {
   for (const auto &cfg_seg_entry : cfg_seg->entries) {
-    auto &entry = cfg_seg_entry.second;
-    if (!entry.blob || !IsZero(entry.blob->data)) {
+    const auto &entry = cfg_seg_entry.second;
+    if (!entry.blob || !entry.blob->is_zero) {
       return false;
     }
   }
@@ -86,19 +86,38 @@ static bool IsZero(const NativeSegment *cfg_seg) {
 // byte arrays, interspersed with cross-references, which will be represented
 // as (pointers casted to) integers.
 static llvm::StructType *GetSegmentType(const NativeSegment *cfg_seg) {
+  std::stringstream ss;
+  ss << cfg_seg->lifted_name << "_type";
+  const auto type_name = ss.str();
+
+  auto seg_type = gModule->getTypeByName(type_name);
+  if (seg_type) {
+    return seg_type;
+  }
+
   std::vector<llvm::Type *> entry_types;
 
   auto byte_type = llvm::Type::getInt8Ty(*gContext);
+
+  if (cfg_seg->padding) {
+    auto arr_type = llvm::ArrayType::get(byte_type, cfg_seg->padding);
+    entry_types.push_back(arr_type);
+  }
+
   for (const auto &cfg_seg_entry : cfg_seg->entries) {
-    auto &entry = cfg_seg_entry.second;
+    const auto &entry = cfg_seg_entry.second;
     if (entry.blob) {
-      auto arr_type = llvm::ArrayType::get(byte_type, entry.blob->data.size());
+      auto arr_type = llvm::ArrayType::get(byte_type, entry.blob->size);
       entry_types.push_back(arr_type);
 
     } else if (entry.xref) {
-      auto val_type = llvm::Type::getIntNTy(
-          *gContext, static_cast<unsigned>(entry.xref->width * 8));
-      entry_types.push_back(val_type);
+      const auto entry_size = entry.xref->width * 8;
+      if (entry_size == gArch->address_size) {
+        entry_types.push_back(llvm::Type::getInt8PtrTy(*gContext, 0));
+      } else {
+        entry_types.push_back(llvm::Type::getIntNTy(
+            *gContext, static_cast<unsigned>(entry_size)));
+      }
 
     } else {
       LOG(FATAL)
@@ -107,17 +126,14 @@ static llvm::StructType *GetSegmentType(const NativeSegment *cfg_seg) {
     }
   }
 
-  std::stringstream ss;
-  ss << cfg_seg->lifted_name << "_type";
-
-  auto seg_type = llvm::StructType::create(entry_types, ss.str(), true);
+  seg_type = llvm::StructType::create(entry_types, type_name, true);
   CHECK(nullptr != seg_type)
       << "Unable to create structure type for segment " << cfg_seg->name
       << " beginning at " << std::hex << cfg_seg->ea;
 
   llvm::DataLayout data_layout(gModule.get());
   auto seg_size = data_layout.getTypeAllocSize(seg_type);
-  CHECK(seg_size == cfg_seg->size)
+  CHECK_EQ(seg_size, (cfg_seg->size + cfg_seg->padding))
       << "Size of structure type of segment " << cfg_seg->name
       << " is " << seg_size << " but was expected to be " << cfg_seg->size;
 
@@ -127,77 +143,9 @@ static llvm::StructType *GetSegmentType(const NativeSegment *cfg_seg) {
 static llvm::GlobalValue::ThreadLocalMode ThreadLocalMode(
     const NativeObject *cfg_obj) {
   if (cfg_obj->is_thread_local) {
-    return llvm::GlobalValue::GeneralDynamicTLSModel;
+    return llvm::GlobalValue::InitialExecTLSModel;
   } else {
     return llvm::GlobalValue::NotThreadLocal;
-  }
-}
-
-static llvm::GlobalVariable *GlobalVariable(
-    const NativeSegment *cfg_seg, std::string lifted_name) {
-  auto seg_type = GetSegmentType(cfg_seg);
-
-  auto seg_var = new llvm::GlobalVariable(
-      *gModule, seg_type, cfg_seg->is_read_only,
-      llvm::GlobalValue::InternalLinkage, nullptr,
-      lifted_name, nullptr, ThreadLocalMode(cfg_seg));
-
-  if (cfg_seg->is_exported) {
-    seg_var->setLinkage(llvm::GlobalValue::ExternalLinkage);
-  }
-
-  return seg_var;
-}
-
-// Declare a data segment, and return a global value pointing to that segment.
-static void DeclareSegment(const NativeSegment *cfg_seg) {
-  cfg_seg->seg_var = gModule->getGlobalVariable(cfg_seg->lifted_name);
-
-  if (cfg_seg->seg_var) {
-    // If the variable is exported and zero initialized (not having xrefs),
-    // No need to initialize these variables
-    if (cfg_seg->is_exported && cfg_seg->seg_var->hasExternalLinkage()) {
-      cfg_seg->needs_initializer = !IsZero(cfg_seg);
-    } else {
-      // If there is a variable with the same name, rename the variable
-      // and set the needs_initializer flag;
-      std::stringstream ss;
-      ss << "internal_" << cfg_seg->lifted_name;
-      cfg_seg->seg_var = GlobalVariable(cfg_seg, ss.str());
-
-      LOG(ERROR)
-          << "Segment variable '" << cfg_seg->lifted_name
-          << "' was already defined";
-
-      cfg_seg->needs_initializer = true;
-    }
-  } else {
-    cfg_seg->seg_var = GlobalVariable(cfg_seg, cfg_seg->lifted_name);
-  }
-}
-
-// Declare named variables that point into the data segment. The program being
-// lifted may have cross-references that addresses meaningfully named (global)
-// variables within a segment, so we want to try to preserve those names,
-// treating them as GEPs into the segment's data.
-static void DeclareVariables(const NativeModule *cfg_module) {
-  for (auto &entry : cfg_module->ea_to_var) {
-    auto cfg_var = reinterpret_cast<const NativeVariable *>(
-        entry.second->Get());
-
-    if (cfg_var && cfg_var->is_external) {
-      continue;
-    }
-
-    CHECK(cfg_var && cfg_var->segment && !cfg_var->name.empty())
-        << "Invalid variable at " << std::hex << entry.first;
-
-    auto cfg_seg = cfg_var->segment;
-    CHECK(cfg_var->ea >= cfg_seg->ea)
-        << "Variable " << cfg_var->name << " at " << std::hex << cfg_var->ea
-        << " is incorrectly assigned to the segment " << cfg_seg->name;
-
-    cfg_var->address = LiftEA(cfg_seg, cfg_var->ea);
   }
 }
 
@@ -274,15 +222,13 @@ static llvm::Function *CreateMcSemaInitFiniImpl(
 
 static llvm::Function *GetOrCreateMcSemaConstructor(void) {
   static llvm::Function *gInitFunc = nullptr;
-  if (!gInitFunc) {
-    gInitFunc = CreateMcSemaInitFiniImpl(
-        "__mcsema_constructor", "llvm.global_ctors");
-
-    // Make sure that the `__mcsema_constructor` calls the xref initializer
-    // as it's first thing.
-    llvm::IRBuilder<> ir(&(gInitFunc->front().front()));
-    ir.CreateCall(GetOrCreateMcSemaInitializer());
+  if (gInitFunc) {
+    return gInitFunc;
   }
+
+  gInitFunc = CreateMcSemaInitFiniImpl(
+      "__mcsema_constructor", "llvm.global_ctors");
+
   return gInitFunc;
 }
 
@@ -313,28 +259,33 @@ static llvm::Function *GetOrCreateMcSemaDestructor(void) {
 // handle them by emulating this runtime initialization. We create a special
 // constructor function of our own, `__mcsema_constructor`, that will contain
 // code that can do these initializations.
-static void LazyInitXRef(const NativeXref *xref, llvm::Type *extern_addr_type,
+static void LazyInitXRef(const NativeXref *xref,
                          llvm::Constant *target_addr_const) {
   auto init_func = GetOrCreateMcSemaInitializer();
   llvm::BasicBlock *block = &init_func->back();
   llvm::IRBuilder<> ir(block);
   ir.SetInsertPoint(&block->front());
 
-  auto seg = xref->segment->seg_var;
-  if (seg->isConstant()) {
+  if (xref->segment->is_external) {
     LOG(ERROR)
+        << "Ignoring lazy initialization of cross-reference to "
+        << std::hex << xref->target_ea << " at " << xref->ea
+        << " in external segment '" << xref->segment->name << "' at "
+        << xref->segment->ea << std::dec;
+    return;
+  }
+
+  auto seg = llvm::dyn_cast<llvm::GlobalVariable>(xref->segment->Pointer());
+  if (seg->isConstant()) {
+    LOG(WARNING)
         << "Marking " << seg->getName().str() << " as non-constant to "
-        << "support lazy initialization of reference to " << xref->target_name
-        << " from " << std::hex << xref->ea;
+        << "support lazy initialization of reference to " << std::hex
+        << xref->target_ea << " from " << xref->ea << std::dec;
     seg->setConstant(false);
   }
 
-  if (!target_addr_const || target_addr_const->isNullValue()) {
-    LOG_IF(FATAL, !xref->var)
-        << "Cannot perform lazy relocation of non-variable cross-reference "
-        << "from " << std::hex << xref->ea << " to " << xref->target_ea
-        << std::dec << " (" << xref->target_name << ")";
-    target_addr_const = xref->var->address;
+  if (target_addr_const->isNullValue()) {
+    return;
   }
 
   llvm::Value *target_addr = target_addr_const;
@@ -343,8 +294,8 @@ static void LazyInitXRef(const NativeXref *xref, llvm::Type *extern_addr_type,
     case NativeXref::kAbsoluteFixup: {
       CHECK(!xref->var || !xref->var->is_thread_local)
           << "Cannot do absolute fixup from " << std::hex << xref->ea
-          << " to thread-local variable " << xref->target_name << " at "
-          << std::hex << xref->target_ea;
+          << " to thread-local variable at "
+          << std::hex << xref->target_ea << std::dec;
       // `target_addr` already has the right value.
       break;
     }
@@ -352,13 +303,12 @@ static void LazyInitXRef(const NativeXref *xref, llvm::Type *extern_addr_type,
     case NativeXref::kThreadLocalOffsetFixup: {
       CHECK(xref->var != nullptr)
           << "Non-variable thread-local cross-reference from "
-          << std::hex << xref->ea << " to " << xref->target_ea << std::dec
-          << " (" << xref->target_name << ")";
+          << std::hex << xref->ea << " to " << xref->target_ea << std::dec;
 
       CHECK(xref->var->is_thread_local)
           << "Cannot do thread-local fixup from " << std::hex << xref->ea
-          << " to non-thread-local variable " << xref->target_name << " at "
-          << std::hex << xref->target_ea;
+          << " to non-thread-local variable at "
+          << std::hex << xref->target_ea << std::dec;
 
       static llvm::Value *thread_base = nullptr;
       if (!thread_base) {
@@ -369,40 +319,45 @@ static void LazyInitXRef(const NativeXref *xref, llvm::Type *extern_addr_type,
     }
   }
 
-  if (xref->width < gArch->address_size) {
-    target_addr = ir.CreateTrunc(target_addr, extern_addr_type);
-  }
-
-  auto addr_of_xref = LiftEA(xref->segment, xref->ea);
-  auto ptr_to_xref = ir.CreateIntToPtr(
-      addr_of_xref, llvm::PointerType::get(extern_addr_type, 0));
-
-  ir.CreateStore(target_addr, ptr_to_xref);
+  auto addr_of_xref = LiftXrefInData(xref->segment, xref->ea, false);
+  ir.CreateStore(target_addr, addr_of_xref);
 }
 
 // Fill in the contents of the data segment.
-static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
+static llvm::Constant *FillDataSegment(const NativeModule *cfg_module,
+                                       const NativeSegment *cfg_seg,
                                        llvm::StructType *seg_type) {
   if (IsZero(cfg_seg)) {
     return llvm::ConstantAggregateZero::get(seg_type);
   }
 
-  unsigned i = 0;
 
   std::vector<llvm::Constant *> entry_vals;
-  for (const auto &cfg_seg_entry : cfg_seg->entries) {
 
+  // We might add some padding on the beginning of this
+  unsigned i = 0;
+  if (cfg_seg->padding) {
+    auto byte_type = llvm::Type::getInt8Ty(*gContext);
+    auto arr_type = llvm::ArrayType::get(byte_type, cfg_seg->padding);
+    entry_vals.push_back(llvm::ConstantAggregateZero::get(arr_type));
+    ++i;
+  }
+
+  for (auto &cfg_seg_entry : cfg_seg->entries) {
     auto &entry = cfg_seg_entry.second;
     auto entry_type = seg_type->getContainedType(i++);
 
     // This entry is an opaque sequence of bytes.
     if (entry.blob) {
-      if (IsZero(entry.blob->data)) {
+      if (entry.blob->is_zero) {
         entry_vals.push_back(llvm::ConstantAggregateZero::get(entry_type));
 
-      } else {
+      } else if (auto bytes = cfg_module->FindBytes(entry.blob->ea, entry.blob->size);
+                 bytes && bytes.Size() == entry.blob->size) {
+
+        const llvm::StringRef str_data(bytes.ToString().data(), bytes.Size());
         auto data = llvm::ConstantDataArray::getString(
-            *gContext, entry.blob->data, false /* AddNull */);
+            *gContext, str_data, false /* AddNull */);
 
         CHECK(data->getType() == entry_type)
             << "Type mismatch: Got "
@@ -411,94 +366,91 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
             << remill::LLVMThingToString(entry_type);
 
         entry_vals.push_back(data);
+
+      } else {
+        LOG(ERROR)
+            << "Could not find data backing " << std::hex << entry.blob->ea
+            << std::dec << " in segment " << cfg_seg->name;
+        entry_vals.push_back(llvm::ConstantAggregateZero::get(entry_type));
       }
 
     // This entry is a cross-reference.
-    } else {
-      CHECK(nullptr != entry.xref)
-          << "Empty entry at " << std::hex << entry.ea
-          << " in segment " << cfg_seg->name;
+    } else if (entry.xref) {
 
-      auto val_size = static_cast<unsigned>(entry.xref->width * 8);
-      auto val_type = llvm::Type::getIntNTy(*gContext, val_size);
       auto &xref = entry.xref;
       llvm::Constant *val = nullptr;
 
-      CHECK(val_size <= gArch->address_size)
+      CHECK((entry.xref->width * 8) <= gArch->address_size)
           << "Cross-reference at " << std::hex
           << xref->ea << " to " << std::hex << xref->target_ea
           << " is too wide at " << entry.xref->width << " bytes";
 
-      CHECK(val_type == entry_type)
-          << entry.xref->width << "-byte cross-reference at " << std::hex
-          << xref->ea << " to " << std::hex << xref->target_ea
-          << " doesn't match the type of the segment entry "
-          << remill::LLVMThingToString(entry_type);
+      auto be_lazy = false;
 
       // Pointer to a (possibly external) function.
-      if (auto cfg_func = xref->func) {
-        if (cfg_func->is_external) {
-          val = gModule->getFunction(cfg_func->name);
-        } else {
-          val = GetNativeToLiftedCallback(cfg_func);
-        }
-
-        val = llvm::ConstantExpr::getPtrToInt(val, gWordType);
-        CHECK(val != nullptr)
-            << "Can't insert cross reference to function "
-            << cfg_func->name << " at " << std::hex << cfg_seg_entry.first
-            << " in segment " << cfg_seg->name;
+      if (xref->func) {
+        const auto cfg_func = xref->func->Get();
+        val = cfg_func->Pointer();
 
       // Pointer to a global (possibly external) variable.
-      } else if (auto cfg_var = xref->var) {
-        if (cfg_var->is_external || cfg_var->is_thread_local) {
-          LOG(INFO)
-              << "Adding runtime initializer for cross reference to variable "
-              << cfg_var->name << " at " << std::hex << cfg_seg_entry.first
-              << " in segment " << cfg_seg->name;
-          LazyInitXRef(xref.get(), val_type, val);
-          val = llvm::Constant::getNullValue(gWordType);
-        } else {
-          val = cfg_var->address;
-        }
-
-        CHECK(val != nullptr)
-            << "Can't insert cross reference to variable "
-            << cfg_var->name << " at " << std::hex << cfg_seg_entry.first
-            << " in segment " << cfg_seg->name;
+      } else if (xref->var) {
+        const auto cfg_var = xref->var->Get();
+        val = cfg_var->Pointer();
+        be_lazy = cfg_var->is_external || cfg_var->is_thread_local;
 
       // Pointer to an unnamed location inside of a data segment.
+      } else if (xref->target_segment) {
+        const auto target_seg = xref->target_segment;
+        val = LiftXrefInData(target_seg, xref->target_ea, false);
+        be_lazy = target_seg->is_external || target_seg->is_thread_local;
+
       } else {
-        val = LiftEA(xref->target_segment, xref->target_ea);
-      }
-
-      // Scale and add the value in. We need to fit it to its original width.
-      if (val_size > gArch->address_size) {
-        val = llvm::ConstantExpr::getZExt(val, val_type);
-
-      // Pointer truncation is generating the weird code for static
-      // initialization of segment variables which is causing problem
-      // during recompilations. Use Lazy initialization of the variable
-      //    segXXXX__gcc_except_table
-      // Wrongly generated static initializer looks like following:
-      //    .long   _ZTI12out_of_range&-1
-      //    .long   _ZTI17special_condition&-1
-      } else if (val_size < gArch->address_size) {
-        if (xref->var != nullptr) {
-          LazyInitXRef(xref.get(), val_type, val);
-          val = llvm::ConstantInt::getNullValue(val_type);
+        val = llvm::ConstantInt::get(gWordType, xref->target_ea);
+        if (entry_type->isPointerTy()) {
+          val = llvm::ConstantExpr::getIntToPtr(val, entry_type);
         } else {
-          val = llvm::ConstantExpr::getTrunc(val, val_type);
+          val = llvm::ConstantExpr::getIntToPtr(
+              val, llvm::Type::getInt8PtrTy(*gContext));
         }
       }
 
-      CHECK(val->getType() == entry_type)
+      auto val_type = llvm::dyn_cast<llvm::PointerType>(val->getType());
+      CHECK_NOTNULL(val_type);
+
+      if (val_type->getAddressSpace()) {
+        val_type = llvm::PointerType::get(val_type->getElementType(), 0);
+        val = llvm::ConstantExpr::getAddrSpaceCast(val, val_type);
+      }
+
+      if (entry_type->isIntegerTy()) {
+        val = llvm::ConstantExpr::getPtrToInt(val, gWordType);
+        if ((gArch->address_size / 8) > xref->width) {
+          val = llvm::ConstantExpr::getTrunc(val, entry_type);
+          be_lazy = true;
+        }
+
+      } else if (val_type != entry_type) {
+        CHECK(entry_type->isPointerTy());
+        val = llvm::ConstantExpr::getBitCast(val, entry_type);
+      }
+
+      if (be_lazy && !FLAGS_force_embed_data_refs) {
+        LazyInitXRef(xref.get(), val);
+        val = llvm::Constant::getNullValue(entry_type);
+      }
+
+      CHECK_EQ(val->getType(), entry_type)
           << "Type mismatch: Got "
           << remill::LLVMThingToString(val->getType())
           << " but expected "
           << remill::LLVMThingToString(entry_type);
 
       entry_vals.push_back(val);
+
+    } else {
+      LOG(FATAL)
+          << "Empty entry at " << std::hex << entry.ea
+          << " in segment " << cfg_seg->name;
     }
   }
 
@@ -506,68 +458,196 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
 }
 
 // Fill all the data segments in a given region.
-static void FillSegment(const NativeSegment *cfg_seg) {
-  auto seg = cfg_seg->seg_var;
-  if (cfg_seg->needs_initializer) {
-    CHECK_NOTNULL(seg);
-    auto seg_type = llvm::dyn_cast<llvm::StructType>(remill::GetValueType(seg));
-
-    // This might be null if there are two lifted variables with same name and one of them is exported
-    // and the exported variable is having xrefs or notnull.
-    CHECK_NOTNULL(seg_type);
-    seg->setInitializer(FillDataSegment(cfg_seg, seg_type));
+static void FillSegment(const NativeModule *cfg_module,
+                        const NativeSegment *cfg_seg) {
+  if (cfg_seg->entries.empty()) {
+    CHECK(cfg_seg->is_external && !cfg_seg->is_exported);
+    return;
   }
+
+  auto seg = llvm::dyn_cast<llvm::GlobalVariable>(cfg_seg->Pointer());
+  CHECK_NOTNULL(seg);
+  if (seg->hasInitializer()) {
+    return;  // Already initialized, e.g. due to `->Get()`.
+  }
+
+  auto seg_type = llvm::dyn_cast<llvm::StructType>(remill::GetValueType(seg));
+
+  // This might be null if there are two lifted variables with same name and
+  // one of them is exported and the exported variable is having xrefs or
+  // notnull.
+  CHECK_NOTNULL(seg_type);
+  seg->setInitializer(FillDataSegment(cfg_module, cfg_seg, seg_type));
 }
 
 }  // namespace
 
+
+llvm::Constant *NativeVariable::Pointer(void) const {
+  CHECK(!is_external);
+  CHECK_NOTNULL(segment);
+  const auto cfg_seg = segment->Get();
+  CHECK(!cfg_seg->is_external);
+
+  const auto &alias_name = is_exported && !name.empty() ? name : lifted_name;
+  auto alias = gModule->getNamedAlias(alias_name);
+  if (alias) {
+    return alias;
+  }
+
+  auto ret = LiftXrefInData(segment, ea, false  /* cast_to_int */);
+  if (!FLAGS_disable_aliases && is_exported) {
+    auto ptr_type = llvm::dyn_cast<llvm::PointerType>(ret->getType());
+    auto alias = llvm::GlobalAlias::create(
+        ptr_type->getElementType(), ptr_type->getAddressSpace(),
+        llvm::GlobalValue::ExternalLinkage, alias_name, ret, gModule.get());
+    ret = alias;
+
+    module->AddNameToAddress(alias_name, ea);
+
+    if (cfg_seg->is_thread_local) {
+      alias->setThreadLocalMode(llvm::GlobalValue::InitialExecTLSModel);
+    }
+  }
+  return ret;
+}
+
+llvm::Constant *NativeVariable::Address(void) const {
+  return llvm::ConstantExpr::getPtrToInt(Pointer(), gWordType);
+}
+
+llvm::Constant *NativeSegment::Address(void) const {
+  auto ret = llvm::ConstantExpr::getPtrToInt(Pointer(), gWordType);
+  if (padding) {
+    ret = llvm::ConstantExpr::getAdd(
+        ret, llvm::ConstantInt::get(gWordType, padding));
+  }
+  return ret;
+}
+
+llvm::Constant *NativeSegment::Pointer(void) const {
+  const auto &var_name = (is_exported || is_external) ? name : lifted_name;
+
+  auto lifted_var = gModule->getGlobalVariable(
+      var_name, true  /* AllowInternal */);
+
+  if (lifted_var) {
+    return lifted_var;
+  }
+
+  module->AddNameToAddress(var_name, ea);
+
+  if (is_external) {
+    LOG(INFO)
+        << "Adding external segment " << name << " at "
+        << std::hex << ea << std::dec;
+
+    llvm::Type* var_type = nullptr;
+
+    CHECK_NE(0, size)
+        << "The size of the external variable '" << name << "' at "
+        << std::hex << ea << std::dec << " cannot be zero";
+
+    // Handle external variables of up to 128 bits as intgers
+    // Anything else is treated as an array of bytes
+    switch(size) {
+      case 0:
+        // Why is this zero length? This should never happen
+        // Attempt a fix and output a warning
+        LOG(ERROR)
+            << "The variable '" << name << "' at " << std::hex << ea
+            << std::dec << " has size of zero; Assuming it should be size 1";
+        var_type = llvm::Type::getInt8Ty(*gContext);
+        break;
+      case 1: // 8 bit integer
+      case 2: // 16 bit integer
+      case 4: // 32 bit integer
+      case 8: // 64 bit integer
+      case 16: // 128 bit integer
+        var_type = llvm::Type::getIntNTy(
+            *gContext, static_cast<unsigned>(size * 8u));
+        break;
+
+        // An array of bytes
+      default: {
+        auto byte_type = llvm::Type::getInt8Ty(*gContext);
+        var_type = llvm::ArrayType::get(
+            byte_type, static_cast<unsigned>(size));
+        break;
+      }
+    }
+
+    lifted_var = new llvm::GlobalVariable(
+        *gModule, var_type, false, llvm::GlobalValue::ExternalLinkage,
+        nullptr, var_name, nullptr, ThreadLocalMode(this));
+
+  } else {
+    const auto linkage = is_exported ?
+                         llvm::GlobalValue::ExternalLinkage :
+                         llvm::GlobalValue::InternalLinkage;
+    LOG(INFO)
+        << "Adding internal segment " << name;
+
+    lifted_var = new llvm::GlobalVariable(
+        *gModule, GetSegmentType(this), is_read_only,
+        linkage, nullptr, var_name, nullptr,
+        ThreadLocalMode(this));
+  }
+
+  if (ea) {
+    const auto alignment = 1u << __builtin_ctzl(ea - padding);
+#if LLVM_VERSION_NUMBER >= LLVM_VERSION(10, 0)
+    lifted_var->setAlignment(llvm::MaybeAlign(alignment));
+#else
+    lifted_var->setAlignment(alignment);
+#endif
+  }
+
+  return lifted_var;
+}
+
 llvm::Function *GetOrCreateMcSemaInitializer(void) {
   static llvm::Function *gInitFunc = nullptr;
-  if (!gInitFunc) {
-    LOG(INFO)
-          << "Creating __mcsema_early_init function to pre-initialize runtime.";
-
-    gInitFunc = llvm::Function::Create(
-        llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext), false),
-        llvm::GlobalValue::InternalLinkage,
-        "__mcsema_early_init", gModule.get());
-
-    auto bool_type = llvm::Type::getInt1Ty(*gContext);
-    auto check_var = new llvm::GlobalVariable(
-        *gModule, bool_type, false, llvm::GlobalValue::InternalLinkage,
-        llvm::Constant::getNullValue(bool_type));
-
-    auto entry = llvm::BasicBlock::Create(*gContext, "", gInitFunc);
-    auto already_done = llvm::BasicBlock::Create(*gContext, "", gInitFunc);
-    auto lazy_xref = llvm::BasicBlock::Create(*gContext, "", gInitFunc);
-
-    llvm::IRBuilder<> ir(entry);
-
-    auto guard = ir.CreateLoad(check_var, true);
-    ir.CreateCondBr(guard, already_done, lazy_xref);
-
-    ir.SetInsertPoint(already_done);
-    ir.CreateRetVoid();
-
-    // Last basic block will have lazy xrefs injected into it.
-    ir.SetInsertPoint(lazy_xref);
-    ir.CreateStore(llvm::ConstantInt::get(bool_type, 1), check_var, true);
-    ir.CreateRetVoid();
+  if (gInitFunc) {
+    return gInitFunc;
   }
+
+  LOG(INFO)
+        << "Creating __mcsema_early_init function to pre-initialize runtime.";
+
+  gInitFunc = llvm::Function::Create(
+      llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext), false),
+      llvm::GlobalValue::InternalLinkage,
+      "__mcsema_early_init", gModule.get());
+
+  auto bool_type = llvm::Type::getInt1Ty(*gContext);
+  auto check_var = new llvm::GlobalVariable(
+      *gModule, bool_type, false, llvm::GlobalValue::InternalLinkage,
+      llvm::Constant::getNullValue(bool_type));
+
+  auto entry = llvm::BasicBlock::Create(*gContext, "", gInitFunc);
+  auto already_done = llvm::BasicBlock::Create(*gContext, "", gInitFunc);
+  auto lazy_xref = llvm::BasicBlock::Create(*gContext, "", gInitFunc);
+
+  llvm::IRBuilder<> ir(entry);
+
+  auto guard = ir.CreateLoad(check_var, true);
+  ir.CreateCondBr(guard, already_done, lazy_xref);
+
+  ir.SetInsertPoint(already_done);
+  ir.CreateRetVoid();
+
+  // Last basic block will have lazy xrefs injected into it.
+  ir.SetInsertPoint(lazy_xref);
+  ir.CreateStore(llvm::ConstantInt::get(bool_type, 1), check_var, true);
+  ir.CreateRetVoid();
+
   return gInitFunc;
 }
 
-void DeclareDataSegments(const NativeModule *cfg_module) {
-  for (auto &cfg_seg_entry : cfg_module->segments) {
-    DeclareSegment(cfg_seg_entry.second.get());
-  }
-
-  DeclareVariables(cfg_module);
-}
-
 void DefineDataSegments(const NativeModule *cfg_module) {
-  for (auto &cfg_seg_entry : cfg_module->segments) {
-    FillSegment(cfg_seg_entry.second.get());
+  for (const auto &cfg_seg : cfg_module->segments) {
+    FillSegment(cfg_module, cfg_seg.get());
   }
 }
 
@@ -587,7 +667,7 @@ bool DetectAndSetInitFiniCode(const NativeModule *cfg_module) {
 
   for (const auto &cfg_func : cfg_module->ea_to_func) {
     for (auto &init_fini_func : init_fini_pairs) {
-      if (cfg_func.second->name ==  init_fini_func.first) {
+      if (cfg_func.second->name == init_fini_func.first) {
         init_fini_func.second = true;
       }
     }
@@ -616,19 +696,19 @@ void CallInitFiniCode(const NativeModule *cfg_module) {
   }
 
   for (const auto &entry : cfg_module->ea_to_func) {
-    auto &cfg_func = entry.second;
+    const auto &cfg_func = entry.second;
     llvm::Function *callback = nullptr;
     llvm::Instruction *insert_point = nullptr;
 
     if (FLAGS_libc_constructor.size() &&
         FLAGS_libc_constructor == cfg_func->name) {
-      callback = GetNativeToLiftedCallback(cfg_func.get());
+      callback = llvm::dyn_cast<llvm::Function>(cfg_func->Pointer());
       auto init_func = GetOrCreateMcSemaConstructor();
       insert_point = &(init_func->front().back());
 
     } else if (FLAGS_libc_destructor.size() &&
                FLAGS_libc_destructor == cfg_func->name) {
-      callback = GetNativeToLiftedCallback(cfg_func.get());
+      callback = llvm::dyn_cast<llvm::Function>(cfg_func->Pointer());
       auto fini_func = GetOrCreateMcSemaDestructor();
       insert_point = &(fini_func->front().front());
     }

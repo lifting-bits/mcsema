@@ -23,18 +23,21 @@ RUN apt-get update && \
 # Build-time dependencies go here
 FROM trailofbits/cxx-common:llvm${LLVM_VERSION}-${DISTRO_BASE}-${ARCH} as deps
 ARG LIBRARIES
-
 RUN apt-get update && \
-    apt-get install -qqy python2.7 libc6-dev wget liblzma-dev zlib1g-dev libtinfo-dev curl git build-essential ninja-build ccache && \
+    apt-get install -qqy python2.7 python3 python3-pip libc6-dev wget liblzma-dev zlib1g-dev libtinfo-dev curl git build-essential ninja-build libselinux1-dev libbsd-dev ccache && \
     if [ "$(uname -m)" = "x86_64" ]; then dpkg --add-architecture i386 && apt-get update && apt-get install -qqy gcc-multilib g++-multilib zip zlib1g-dev:i386; fi && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    pip3 install ccsyspath
 
 # needed for 20.04 support until we migrate to py3
 RUN curl https://bootstrap.pypa.io/get-pip.py --output get-pip.py && python2.7 get-pip.py
 
+RUN update-alternatives --install /usr/bin/python2 python2 /usr/bin/python2.7 1
+
 WORKDIR /
 COPY .remill_commit_id ./
 RUN git clone https://github.com/lifting-bits/remill.git && \
+    git clone https://github.com/lifting-bits/anvill.git remill/tools/anvill && \
     cd remill && \
     echo "Using remill commit $(cat ../.remill_commit_id)" && \
     git checkout $(cat ../.remill_commit_id)
