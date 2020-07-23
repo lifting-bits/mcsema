@@ -380,7 +380,6 @@ def lift_test_cfg(test_directory, toolset, test):
                   "--libc_constructor", "init",
                   "--libc_destructor", "fini", 
                   "--abi_libraries", abi_libs,
-                  "--local_state_pointer",
                   ]
 
   exec_result = execute_with_timeout(command_line, 1200)
