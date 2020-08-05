@@ -100,6 +100,7 @@ ARG LLVM_VERSION
 # Allow for mounting of local folder
 RUN mkdir -p /mcsema/local
 
+COPY --from=build /opt/trailofbits/remill /opt/trailofbits/remill
 COPY --from=build /opt/trailofbits/mcsema /opt/trailofbits/mcsema
 COPY scripts/docker-lifter-entrypoint.sh /opt/trailofbits/mcsema
 ENV LLVM_VERSION=llvm${LLVM_VERSION} \
