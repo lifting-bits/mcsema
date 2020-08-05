@@ -1,16 +1,17 @@
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import collections
 import idaapi
@@ -36,7 +37,7 @@ IS_ARM = "ARM" in _INFO.procName
 
 # True if we are running on an ELF file.
 IS_ELF = (idaapi.f_ELF == _INFO.filetype) or \
-         (idc.GetLongPrm(idc.INF_FILETYPE) == idc.FT_ELF)
+         (idc.get_inf_attr(idc.INF_FILETYPE) == idc.FT_ELF)
 
 # True if this is a Windows PE file.
 IS_PE = idaapi.f_PE == _INFO.filetype
@@ -131,8 +132,8 @@ def is_tls(ea):
   # `TLS-reference`. This comes up if you have an thread-local extern variable
   # declared/used in a binary, and defined in a shared lib. There will be an
   # offset variable.
-  for source_ea in _drefs_to(ea):
-    comment = idc.GetCommentEx(source_ea, 0)
+  for source_ea in drefs_to(ea):
+    comment = ida_bytes.get_cmt(source_ea, 0)
     if isinstance(comment, str) and "TLS-reference" in comment:
       return True
 
@@ -141,7 +142,7 @@ def is_tls(ea):
 # Mark an address as containing code.
 def try_mark_as_code(ea):
   if is_code(ea) and not is_code_by_flags(ea):
-    idc.MakeCode(ea)
+    idc.create_insn(ea)
     idaapi.auto_wait()
     return True
   return False
@@ -165,19 +166,25 @@ def read_byte(ea):
   byte = ord(byte) 
   return byte
 
+IS_BIG_ENDIAN = False
+
+_UNPACK_FORMAT_WORD = IS_BIG_ENDIAN and ">H" or "<H"
+_UNPACK_FORMAT_DWORD = IS_BIG_ENDIAN and ">L" or "<L"
+_UNPACK_FORMAT_QWORD = IS_BIG_ENDIAN and ">Q" or "<Q"
+
 def read_word(ea):
   bytestr = read_bytes_slowly(ea, ea + 2)
-  word = struct.unpack("<L", bytestr)[0]
+  word = struct.unpack(_UNPACK_FORMAT_WORD, bytestr)[0]
   return word
 
 def read_dword(ea):
   bytestr = read_bytes_slowly(ea, ea + 4)
-  dword = struct.unpack("<L", bytestr)[0]
+  dword = struct.unpack(_UNPACK_FORMAT_DWORD, bytestr)[0]
   return dword
 
 def read_qword(ea):
   bytestr = read_bytes_slowly(ea, ea + 8)
-  qword = struct.unpack("<Q", bytestr)[0]
+  qword = struct.unpack(_UNPACK_FORMAT_QWORD, bytestr)[0]
   return qword
 
 def read_leb128(ea, signed):
@@ -208,15 +215,14 @@ def read_pointer(ea):
     return read_dword(ea)
 
 def instruction_personality(arg):
-  global PERSONALITIES
+  global PERSONALITIES, PERSONALITY_NORMAL
   if isinstance(arg, (int, long)):
     arg, _ = decode_instruction(arg)
-  try:
-    p = PERSONALITIES[arg.itype]
-  except AttributeError:
-    p = PERSONALITY_NORMAL
-
-  return fixup_personality(arg, p)
+  if arg:
+    p = PERSONALITIES.get(arg.itype, PERSONALITY_NORMAL)
+    return fixup_personality(arg, p)
+  else:
+    return PERSONALITY_NORMAL
 
 def is_conditional_jump(arg):
   return instruction_personality(arg) == PERSONALITY_CONDITIONAL_BRANCH
@@ -245,6 +251,9 @@ def is_return(arg):
 def is_control_flow(arg):
   return instruction_personality(arg) != PERSONALITY_NORMAL
 
+def is_terminator(arg):
+  return instruction_personality(arg) == PERSONALITY_TERMINATOR
+
 def instruction_ends_block(arg):
   return instruction_personality(arg) in (PERSONALITY_CONDITIONAL_BRANCH,
                                           PERSONALITY_DIRECT_JUMP,
@@ -252,6 +261,10 @@ def instruction_ends_block(arg):
                                           PERSONALITY_RETURN,
                                           PERSONALITY_TERMINATOR,
                                           PERSONALITY_SYSTEM_RETURN)
+
+def disassemble(ea):
+  """Get the disassembly text associated witn an `ea`."""
+  return idc.generate_disasm_line(ea, idc.GENDSM_FORCE_CODE)
 
 def is_invalid_ea(ea):
   """Returns `True` if `ea` is not valid, i.e. it doesn't point into any
@@ -507,7 +520,8 @@ def is_noreturn_external_function(ea):
   """Returns `True` if ea refers to an external function which does not return.
   """
   target_ea = get_reference_target(ea)
-  return get_symbol_name(target_ea) in _NORETURN_EXTERNAL_FUNC
+  return (get_symbol_name(target_ea) in _NORETURN_EXTERNAL_FUNC) \
+            or (get_symbol_name(target_ea)[1:] in _NORETURN_EXTERNAL_FUNC)
 
 def is_noreturn_function(ea):
   """Returns `True` if the function at `ea` is a no-return function."""
@@ -517,12 +531,24 @@ def is_noreturn_function(ea):
          ea not in FUNC_LSDA_ENTRIES.keys() and \
          "cxa_throw" not in get_symbol_name(ea)
 
-_CREFS_FROM = collections.defaultdict(set)
+def get_delayed_instruction(term_inst):
+  """ Returns the delayed instruction if the BB terminating instruction
+      has delay slot. If there is no delayed instruction, it returns the
+      terminating instruction itself.
+  """
+  term_ea = term_inst.ea
+  if has_delayed_slot(term_inst):
+    delayed_inst, _ = decode_instruction(term_ea + term_inst.size)
+    if delayed_inst:
+      term_inst = delayed_inst
+      term_ea = delayed_inst.ea
+
+  return (term_inst, term_ea)
+
 _DREFS_FROM = collections.defaultdict(set)
-_CREFS_TO = collections.defaultdict(set)
 _DREFS_TO = collections.defaultdict(set)
 
-def make_xref(from_ea, to_ea, data_type, xref_size):
+def make_dref(from_ea, to_ea, data_type, xref_size):
   """Force the data at `from_ea` to reference the data at `to_ea`."""
   if not idc.get_full_flags(to_ea) or is_invalid_ea(to_ea):
     DEBUG("  Not making reference (A) from {:x} to {:x}".format(from_ea, to_ea))
@@ -530,12 +556,8 @@ def make_xref(from_ea, to_ea, data_type, xref_size):
 
   make_head(from_ea)
 
-  if is_code(from_ea):
-    _CREFS_FROM[from_ea].add(to_ea)
-    _CREFS_TO[to_ea].add(from_ea)
-  else:
-    _DREFS_FROM[from_ea].add(to_ea)
-    _DREFS_TO[to_ea].add(from_ea)
+  _DREFS_FROM[from_ea].add(to_ea)
+  _DREFS_TO[to_ea].add(from_ea)
 
   # If we can't make a head, then it probably means that we're at the
   # end of the binary, e.g. the last thing in the `.extern` segment.
@@ -551,9 +573,9 @@ def make_xref(from_ea, to_ea, data_type, xref_size):
 
   ida_bytes.del_items(from_ea, idc.DELIT_EXPAND, xref_size)
 
-  if data_type == idc.FF_QWORD:
+  if data_type == ida_bytes.FF_QWORD:
     data_size = 8
-  elif data_type == idc.FF_DWORD:
+  elif data_type == ida_bytes.FF_DWORD:
     data_size = 4
   else:
     raise ValueError("Invalid data type")
@@ -565,6 +587,9 @@ def make_xref(from_ea, to_ea, data_type, xref_size):
     DEBUG("  Not making reference (B) from {:x} to {:x}".format(from_ea, to_ea))
 
   return True
+
+def has_our_dref_to(ea):
+  return ea in _DREFS_TO
 
 _IGNORE_DREF = (lambda x: [idc.BADADDR])
 _IGNORE_CREF = (lambda x, y: [idc.BADADDR])
@@ -646,13 +671,6 @@ def crefs_from(ea, only_one=False, check_fixup=True):
       if seen:
         return
 
-  if not seen and ea in _CREFS_FROM:
-    for target_ea in _CREFS_FROM[ea]:
-      seen = only_one
-      yield target_ea
-      if seen:
-        return
-
 def xrefs_from(ea, only_one=False):
   fixup_ea = idc.get_fixup_target_off(ea)
   seen = False
@@ -679,19 +697,19 @@ def xrefs_from(ea, only_one=False):
       if seen:
         return
 
-def _drefs_to(ea):
+def drefs_to(ea):
   for source_ea in _xref_generator(ea, idaapi.get_first_dref_to, idaapi.get_next_dref_to):
     yield source_ea
 
-def _crefs_to(ea):
+def crefs_to(ea):
   for source_ea in _xref_generator(ea, idaapi.get_first_cref_to, idaapi.get_next_cref_to):
     yield source_ea
 
-def _xrefs_to(ea):
-  for source_ea in _drefs_to(ea):
+def xrefs_to(ea):
+  for source_ea in drefs_to(ea):
     yield source_ea
 
-  for source_ea in _crefs_to(ea):
+  for source_ea in crefs_to(ea):
     yield source_ea
 
 def _reference_checker(ea, dref_finder=_IGNORE_DREF, cref_finder=_IGNORE_CREF):
@@ -725,14 +743,14 @@ def is_thunk(ea):
 
 def is_referenced(ea):
   """Returns `True` if the data at `ea` is referenced by something else."""
-  return _reference_checker(ea, _drefs_to, _crefs_to)
+  return _reference_checker(ea, drefs_to, crefs_to)
 
 def is_referenced_by(ea, by_ea):
-  for ref_ea in _drefs_to(ea):
+  for ref_ea in drefs_to(ea):
     if ref_ea == by_ea:
       return True
 
-  for ref_ea in _crefs_to(ea):
+  for ref_ea in crefs_to(ea):
     if ref_ea == by_ea:
       return True
 
@@ -746,7 +764,7 @@ def is_runtime_external_data_reference(ea):
   IDA discovers this type of reference, but it has no real way to
   cross-reference it to anything, because the target address will
   only exist at runtime."""
-  comment = idc.GetCommentEx(ea, 0)
+  comment = ida_bytes.get_cmt(ea, 0)
   if comment and "Copy of shared data" in comment:
     return True
   else:
@@ -764,7 +782,7 @@ def is_external_vtable_reference(ea):
   if not is_runtime_external_data_reference(ea):
     return False
 
-  comment = idc.GetCommentEx(ea, 0)
+  comment = ida_bytes.get_cmt(ea, 0)
   if comment and "Alternative name is '`vtable" in comment:
     return True
   else:

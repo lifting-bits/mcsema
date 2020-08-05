@@ -1,4 +1,6 @@
 /* TAGS: min cpp */
+/* LIFT_OPTS: explicit +--explicit_args +--explicit_args_count 8 */
+/* LIFT_OPTS: default */
 /* LD_OPTS: -lpthread */
 /*
  * Copyright (c) 2017 Trail of Bits, Inc.

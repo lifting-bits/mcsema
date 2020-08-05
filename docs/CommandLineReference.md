@@ -16,7 +16,7 @@ Where:
 
 ## mcsema-lift
 
-Usage: mcsema-lift --arch _architecture_ --os _platform_ --cfg _cfg-path_ [--output _output-path_] [--libc_constructor _init-function_] [--libc_destructor _fini-function_]
+Usage: mcsema-lift-${version} --arch _architecture_ --os _platform_ --cfg _cfg-path_ [--output _output-path_] [--libc_constructor _init-function_] [--libc_destructor _fini-function_]
 
 Where:
 

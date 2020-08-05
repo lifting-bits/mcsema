@@ -1,18 +1,19 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import idautils
 import idaapi
@@ -116,28 +117,32 @@ class Operand(object):
     self._base_id = None
     self._displ = None
     self._scale = None
-        
+
     if self._type in (idaapi.o_displ, idaapi.o_phrase):
       specflag1 = self.op_t.specflag1
       specflag2 = self.op_t.specflag2
       scale = 1 << ((specflag2 & 0xC0) >> 6)
       offset = self.op_t.addr
-            
+
       if specflag1 == 0:
-        index = None
+        index_ = None
         base_ = self.op_t.reg
       elif specflag1 == 1:
-        index = (specflag2 & 0x38) >> 3
+        index_ = (specflag2 & 0x38) >> 3
         base_ = (specflag2 & 0x07) >> 0
-                
+
         if self.op_t.reg == 0xC:
-          if base_ & 4:
-            base_ += 8
-          if index & 4:
-            index += 8
-                        
+          base_ += 8
+          # HACK: Check if the index register is there in the operand
+          # It will fix the issue if `rsi` is getting used as index register
+          if (index_ & 4) and get_register_name(index_) not in idc.GetOpnd(self._ea, opnd.n):
+            index_ += 8
+
+      if (index_ == base_ == idautils.procregs.sp.reg) and (scale == 1):
+        index_ = None
+
       self._scale = scale
-      self._index_id = index
+      self._index_id = index_
       self._base_id = base_
       self._displ = offset
                
@@ -153,7 +158,7 @@ class Operand(object):
     
   @property
   def value(self):
-    return idc.GetOperandValue(self._ea, self.index)
+    return idc.get_operand_value(self._ea, self.index)
     
   @property
   def size(self):
@@ -161,7 +166,7 @@ class Operand(object):
     
   @property
   def text(self):
-    return idc.GetOpnd(self._ea, self.index)
+    return idc.print_operand(self._ea, self.index)
     
   @property
   def dtype(self):
@@ -458,7 +463,7 @@ def _process_instruction(inst_ea, func_variable):
     if opnd.has_phrase:
       base_ = _translate_reg(opnd.base_reg) if opnd.base_reg else None
       index_ = _translate_reg(opnd.index_reg) if opnd.index_reg else None
-      offset = _signed_from_unsigned(idc.GetOperandValue(inst_ea, opnd.index))
+      offset = _signed_from_unsigned(idc.get_operand_value(inst_ea, opnd.index))
       if len(func_variable["stack_vars"].keys()) == 0:
         return
     
@@ -544,7 +549,7 @@ def build_stack_variable(func_ea):
   #grab the offset of the stored frame pointer, so that
   #we can correlate offsets correctly in referent code
   # e.g., EBP+(-0x4) will match up to the -0x4 offset
-  delta = idc.GetMemberOffset(frame, " s")
+  delta = idc.get_member_offset(frame, " s")
   if delta == -1:
     delta = 0
 
@@ -559,12 +564,12 @@ def build_stack_variable(func_ea):
         offset = idc.get_next_offset(frame, offset)
         continue
 
-      member_size = idc.GetMemberSize(frame, offset)
+      member_size = idc.get_member_size(frame, offset)
       if offset >= delta:
         offset = idc.get_next_offset(frame, offset)
         continue
 
-      member_flag = idc.GetMemberFlag(frame, offset)
+      member_flag = idc.get_member_flag(frame, offset)
       flag_str = _get_flags_from_bits(member_flag)
       member_offset = offset-delta
       stack_vars[member_offset] = {"name": member_name,
@@ -618,7 +623,7 @@ def is_function_unsafe(func_ea, blockset):
   """ Returns `True` if the function uses bp and it might access the stack variable
       indirectly using the base pointer.
   """
-  if not (idc.GetFunctionFlags(func_ea) & idc.FUNC_FRAME):
+  if not (idc.get_func_attr(func_ea, idc.FUNCATTR_FLAGS) & idc.FUNC_FRAME):
     return False
 
   for block_ea in blockset:
@@ -635,7 +640,7 @@ def collect_function_vars(func_ea, blockset):
 
   # Check for the variadic function type; Add the variadic function
   # to the list of unsafe functions
-  func_type = idc.GetType(func_ea)
+  func_type = idc.get_type(func_ea)
   if (func_type is not None) and ("(" in func_type):
     args = func_type[ func_type.index('(')+1: func_type.rindex(')') ]
     args_list = [ x.strip() for x in args.split(',')]

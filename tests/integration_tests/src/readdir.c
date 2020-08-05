@@ -1,4 +1,6 @@
 /* TAGS: min c */
+/* LIFT_OPTS: explicit +--explicit_args +--explicit_args_count 8 */
+/* LIFT_OPTS: default */
 /* TEST: readdir.c */
 /* TEST: /tmp */
 /* TEST: file-that-does-not-exist */

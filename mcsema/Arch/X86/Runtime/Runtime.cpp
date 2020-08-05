@@ -1,20 +1,22 @@
 /*
- * Copyright (c) 2017 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <inttypes.h>
+#include <stdlib.h>
 
 #include <cfenv>
 #include <cfloat>
@@ -22,7 +24,10 @@
 
 #define HAS_FEATURE_AVX 1
 #define HAS_FEATURE_AVX512 0
-#define ADDRESS_SIZE_BITS 64
+
+#ifndef ADDRESS_SIZE_BITS
+#  define ADDRESS_SIZE_BITS 64
+#endif
 
 #include "mcsema/Arch/X86/Runtime/Registers.h"
 #include "remill/Arch/X86/Runtime/State.h"
@@ -33,6 +38,12 @@
 
 #ifndef PRIx32
 #  define PRIx32 "x"
+#endif
+
+#if ADDRESS_SIZE_BITS == 64
+#  define PRIxADDR PRIx64
+#else
+#  define PRIxADDR PRIx32
 #endif
 
 extern "C" {
@@ -117,14 +128,14 @@ Memory *__remill_sync_hyper_call(State &state, Memory *mem,
 }
 
 Memory *__mcsema_reg_tracer(State &state, addr_t, Memory *memory) {
-  const char *format = nullptr;
   if (sizeof(void *) == 8) {
     fprintf(stderr,
-            "RIP=%" PRIx64 ",RAX=%" PRIx64 ",RBX=%" PRIx64 ",RCX=%" PRIx64
-            ",RDX=%" PRIx64 ",RSI=%" PRIx64 ",RDI=%" PRIx64 ",RBP=%" PRIx64
-            ",RSP=%" PRIx64 ",R8=%" PRIx64 ",R9=%" PRIx64 ",R10=%" PRIx64
-            ",R11=%" PRIx64 ",R12=%" PRIx64 ",R13=%" PRIx64 ",R14=%" PRIx64
-            ",R15=%" PRIx64 "\n",
+            "RIP=%" PRIxADDR ",RAX=%" PRIxADDR ",RBX=%" PRIxADDR
+            ",RCX=%" PRIxADDR ",RDX=%" PRIxADDR ",RSI=%" PRIxADDR
+            ",RDI=%" PRIxADDR ",RBP=%" PRIxADDR ",RSP=%" PRIxADDR
+            ",R8=%" PRIxADDR ",R9=%" PRIxADDR ",R10=%" PRIxADDR
+            ",R11=%" PRIxADDR ",R12=%" PRIxADDR ",R13=%" PRIxADDR
+            ",R14=%" PRIxADDR ",R15=%" PRIxADDR "\n",
 
             state.RIP, state.RAX, state.RBX, state.RCX, state.RDX, state.RSI,
             state.RDI, state.RBP, state.RSP, state.R8, state.R9, state.R10,

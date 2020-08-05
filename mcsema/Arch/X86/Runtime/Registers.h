@@ -1,17 +1,18 @@
 /*
- * Copyright (c) 2017 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef MCSEMA_ARCH_X86_RUNTIME_REGISTERS_H_
@@ -77,23 +78,23 @@
 #define R14D gpr.r14.dword
 #define R15D gpr.r15.dword
 
-#define RAX gpr.rax.qword
-#define RBX gpr.rbx.qword
-#define RCX gpr.rcx.qword
-#define RDX gpr.rdx.qword
-#define RSI gpr.rsi.qword
-#define RDI gpr.rdi.qword
-#define RSP gpr.rsp.qword
-#define RBP gpr.rbp.qword
-#define R8 gpr.r8.qword
-#define R9 gpr.r9.qword
-#define R10 gpr.r10.qword
-#define R11 gpr.r11.qword
-#define R12 gpr.r12.qword
-#define R13 gpr.r13.qword
-#define R14 gpr.r14.qword
-#define R15 gpr.r15.qword
-#define RIP gpr.rip.qword
+#define RAX gpr.rax.aword
+#define RBX gpr.rbx.aword
+#define RCX gpr.rcx.aword
+#define RDX gpr.rdx.aword
+#define RSI gpr.rsi.aword
+#define RDI gpr.rdi.aword
+#define RSP gpr.rsp.aword
+#define RBP gpr.rbp.aword
+#define R8 gpr.r8.aword
+#define R9 gpr.r9.aword
+#define R10 gpr.r10.aword
+#define R11 gpr.r11.aword
+#define R12 gpr.r12.aword
+#define R13 gpr.r13.aword
+#define R14 gpr.r14.aword
+#define R15 gpr.r15.aword
+#define RIP gpr.rip.aword
 
 #define SS seg.ss
 #define ES seg.es
@@ -220,14 +221,14 @@
 #define ST6 st.elems[6].val
 #define ST7 st.elems[7].val
 
-#define MMX0 mmx.elems[0].val.qwords.elems[0]
-#define MMX1 mmx.elems[1].val.qwords.elems[0]
-#define MMX2 mmx.elems[2].val.qwords.elems[0]
-#define MMX3 mmx.elems[3].val.qwords.elems[0]
-#define MMX4 mmx.elems[4].val.qwords.elems[0]
-#define MMX5 mmx.elems[5].val.qwords.elems[0]
-#define MMX6 mmx.elems[6].val.qwords.elems[0]
-#define MMX7 mmx.elems[7].val.qwords.elems[0]
+#define MM0 mmx.elems[0].val.qwords.elems[0]
+#define MM1 mmx.elems[1].val.qwords.elems[0]
+#define MM2 mmx.elems[2].val.qwords.elems[0]
+#define MM3 mmx.elems[3].val.qwords.elems[0]
+#define MM4 mmx.elems[4].val.qwords.elems[0]
+#define MM5 mmx.elems[5].val.qwords.elems[0]
+#define MM6 mmx.elems[6].val.qwords.elems[0]
+#define MM7 mmx.elems[7].val.qwords.elems[0]
 
 #define AF aflag.af
 #define CF aflag.cf

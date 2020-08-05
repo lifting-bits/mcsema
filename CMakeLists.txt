@@ -1,23 +1,28 @@
-# Copyright (c) 2018 Trail of Bits, Inc.
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 project(mcsema)
 cmake_minimum_required(VERSION 3.2)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/settings.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/BCCompiler.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/ccache.cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
+configureCcache()
 FindAndSelectClangCompiler()
 
 set(MCSEMA_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
@@ -78,6 +83,14 @@ set_source_files_properties(${PROJECT_PROTOBUFHEADERFILES} PROPERTIES
   COMPILE_FLAGS "-Wno-sign-conversion -Wno-shorten-64-to-32 -Wno-conversion"
 )
 
+# llvm
+find_package(LLVM REQUIRED CONFIG HINTS ${FINDPACKAGE_LLVM_HINTS})
+
+string(REPLACE "." ";" LLVM_VERSION_LIST ${LLVM_PACKAGE_VERSION})
+list(GET LLVM_VERSION_LIST 0 LLVM_MAJOR_VERSION)
+list(GET LLVM_VERSION_LIST 1 LLVM_MINOR_VERSION)
+set(REMILL_LLVM_VERSION "${LLVM_MAJOR_VERSION}.${LLVM_MINOR_VERSION}")
+
 #
 # target settings
 #
@@ -119,7 +132,6 @@ target_link_libraries(${MCSEMA_INIT} ${MCSEMA_CFG})
 add_executable(${MCSEMA_LIFT}
   ${PROJECT_PROTOBUFSOURCEFILES}
 
-  mcsema/Arch/ABI.cpp
   mcsema/Arch/Arch.cpp
 
   mcsema/CFG/CFG.cpp
@@ -137,18 +149,11 @@ add_executable(${MCSEMA_LIFT}
   tools/mcsema_lift/Lift.cpp
 )
 
-
 # Copy mcsema-disass in
 add_custom_command(
   TARGET protobuf_python_module_ida POST_BUILD
   DEPENDS {PROJECT_PROTOBUFPYTHONMODULE}
-  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/ida
-)
-
-add_custom_command(
-  TARGET protobuf_python_module_binja POST_BUILD
-  DEPENDS {PROJECT_PROTOBUFPYTHONMODULE}
-  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/binja
+  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/ida7
 )
 
 # this is needed for the #include directives with absolutes paths to work correctly; it must
@@ -156,9 +161,9 @@ add_custom_command(
 list(APPEND PROJECT_INCLUDEDIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_dependencies(${MCSEMA_LIFT}
-  semantics protobuf_python_module_ida
-  protobuf_python_module_binja
-)
+  semantics
+  protobuf_python_module_ida
+  protobuf_python_module_binja)
 
 #
 # libraries
@@ -175,12 +180,31 @@ endif()
 
 list(APPEND PROJECT_LIBRARIES remill)
 
-# llvm
-find_package(LLVM REQUIRED CONFIG HINTS ${FINDPACKAGE_LLVM_HINTS})
+# anvill
+if(NOT TARGET anvill-${REMILL_LLVM_VERSION})
+  find_package(anvill REQUIRED)
+  if(NOT anvill_FOUND)
+    message(FATAL_ERROR "McSema depends upon Anvill being cloned into Remill's tools directory")
+  endif()
+endif()
+list(APPEND PROJECT_LIBRARIES anvill-${REMILL_LLVM_VERSION})
 
-string(REPLACE "." ";" LLVM_VERSION_LIST ${LLVM_PACKAGE_VERSION})
-list(GET LLVM_VERSION_LIST 0 LLVM_MAJOR_VERSION)
-list(GET LLVM_VERSION_LIST 1 LLVM_MINOR_VERSION)
+if (LLVM_Z3_INSTALL_DIR)
+  set(need_z3 TRUE)
+elseif(DEFINED ENV{TRAILOFBITS_LIBRARIES})
+  set(LLVM_Z3_INSTALL_DIR "$ENV{TRAILOFBITS_LIBRARIES}/z3")
+  set(need_z3 TRUE)
+else()
+  set(need_z3 FALSE)
+endif()
+
+if(need_z3)
+  find_package(Z3 4.7.1)
+  if (NOT Z3_FOUND)
+    message(WARNING "Z3 >= 4.7.1 has not been found in LLVM_Z3_INSTALL_DIR: ${LLVM_Z3_INSTALL_DIR}.")
+  endif()
+endif()
+
 
 set(LLVM_LIBRARIES
   LLVMCore LLVMSupport LLVMAnalysis LLVMipo LLVMIRReader
@@ -270,6 +294,7 @@ set(python_package_installer "${CMAKE_CURRENT_SOURCE_DIR}/tools/setup_launcher")
 if(DEFINED WIN32)
   string(REPLACE "/" "\\" python_package_install_path "${install_folder}")
   set(python_package_installer "${python_package_installer}.bat")
+  set(optional_interpreter "cmd.exe /C")
 else()
   set(python_package_install_path "${install_folder}")
   set(python_package_installer "${python_package_installer}.sh")
@@ -283,7 +308,7 @@ if (DEFINED BUILD_MCSEMA_DYNINST_DISASS)
 endif()
 
 install(CODE
-  "execute_process(COMMAND \"${python_package_installer}\" \"${python_package_install_path}\" WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tools RESULT_VARIABLE exit_code)
+  "execute_process(COMMAND ${optional_interpreter} \"${python_package_installer}\" \"${python_package_install_path}\" WORKING_DIRECTORY \"${PROJECT_SOURCE_DIR}/tools\" RESULT_VARIABLE exit_code)
    if(NOT exit_code EQUAL 0)
      message(FATAL_ERROR \"Failed to install the Python package\")
    endif()"

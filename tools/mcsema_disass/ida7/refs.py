@@ -1,23 +1,24 @@
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import ida_bytes
 import ida_nalt
 from util import *
 
 class Reference(object):
-  __slots__ = ('offset', 'ea', 'symbol', 'type', 'mask')
+  __slots__ = ('offset', 'ea', 'symbol', 'type', 'mask', 'imm_val')
 
   INVALID = 0
   IMMEDIATE = 1
@@ -33,12 +34,13 @@ class Reference(object):
     CODE: "code",
   }
 
-  def __init__(self, ea, offset, mask=0):
+  def __init__(self, ea, offset, mask=0, imm_val=0):
     self.offset = offset
     self.ea = ea
     self.symbol = ""
     self.type = self.INVALID
     self.mask = mask
+    self.imm_val = imm_val
 
   def __str__(self):
     mask_str = ""
@@ -52,6 +54,10 @@ class Reference(object):
 
   def is_valid(self):
     return self.type != self.INVALID
+
+# Sort flow references first; in arch utils, when looking up preserved
+# registers, we need easy access to flow targets, if any.
+_REF_SORT_KEY = lambda r: -r.type
 
 # Try to determine if `ea` points at a field within a structure. This is a
 # heuristic for determining whether or not an immediate `ea` should actually
@@ -94,7 +100,7 @@ def _is_address_of_struct_field(ea):
   if field_begin_ea != ea:
     return False
 
-  field_size = idc.GetMemberSize(oi.tid, off_in_struct)
+  field_size = idc.get_member_size(oi.tid, off_in_struct)
   if not field_size:
     return False
 
@@ -199,64 +205,6 @@ def remove_instruction_reference(from_ea, to_ea):
   if found:
     _REFS[from_ea] = tuple(new_refs)
 
-def _get_arm_ref_candidate(mask, op_val, op_str, all_refs):
-  global _BAD_ARM_REF_OFF
-
-  try:
-    op_name = op_str.split("@")[0][1:]  # `#asc_400E5C@PAGE` -> `asc_400E5C`.
-    ref_ea = idc.get_name_ea_simple(op_name)
-    if (ref_ea & mask) == op_val:
-      return ref_ea, mask
-  except:
-    pass
-
-  # NOTE(pag): We deal with candidates because it's possible that this
-  #            instruction will have multiple references. In the case of
-  #            `@PAGE`-based offsets, it's problematic when the wrong base
-  #            is matched, because it really throws off the C++ side of things
-  #            because the arrangement of the lifted data being on the same
-  #            page is not guaranteed.
-
-  candidates = set()
-  for ref_ea in all_refs:
-    if (ref_ea & mask) == op_val:
-      candidates.add(ref_ea)
-      return ref_ea, mask
-
-  if len(candidates):
-    for candidate_ea in candidates:
-      if candidate_ea == op_val:
-        return candidate_ea, mask
-
-    return candidates.pop(), mask
-
-  return _BAD_ARM_REF_OFF
-
-# Try to handle `@PAGE` and `@PAGEOFF` references, resolving them to their
-# 'intended' address.
-#
-# TODO(pag): There must be a better way than just string searching :-/
-def _try_get_arm_ref_addr(inst, op, op_val, all_refs):
-  global _BAD_ARM_REF_OFF
-
-  if op.type not in (idc.o_imm, idc.o_displ):
-    # This is a reference type that the other ref tracking code
-    # can handle, return defaults
-    return op_val, 0
-
-  op_str = idc.GetOpnd(inst.ea, op.n)
-
-  if '@PAGEOFF' in op_str:
-    return _get_arm_ref_candidate(4095, op_val, op_str, all_refs)
-
-  elif '@PAGE' in op_str:
-    return _get_arm_ref_candidate(-4096L, op_val, op_str, all_refs)
-
-  elif not is_invalid_ea(op_val) and inst.get_canon_mnem().lower() == "adr":
-    return op_val, 0
-
-  return _BAD_ARM_REF_OFF
-
 # Returns `True` if `ea` looks like it points into the middle of an instruction.
 def _is_ea_into_bad_code(ea, binary_is_pie):
   if not is_code(ea):
@@ -267,7 +215,8 @@ def _is_ea_into_bad_code(ea, binary_is_pie):
   if not term_inst:
     return True
 
-  succs = list(flow.get_static_successors(idc.BADADDR, term_inst, binary_is_pie))
+  delayed_inst, delayed_ea = get_delayed_instruction(term_inst)
+  succs = list(flow.get_static_successors(idc.BADADDR, term_inst, delayed_inst, binary_is_pie))
   if not succs:
     return True
 
@@ -277,14 +226,37 @@ def _is_ea_into_bad_code(ea, binary_is_pie):
 
   return False
 
+# Returns `True` if a number looks more like a magic constant that would
+# appear in a program.
+def _looks_like_constant(val):
+  # In decimal, a number with only a single non-zero digit.
+  if len("{}".format(val).replace("0", "")) == 1:
+    return True
+
+  # This looks more like a bitmask, or just some value without much going on
+  # in it.
+  bin_rep = "{:b}".format(val)
+  if min(bin_rep.count('1'), bin_rep.count('0')) <= 2:
+    return True
+
+  hex_rep = "{:x}".format(val)
+
+  # Looks like it's probably a bitmask or negative value meant for sign-exension.
+  if len(hex_rep) in (4, 8, 16) and hex_rep.startswith('ff'):
+    return True
+
+  # TODO(pag): Look for yyyymmdd, ddmmyyyy, etc.?
+  return False
+
 # Try to recognize an operand as a reference candidate when a target fixup
 # is not available.
 def _get_ref_candidate(inst, op, all_refs, binary_is_pie):
-  global _POSSIBLE_REFS, _ENABLE_CACHING
+  global _POSSIBLE_REFS, _ENABLE_CACHING, _NOT_A_REF
 
   ref = None
   addr_val = idc.BADADDR
   mask = 0
+  imm_val = 0
   is_memop = idc.o_mem == op.type
 
   if idc.o_imm == op.type:
@@ -294,13 +266,8 @@ def _get_ref_candidate(inst, op, all_refs, binary_is_pie):
   else:
     return None
 
-  # TODO(artem): We should have a class that has ref heuristics and put ARM
-  #              related refs in the ARM class, and X86 in the x86 class that
-  #              will avoid these awkward `if IS_ARM` and the comments about
-  #              x86 / amd64 stuff.
-  if IS_ARM:
-    old_addr_val = addr_val
-    addr_val, mask = _try_get_arm_ref_addr(inst, op, addr_val, all_refs)
+  old_addr_val = addr_val
+  addr_val, mask, imm_val = try_get_ref_addr(inst, op, addr_val, all_refs, _NOT_A_REF)
 
   info = idaapi.refinfo_t()
   has_ref_info = ida_nalt.get_refinfo(info, inst.ea, op.n) == 1
@@ -349,7 +316,9 @@ def _get_ref_candidate(inst, op, all_refs, binary_is_pie):
   # Same as above, `idal64` can miss things that `idaq` gets.
   if addr_val not in all_refs:
     nearest_head_ea = _nearest_head(addr_val, 128)
-    if not is_invalid_ea(nearest_head_ea) and not _is_ea_into_bad_code(nearest_head_ea, binary_is_pie):
+    if not is_invalid_ea(nearest_head_ea) and \
+       not _is_ea_into_bad_code(nearest_head_ea, binary_is_pie) and \
+       not _looks_like_constant(addr_val):
       DEBUG("WARNING: Adding reference from {:x} to {:x}, which is near other heads".format(
           inst.ea, addr_val))
       all_refs.add(addr_val)
@@ -372,7 +341,7 @@ def _get_ref_candidate(inst, op, all_refs, binary_is_pie):
     _POSSIBLE_REFS.add(addr_val)
     return None
 
-  ref = Reference(addr_val, op.offb, mask=mask)
+  ref = Reference(addr_val, op.offb, mask=mask, imm_val=imm_val)
 
   # Make sure we add in a reference to the (possibly new) head, addressed
   # by `addr_val`.
@@ -388,7 +357,7 @@ def memop_is_actually_displacement(inst):
   and tell us that this is an `o_mem` rather than an `o_displ`. We really want
   to recognize it as an `o_displ` because the memory reference is a displacement
   and not an absolute address."""
-  asm = idc.GetDisasm(inst.ea)
+  asm = disassemble(inst.ea)
   return "[" in asm and "]" in asm
 
 # Return the set of all references from `ea` to anything.
@@ -404,9 +373,11 @@ def enable_reference_caching():
   global _ENABLE_CACHING
   _ENABLE_CACHING = True
 
+_FIXUPS = []
+
 # Get a list of references from an instruction.
 def get_instruction_references(arg, binary_is_pie=False):
-  global _ENABLE_CACHING, _NOT_A_REF
+  global _ENABLE_CACHING, _NOT_A_REF, _FIXUPS
 
   inst = arg
   if isinstance(arg, (int, long)):
@@ -422,14 +393,17 @@ def get_instruction_references(arg, binary_is_pie=False):
     if inst.ea in _REFS:
       return _REFS[inst.ea]
 
-  offset_to_ref = {}
+  # offset_to_ref = {}
   all_refs = get_all_references_from(inst.ea)
-  for ea in xrange(inst.ea, inst.ea + inst.size):
-    targ_ea = idc.get_fixup_target_off(ea)
+
+  del _FIXUPS[:]
+  offset = 0
+  while offset < inst.size:
+    targ_ea = idc.get_fixup_target_off(offset + inst.ea)
     if not is_invalid_ea(targ_ea):
       all_refs.add(targ_ea)
-      ref = Reference(targ_ea, ea - inst.ea)
-      offset_to_ref[ref.offset] = ref
+      _FIXUPS.append((offset, targ_ea))
+    offset += 1
 
   refs = []
   for i, op in enumerate(inst.ops):
@@ -438,8 +412,8 @@ def get_instruction_references(arg, binary_is_pie=False):
 
     op_ea = inst.ea + op.offb
     ref = None
-    if op.offb in offset_to_ref:
-      ref = offset_to_ref[op.offb]
+    # if op.offb in offset_to_ref:
+    #   ref = offset_to_ref[op.offb]
     
     if not ref or is_invalid_ea(ref.ea):
       ref = _get_ref_candidate(inst, op, all_refs, binary_is_pie)
@@ -497,7 +471,10 @@ def get_instruction_references(arg, binary_is_pie=False):
 
     # Code reference.
     elif idc.o_near == op.type:
-      assert ref.ea == op.addr
+      # assert ref.ea == op.addr
+      if ref.ea != op.addr:
+        DEBUG("ERROR inst={:x} ref.ea={:x} op.addr={:x}".format(inst.ea, ref.ea, op.addr))
+
       ref.type = Reference.CODE
       ref.symbol = get_symbol_name(op_ea, ref.ea)
 
@@ -513,11 +490,17 @@ def get_instruction_references(arg, binary_is_pie=False):
     if (inst.ea, ref.ea) not in _NOT_A_REF:
       refs.append(ref)
 
-  for ref in refs:
-    assert not is_invalid_ea(ref.ea)
+  # Issue #623, `get_fixup_target_off` can sometimes add in the wrong target. So
+  # go and prefer the instruction-operand focused approach, and fall back on
+  # fixup targets when available.
+  for offset, targ_ea in _FIXUPS:
+    # if offset not in offset_to_ref and (inst.ea, targ_ea) not in _NOT_A_REF:
+    if (inst.ea, targ_ea) not in _NOT_A_REF:
+      refs.append(Reference(targ_ea, offset))
 
   if len(refs):
-    refs = tuple(refs)
+    refs.sort(key=_REF_SORT_KEY)
+    refs = tuple(r for r in refs if not is_invalid_ea(r.ea))
     if _ENABLE_CACHING:
       _REFS[inst.ea] = refs
     return refs

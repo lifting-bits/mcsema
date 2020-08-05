@@ -1,12 +1,6 @@
 /* TAGS: min c */
-/* CC_OPTS: */
-/* LD_OPTS: */
-/* LIFT_OPTS: EXP +explicit_args +explicit_args_count 8 !abi_libraries */
-/* TEST: --help */
-/* STDIN: F/inputs.txt */
-/* TEST: --version */
-/* TEST: --extract nonsense.txt */
-/* STDIN: Hello World\nThis Should Be Together */
+/* LIFT_OPTS: explicit +--explicit_args +--explicit_args_count 8 */
+/* LIFT_OPTS: default */
 /*
  * Copyright (c) 2018 Trail of Bits, Inc.
  *

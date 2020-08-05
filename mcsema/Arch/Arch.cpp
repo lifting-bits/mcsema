@@ -1,24 +1,26 @@
 /*
- * Copyright (c) 2017 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "remill/Arch/Arch.h"
+#include "mcsema/Arch/Arch.h"
 
 #include <glog/logging.h>
 #include <llvm/ADT/ArrayRef.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Instructions.h>
@@ -27,24 +29,32 @@
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
+#include <remill/Arch/Arch.h>
 
 #include <unordered_set>
 
-#include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Util.h"
 
 namespace mcsema {
 
-extern llvm::LLVMContext *gContext;
+extern std::shared_ptr<llvm::LLVMContext> gContext;
 
-const remill::Arch *gArch = nullptr;
+std::unique_ptr<const remill::Arch> gArch(nullptr);
 
 bool InitArch(const std::string &os, const std::string &arch) {
   LOG(INFO) << "Initializing for " << arch << " code on " << os;
 
-  gArch = remill::GetTargetArch(*gContext);
+  remill::Arch::GetTargetArch(*gContext).swap(gArch);
   gWordType = llvm::Type::getIntNTy(*gContext,
                                     static_cast<unsigned>(gArch->address_size));
+
+  gWordMask = 0;
+  if (32 == gArch->address_size) {
+    gWordMask = static_cast<uint32_t>(~0u);
+  } else {
+    gWordMask = ~gWordMask;
+  }
+
   return true;
 }
 

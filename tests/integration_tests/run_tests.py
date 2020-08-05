@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 
-# Copyright (c) 2019 Trail of Bits, Inc.
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
 import difflib
@@ -135,9 +136,14 @@ def check_arguments(args):
 
 
 def exec_and_log_fail(args):
-    pipes = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-    std_out, std_err = pipes.communicate()
-    ret_code = pipes.returncode
+    try:
+        pipes = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        std_out, std_err = pipes.communicate(timeout = 180)
+        ret_code = pipes.returncode
+    except subprocess.TimeoutExpired as e:
+        pipes.terminate()
+        print("Timeout!")
+        return False
 
     if ret_code:
         print("** stdout:")
@@ -262,7 +268,7 @@ def parallel_lift(*t_args):
         res = config.lift(test_dir)
         # TODO: More fine grained log
         if res != Config.Result.SUCCESS:
-            results[self.id] = result_data.TCData(self.id, self.recompiled, self.binary)
+            results[config.id] = result_data.TCData(config.id,config.recompiled, config.binary)
 
 def get_configs(directory, allowed_tags, batched):
     result = []
@@ -400,10 +406,13 @@ class Runner:
             base_name = os.path.basename(name)
             actual = os.path.join(self.t_recompiled, base_name)
             expected = os.path.join(self.t_bin, base_name)
-            if not filecmp.cmp(expected, actual):
-                counterexample += 'Files do not match: ' + basename + '\n'
+            try:
+                if not filecmp.cmp(expected, actual):
+                    counterexample += 'Files do not match: ' + base_name + '\n'
+                    correct = correct and False
+            except FileNotFoundError as e:
+                counterexample += 'File {} not found/produced! '.format(base_name)
                 correct = correct and False
-
 
         result = result_data.RUN if correct else result_data.FAIL
         return (result, counterexample)
@@ -443,8 +452,9 @@ class Runner:
             actual = _exec(self, self.t_recompiled, [filename] + detail.cmd, stdin)
             return self.compare(expected, actual, files)
         except subprocess.TimeoutExpired as e:
-            return result_data.TIMEOUT
-
+            return result_data.TIMEOUT, "Timeout"
+        except FileNotFoundError as e:
+            return result_data.ERROR, "File not found"
 
     def run(self, detail):
         self.set_up()
@@ -511,6 +521,7 @@ g_complex_test = {
         TestDetails(['-l', './dec_data.txt.gz']).set_files(['inputs/dec_data.txt.gz']),
         TestDetails(['-df', './dec_data.txt.gz']).set_files(['inputs/dec_data.txt.gz']).\
                     set_check(['dec_data.txt']),
+        TestDetails(['']),
     ],
 
     "cat":

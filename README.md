@@ -19,7 +19,7 @@ McSema and `remill` were developed and are maintained by Trail of Bits, funded b
 
 |       | master                                   |
 | ----- | ---------------------------------------- |
-| Linux | [![Build Status](https://travis-ci.org/lifting-bits/mcsema.svg?branch=master)](https://travis-ci.org/lifting-bits/mcsema) |
+| Linux | [![Build Status](https://github.com/lifting-bits/mcsema/workflows/CI/badge.svg)](https://github.com/lifting-bits/mcsema/actions?query=workflow%3ACI) |
 
 ## Features
 
@@ -45,14 +45,14 @@ Why would anyone translate binaries *back* to bitcode?
 * **Write one set of analysis tools**. Lifting to LLVM IR means that one set of analysis tools can work on both the source and the binary. Maintaining a single set of tools saves development time and effort, and allows for a single set of better tools.
 
 ## Comparison with other machine code to LLVM bitcode lifters
-|   | McSema | [dagger](https://github.com/repzret/dagger) | [llvm-mctoll](https://github.com/Microsoft/llvm-mctoll) | [retdec](https://github.com/avast-tl/retdec) | [reopt](https://github.com/GaloisInc/reopt) | [rev.ng](https://github.com/revng/revamb) | [bin2llvm](https://github.com/cojocar/bin2llvm) | [fcd](https://github.com/zneak/fcd) | [RevGen](https://github.com/S2E/tools/tree/master/tools) | [Fracture](https://github.com/draperlaboratory/fracture) | [libbeauty](https://github.com/jcdutton/libbeauty) |
+|   | McSema | [dagger](https://github.com/repzret/dagger) | [llvm-mctoll](https://github.com/Microsoft/llvm-mctoll) | [retdec](https://github.com/avast-tl/retdec) | [reopt](https://github.com/GaloisInc/reopt) | [rev.ng](https://github.com/revng/revamb) | [bin2llvm](https://github.com/cojocar/bin2llvm) | [fcd](https://github.com/zneak/fcd) | [RevGen](https://github.com/S2E/tools/tree/master/tools) | [Fracture](https://github.com/draperlaboratory/fracture) | [libbeauty](https://github.com/pgoodman/libbeauty) |
 |  ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
 |  Actively maintained? | Yes | No | Yes | Yes | Yes | No | Maybe | Maybe | Maybe | No | Yes |
 |  Commercial support available? | Yes | No | No | No | Maybe | No | No | No | No | Maybe | No |
-|  LLVM versions | 3.5 - current | 5 | current | 3.9.1 | 3.8 | 3.8 | 3.2 | 4 | 3.9 | 3.4 | 6 |
+|  LLVM versions | 3.5 - current | 5 | current | 4.0 | 3.8 | 3.8 | 3.2 | 4 | 3.9 | 3.4 | 6 |
 |  Builds with CI? | Yes | No | No | Yes | No | No | Yes | Maybe | Maybe | No | No |
 |  32-bit architectures | x86 | x86 | ARM | x86, ARM, MIPS, PIC32, PowerPC |  | ARM, MIPS | S2E | S2E | S2E | ARM, x86 |  |
-|  64-bit architectures | x86-64, AArch64 | x86-64, [AArch64](https://github.com/IAIK/ios-analysis-dagger/)) | x86-64 |  | x86-64 | x86-64 |  | S2E | S2E | PowerPC | x86-64 |
+|  64-bit architectures | x86-64, AArch64 | x86-64, [AArch64](https://github.com/IAIK/ios-analysis-dagger/)) | x86-64 | x86-64, arm64 & more | x86-64 | x86-64 |  | S2E | S2E | PowerPC | x86-64 |
 |  Control-flow recovery | IDA Pro, Binary Ninja, DynInst | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | McSema | Ad-hoc | Ad-hoc |
 |  File formats | ELF, PE | ELF, Mach-O |  | ELF, PE, Mach-O, COFF, AR, Intel HEX, Raw | ELF | ELF | ELF |  | ELF, PE | ELF, Mach-O (maybe) | ELF |
 |  Bitcode is executable? | Yes | Yes | Yes | Yes | Yes | Yes | No | No | CGC | No | No |
@@ -79,6 +79,8 @@ Why would anyone translate binaries *back* to bitcode?
 | [Python](https://www.python.org/) | 2.7 | 
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
+| [python-clang](https://pypi.org/project/clang/) | 3.5.0 |
+| [ccsyspath](https://pypi.org/project/ccsyspath/) | 1.1.0 |
 | [IDA Pro](https://www.hex-rays.com/products/ida) | 7.1+ |
 | [Binary Ninja](https://binary.ninja/) | Latest |
 | [Dyninst](https://www.dyninst.org/) | 9.3.2 |
@@ -102,10 +104,22 @@ RUN /root/binaryninja/scripts/linux-setup.sh
 
 #### Step 3: Build & Run Dockerfile
 
-This will build the container for you and run it with your local directory mounted into the container (at /home/user/local) such that your work in the container is saved locally:
-`docker build -t=mcsema . && docker run --rm -it --ipc=host -v "${PWD}":/home/user/local mcsema`
+This will build the container for you and run it with your local directory mounted into the container (at `/mcsema/local`) such that your work in the container is saved locally:
 
-### On Linux
+```sh
+# build mcsema container
+ARCH=amd64; UBUNTU=18.04; LLVM=800; docker build . \
+  -t mcsema:llvm${LLVM}-ubuntu${UBUNTU}-${ARCH} \
+  -f Dockerfile \
+  --build-arg UBUNTU_VERSION=${UBUNTU} \
+  --build-arg LLVM_VERSION=${LLVM} \
+  --build-arg ARCH=${ARCH}
+
+# run mcsema container
+docker run --rm -it --ipc=host -v "$(pwd)":/mcsema/local mcsema:llvm${LLVM}-ubuntu{$UBUNTU}-${ARCH}
+```
+
+### Native Build On Linux
 
 #### Step 1: Install dependencies
 
@@ -123,9 +137,11 @@ sudo apt-get install \
      gcc-multilib g++-multilib \
      libtinfo-dev \
      lsb-release \
-     realpath \
-     zlib1g-dev
+     zlib1g-dev \
+     ccache
 ```
+
+For Ubuntu 16.04 and 14.04 you also need to install the realpath package.
 
 If you are going to be using IDA Pro for CFG recovery also do the following:
 
@@ -193,12 +209,26 @@ else
 fi
 ```
 
+In case you want to use Dyninst as the frontend do this instead (after Dyninst 9.3.2 has been installed to the standard /usr/local location):
+```shell
+export CMAKE_PREFIX_PATH=/usr/local/lib/cmake/Dyninst
+if [ -z "${VIRTUAL_ENV}" ]
+then
+  # no virtualenv; global install for all users
+  ./scripts/build.sh --dyninst-frontend
+else
+  # found a virtualenv; local install
+  ./scripts/build.sh --dyninst-frontend --prefix $(realpath ../)
+fi
+```
+Details can be found in [Dyninst frontend](tools/mcsema_disass/dyninst/README.md).
+
 This script accepts several command line options:
 
 * `--prefix PATH`: Install files to `PATH`. By default, `PATH` is `/usr/local`.
 * `--llvm-version MAJOR.MINOR`: Download pre-built dependencies for LLVM version MAJOR.MINOR. The default is to use LLVM 4.0.
 * `--build-dir PATH`: Produce all intermediate build files in `PATH`. By default, `PATH` is `$CWD/remill-build`.
-* `--use-system-compiler`: Compile Remill+McSema using the system compiler toolchain (typically the GCC). **If you encounter linker errors when compiling McSema, and did not use this option, then re-try with this option.**
+* `--use-host-compiler`: Compile Remill+McSema using the system compiler toolchain (typically the GCC). **If you encounter linker errors when compiling McSema, and did not use this option, then re-try with this option.**
 * `--debug`: Build McSema and Remill with debug symbols. If you're trying to debug McSema, then this option is for you.
 
 #### Step 4: Install McSema
@@ -226,20 +256,20 @@ In order to verify that McSema works correctly as built, head on over to [the do
 ### On Windows
 #### Step 1: Installing the toolchain
 **Visual Studio**
-1. Download the "Build Tools for Visual Studio 2017" installer from the following page: https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2017
-2. Run the setup and select "Visual C++ build tools"
+1. Click on "Tools for Visual Studio 2019" and download the "Build Tools for Visual Studio 2019" installer from the [Visual Studio downloads page](https://visualstudio.microsoft.com/downloads/)
+2. Select "MSVC v142 - VS 2019 C++ x64/x86 build tools" and confirm the installation
 
 **LLVM**
-1. Get the LLVM 7.0.1 (x64) installer from the LLVM download page: http://releases.llvm.org
+1. Get the LLVM 9 (x64) installer from the LLVM download page: http://releases.llvm.org
 2. Do **NOT** enable "Add to PATH"
 
 **Python**
 1. Get the latest Python 2.7 (X64) installer from the official download page: https://www.python.org/downloads/windows/
-2. Enable "Add to PATH" when possible
+2. Enable "Add to PATH"
 
 **CMake**
 1. Download the CMake (x64) installer from https://cmake.org/download
-2. Enable "Add to PATH" when possible
+2. Enable "Add to PATH"
 
 #### Step 2: Obtaining the source code
 ```
@@ -255,14 +285,24 @@ git fetch --unshallow
 git checkout -b production `cat tools/mcsema/.remill_commit_id`
 ```
 
-#### Step 3: Dependencies
-First, set up LLVM Toolchain Support for Visual Studio 2017 Build Tools. There is a script in remill to automate this for you.
-```
-cd C:\Projects\remill\scripts\windows (or wherever you cloned remill)
-powershell -nologo -executionpolicy bypass -File llvm_toolchain_vs2017.ps1
-```
+#### Step 3: Enabling the LLVM toolchain for Visual Studio
 
-Next, its time to fetch library dependencies. You can either build them yourself using our [cxx-common](https://github.com/trailofbits/cxx-common) dependency manager or download a pre-built package.
+Download the official extension from the market place: https://marketplace.visualstudio.com/items?itemName=LLVMExtensions.llvm-toolchain
+
+##### Automatic installation
+
+Only works for the full Visual Studio IDE. Double clicking the extension should automatically install it.
+
+##### Manual installation
+
+The extension is in fact a ZIP archive; extract it and copy the VCTargets folder to the right location.
+
+* Full Visual Studio: `C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\IDE\VC\VCTargets`
+* Visual Studio Build Tools: `C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Microsoft\VC\v160`
+
+#### Step 4: Dependencies
+
+Its time to fetch library dependencies. You can either build them yourself using our [cxx-common](https://github.com/trailofbits/cxx-common) dependency manager or download a pre-built package.
 
 There are two versions of LLVM used by remill and mcsema. One version (currently 7.0.1) builds remill and mcsema. Another version (currently 5.0.1) is used to build the translation semantics.
 
@@ -271,40 +311,57 @@ On Windows, only the LLVM 5.0.1 package is supported for building semantics. If 
 Binaries (extract to C:\Projects\tob_libraries)
 * [LLVM 5](https://s3.amazonaws.com/cxx-common/libraries-llvm50-windows10-amd64.7z)
 
-#### Step 4: Building
+#### Step 5: Building
 Make sure to always execute the `vcvars64.bat` script from the "x64 Native Tools Command Prompt": `C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvars64.bat`.
 
 ```
 mkdir remill_build
 cd remill_build
 
-cmake -G "Visual Studio 15 2017" -T llvm -A x64 -DCMAKE_BUILD_TYPE=Release -DLIBRARY_REPOSITORY_ROOT=C:\Projects\tob_libraries -DCMAKE_INSTALL_PREFIX=C:\ ..\remill
-cmake --build . --config Release -- /maxcpucount:4
+cmake -G "Visual Studio 16 2019" -T llvm -A x64 -DCMAKE_BUILD_TYPE=Release -DLIBRARY_REPOSITORY_ROOT=C:\Projects\tob_libraries -DCMAKE_INSTALL_PREFIX=C:\ ..\remill
+cmake --build . --config Release -- /maxcpucount:%NUMBER_OF_PROCESSORS%
 ```
 
 If you are using a recent CMake version (> 3.13) you can also use the newly introduced cross-platform `-j` parameter:
 
 ```
-cmake --build . --config Release -j 4
+cmake --build . --config Release -j %NUMBER_OF_PROCESSORS%
 ```
 
-#### Step 5: Installing
+#### Step 6: Installing
 ```
 cmake --build . --config Release --target install
 ```
 
 You should now have the following directories: C:\mcsema, C:\remill.
 
-Add the following folders to your PATH environment variable:
-* C:\remill\bin
-* C:\mcsema\Scripts
-* C:\mcsema\bin
+#### Step 7: Running McSema
 
-Also update your PYTHONPATH: C:\mcsema\Lib\site-packages
+**Add the McSema python package to Python**
 
-### Dyninst frontend
+Make extra sure it only contains ASCII characters with no newlines! The following command should work fine under cmd:
 
-[Dyninst frontend](tools/mcsema_disass/dyninst/README.md) can be build with ```./build.sh --dyninst-frontend```. More information can be found in ```tools/mcsema_disass/dyninst/README.md```.
+```
+echo|set /p="C:\mcsema\Lib\site-packages" > "C:\Python27\Lib\site-packages\mcsema.pth"
+```
+
+**Install the libmagic DLL**
+
+```
+pip install python-magic-bin
+```
+
+**Update the PATH (cmd)**
+
+```
+set PATH=%PATH%;C:\remill\bin;C:\mcsema\bin;C:\mcsema\Scripts
+```
+
+**Update the PATH (PowerShell)**
+
+```
+$env:PATH+="C:\remill\bin;C:\mcsema\bin;C:\mcsema\Scripts"
+```
 
 ## Additional Documentation
 
