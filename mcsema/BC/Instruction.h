@@ -48,7 +48,8 @@ class InstructionLifter : public remill::InstructionLifter {
 
   // Lift a single instruction into a basic block.
   remill::LiftStatus LiftIntoBlock(remill::Instruction &inst,
-                                   llvm::BasicBlock *block) override;
+                                   llvm::BasicBlock *block,
+                                   bool is_delayed = false) override;
 
  protected:
   // Lift an immediate operand.

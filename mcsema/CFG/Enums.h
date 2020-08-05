@@ -17,8 +17,8 @@
 #pragma once
 
 #include <cstdint>
+#include <initializer_list>
 #include <string_view>
-
 
 namespace mcsema::ws {
 
@@ -37,7 +37,7 @@ static inline constexpr std::string_view to_string(OS os) {
   }
 };
 
-static inline std::vector<OS> AllOS() {
+static inline std::initializer_list<OS> AllOS() {
   return {OS::Linux, OS::Windows, OS::OSX};
 }
 
@@ -65,7 +65,7 @@ static inline constexpr std::string_view to_string(SymbolVisibility sv) {
   }
 }
 
-using SymbolVisibilities = std::vector<SymbolVisibility>;
+using SymbolVisibilities = std::initializer_list<SymbolVisibility>;
 
 static inline SymbolVisibilities AllSymbolVisibilities() {
   return {SymbolVisibility::Imported, SymbolVisibility::Exported,
@@ -101,7 +101,7 @@ static inline constexpr std::string_view to_string(CallingConv c) {
   }
 }
 
-using CallingConvs = std::vector<CallingConv>;
+using CallingConvs = std::initializer_list<CallingConv>;
 
 static inline CallingConvs AllCCs() {
   return {CallingConv::C,
@@ -134,7 +134,7 @@ static inline constexpr std::string_view to_string(OperandType ot) {
   }
 }
 
-using OperandTypes = std::vector<OperandType>;
+using OperandTypes = std::initializer_list<OperandType>;
 
 static inline OperandTypes AllOperandTypes() {
   return {OperandType::Immediate, OperandType::Memory,

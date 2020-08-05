@@ -130,7 +130,8 @@ InstructionLifter::InstructionLifter(const remill::IntrinsicTable *intrinsics_,
 
 // Lift a single instruction into a basic block.
 remill::LiftStatus InstructionLifter::LiftIntoBlock(remill::Instruction &inst,
-                                                    llvm::BasicBlock *block_) {
+                                                    llvm::BasicBlock *block_,
+                                                    bool is_delayed) {
 
   inst_ptr = &inst;
   block = block_;
@@ -142,7 +143,8 @@ remill::LiftStatus InstructionLifter::LiftIntoBlock(remill::Instruction &inst,
   disp_ref_used = false;
   imm_ref_used = false;
 
-  auto status = this->remill::InstructionLifter::LiftIntoBlock(inst, block);
+  auto status = this->remill::InstructionLifter::LiftIntoBlock(
+      inst, block, is_delayed);
 
   // If we have semantics for the instruction, then make sure that we were
   // able to match cross-reference information to the instruction's operands.
