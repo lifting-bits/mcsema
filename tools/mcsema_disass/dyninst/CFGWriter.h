@@ -100,6 +100,8 @@ private:
   void CheckDisplacement(Dyninst::InstructionAPI::Expression *,
                          mcsema::Instruction *);
   bool IsExternal(Dyninst::Address addr) const;
+  void ComputeBBAttributes();
+
 
   mcsema::Module &module;
 

@@ -359,6 +359,7 @@ void CFGWriter::Write() {
   }
 
   module.set_name(FLAGS_binary);
+  ComputeBBAttributes();
 }
 
 void CFGWriter::WriteExternalVariables() {
@@ -1219,4 +1220,21 @@ bool CFGWriter::IsExternal(Address addr) const {
   return
     ctx.external_vars.find(addr) != ctx.external_vars.end() ||
     ctx.external_funcs.find(addr) != ctx.external_funcs.end();
+}
+
+// Set `is_referenced_by_data`. This is independent from the
+// actual xref resolution and is done as last step.
+// TODO(lukas): We may need mark offset tables entries as well.
+void CFGWriter::ComputeBBAttributes() {
+  std::unordered_map<uint64_t, mcsema::Block *> bbs;
+  for (auto &cfg_fn : *module.mutable_funcs())
+    for (auto &cfg_bb : *cfg_fn.mutable_blocks())
+      bbs.emplace(cfg_bb.ea(), &cfg_bb);
+
+  for (auto &[ea, cfg_dref] : ctx.data_xrefs) {
+    auto it = bbs.find(cfg_dref->target_ea());
+    if (it == bbs.end())
+      continue;
+    it->second->set_is_referenced_by_data(true);
+  }
 }
