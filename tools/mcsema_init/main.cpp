@@ -24,7 +24,8 @@ std::string help() {
   std::string out;
   out += "usage: mcsema-init input output \n";
   out += "\tinput: CFG file produced by a mcsema frontend\n";
-  out += "\toutput: path to mcsema-ws database. If db already exists, entries from cfg are added only if db does not contain such module already.";
+  out +=
+      "\toutput: path to mcsema-ws database. If db already exists, entries from cfg are added only if db does not contain such module already.";
   return out;
 }
 

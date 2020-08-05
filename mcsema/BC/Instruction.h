@@ -51,24 +51,22 @@ class InstructionLifter : public remill::InstructionLifter {
                                    llvm::BasicBlock *block) override;
 
  protected:
-
   // Lift an immediate operand.
-  llvm::Value *LiftImmediateOperand(
-      remill::Instruction &inst, llvm::BasicBlock *block,
-      llvm::Argument *arg, remill::Operand &op) override;
+  llvm::Value *
+  LiftImmediateOperand(remill::Instruction &inst, llvm::BasicBlock *block,
+                       llvm::Argument *arg, remill::Operand &op) override;
 
   // Lift an indirect memory operand to a value.
-  llvm::Value *LiftAddressOperand(
-      remill::Instruction &inst, llvm::BasicBlock *block,
-      llvm::Argument *arg, remill::Operand &mem) override;
+  llvm::Value *LiftAddressOperand(remill::Instruction &inst,
+                                  llvm::BasicBlock *block, llvm::Argument *arg,
+                                  remill::Operand &mem) override;
 
   // Lift a register operand to a value.
-  llvm::Value *LiftRegisterOperand(
-      remill::Instruction &inst, llvm::BasicBlock *block,
-      llvm::Argument *arg, remill::Operand &reg) override;
+  llvm::Value *LiftRegisterOperand(remill::Instruction &inst,
+                                   llvm::BasicBlock *block, llvm::Argument *arg,
+                                   remill::Operand &reg) override;
 
  private:
-
   llvm::Value *GetAddress(const NativeXref *cfg_xref);
   llvm::Value *GetMaskedAddress(const NativeXref *cfg_xref);
 

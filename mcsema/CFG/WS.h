@@ -16,14 +16,14 @@
 
 #pragma once
 
+#include <mcsema/CFG/Enums.h>
+#include <mcsema/CFG/Iterator.h>
+
 #include <iostream>
 #include <memory>
 #include <string_view>
 #include <utility>
 #include <vector>
-
-#include <mcsema/CFG/Iterator.h>
-#include <mcsema/CFG/Enums.h>
 
 namespace mcsema::ws {
 
@@ -49,23 +49,24 @@ class Context;
 using maybe_str = std::optional<std::string>;
 
 namespace details {
-  using CtxPtr = std::shared_ptr<Context>;
-  struct Construct;
-} // namespace details
+using CtxPtr = std::shared_ptr<Context>;
+struct Construct;
+}  // namespace details
 
 // Each object can implement some of the following interfaces
 namespace interface {
 
-template<typename Self>
+template <typename Self>
 struct HasEa {
   uint64_t ea();
 
   // TODO: Can this be hidden away?
   // TODO: This needs to be filtered by module_id
-  template<typename HasCtx>
+  template <typename HasCtx>
   static std::optional<Self> MatchEa(
       const HasCtx &has_ctx,
-      int64_t module_id,  // <- FIXME: normally it is private, this is ugly workaround
+      int64_t
+          module_id,  // <- FIXME: normally it is private, this is ugly workaround
       uint64_t ea) {
 
     return MatchEa(has_ctx._ctx, module_id, ea);
@@ -74,34 +75,31 @@ struct HasEa {
   // If something has ea it must be part of a module
   Module Module();
 
-private:
-
+ private:
   //TODO: Make this callable from outside
-  static std::optional<Self> MatchEa(
-      details::CtxPtr &ctx_ptr,
-      int64_t module_id,
-      uint64_t ea);
+  static std::optional<Self> MatchEa(details::CtxPtr &ctx_ptr,
+                                     int64_t module_id, uint64_t ea);
 };
 
 // Defition uses SymbolTableEntry class, therefore can be found lower
-template<typename Self>
+template <typename Self>
 struct HasSymbolTableEntry;
 
-} // namespace interface
+}  // namespace interface
 
 
 // Internal stuff that could not be hidden away in .cpp file, plese pretend it is not here
 namespace details {
 
 class Internals {
-public:
-
+ public:
   // This is used to allow automatic meta-conversion from object of this hierarchy
   // to their ids.
   static constexpr bool is_public_api = true;
 
   Workspace GetWS();
-protected:
+
+ protected:
   Internals(int64_t id, CtxPtr &ctx) : _id(id), _ctx(ctx) {}
   Internals(int64_t id, CtxPtr &&ctx) : _id(id), _ctx(std::move(ctx)) {}
 
@@ -111,14 +109,14 @@ protected:
   friend details::Construct;
 
   // TODO: Do we care if someone tries to shoot in the foot really hard?
-  template<typename T>
+  template <typename T>
   friend class interface::HasEa;
 
-  template<typename T>
+  template <typename T>
   friend class interface::HasSymbolTableEntry;
 };
 
-} // namespace details
+}  // namespace details
 
 
 /* Each of the following objects is rather opaque and typically correspond to some
@@ -139,8 +137,7 @@ protected:
 // things as desired with Artificial type to signify that they do not origin
 // from the  binary)
 class SymbolTableEntry : public details::Internals {
-public:
-
+ public:
   struct data_t {
     std::string name;
     SymbolVisibility type;
@@ -150,7 +147,7 @@ public:
 
   void Erase();
 
-private:
+ private:
   friend class Module;
   friend class Function;
   friend class CodeXref;
@@ -159,7 +156,6 @@ private:
   friend class BasicBlock;
 
   using details::Internals::Internals;
-
 };
 
 
@@ -167,21 +163,21 @@ namespace interface {
 
 // Some objects can (sometimes it is not required!) have name -- this interface
 // allows manipulation with it
-template<typename Self>
+template <typename Self>
 struct HasSymbolTableEntry {
   maybe_str Name();
-  void Name(const SymbolTableEntry& name);
+  void Name(const SymbolTableEntry &name);
   std::optional<SymbolTableEntry::data_t> Symbol();
 };
 
-} // namespace interface
+}  // namespace interface
 
 
-class ExternalFunction : public details::Internals,
-                         public interface::HasEa<ExternalFunction>,
-                         public interface::HasSymbolTableEntry<ExternalFunction> {
-public:
-
+class ExternalFunction
+    : public details::Internals,
+      public interface::HasEa<ExternalFunction>,
+      public interface::HasSymbolTableEntry<ExternalFunction> {
+ public:
   struct data_t {
     uint64_t ea;
     CallingConv cc;
@@ -198,7 +194,7 @@ public:
 
   void Erase();
 
-private:
+ private:
   friend class Module;
   friend class interface::HasEa<ExternalFunction>;
 
@@ -208,47 +204,44 @@ private:
 
 class BasicBlock : public details::Internals,
                    public interface::HasEa<BasicBlock> {
-public:
+ public:
+  // We are not including underlying data, since they are being cached and need
+  // separate query anyway
+  struct data_t {
+    uint64_t ea;
+    std::optional<uint64_t> size;
+  };
 
-    // We are not including underlying data, since they are being cached and need
-    // separate query anyway
-    struct data_t {
-      uint64_t ea;
-      std::optional<uint64_t> size;
-    };
+  data_t operator*() const;
 
-    data_t operator*() const;
+  // Cached
+  std::string_view Data();
 
-    // Cached
-    std::string_view Data();
+  CodeXref AddXref(uint64_t ea, uint64_t target_ea, OperandType op_type);
+  CodeXref AddXref(uint64_t ea, uint64_t target_ea, OperandType op_type,
+                   const SymbolTableEntry &name,
+                   std::optional<int64_t> mask = {});
 
-    CodeXref AddXref(uint64_t ea, uint64_t target_ea, OperandType op_type);
-    CodeXref AddXref(uint64_t ea,
-                     uint64_t target_ea,
-                     OperandType op_type,
-                     const SymbolTableEntry &name,
-                     std::optional<int64_t> mask={});
+  void AddSucc(const BasicBlock &bb);
 
-    void AddSucc(const BasicBlock &bb);
-
-    template<typename Collection = std::vector<BasicBlock>>
-    void AddSuccs(const Collection &bbs) {
-      for (auto bb : bbs) {
-        AddSucc(bb);
-      }
+  template <typename Collection = std::vector<BasicBlock>>
+  void AddSuccs(const Collection &bbs) {
+    for (auto bb : bbs) {
+      AddSucc(bb);
     }
+  }
 
-    void RemoveSucc(const BasicBlock &bb);
-    void RemoveSuccs();
+  void RemoveSucc(const BasicBlock &bb);
+  void RemoveSuccs();
 
-    WeakObjectIterator<BasicBlock> Succs();
+  WeakObjectIterator<BasicBlock> Succs();
 
-    WeakObjectIterator<CodeXref> CodeXrefs();
-    WeakDataIterator<CodeXref> CodeXrefsData();
+  WeakObjectIterator<CodeXref> CodeXrefs();
+  WeakDataIterator<CodeXref> CodeXrefsData();
 
-    void Erase();
-private:
+  void Erase();
 
+ private:
   friend class Function;
   friend class Workspace;
   friend class Module;
@@ -263,8 +256,7 @@ class Function : public details::Internals,
                  public interface::HasEa<Function>,
                  public interface::HasSymbolTableEntry<Function> {
 
-public:
-
+ public:
   struct data_t {
     uint64_t ea;
     bool is_entrypoint;
@@ -274,7 +266,7 @@ public:
 
   void AttachBlock(const BasicBlock &bb);
 
-  template<typename Collection = std::vector<BasicBlock>>
+  template <typename Collection = std::vector<BasicBlock>>
   void AttachBlocks(const Collection &bbs) {
     for (auto bb : bbs) {
       AttachBlock(bb);
@@ -292,7 +284,7 @@ public:
 
   void Erase();
 
-private:
+ private:
   using details::Internals::Internals;
 
   friend class details::ObjectIterator_impl;
@@ -307,15 +299,14 @@ private:
 class Segment : public details::Internals,
                 public interface::HasEa<Segment>,
                 public interface::HasSymbolTableEntry<Segment> {
-public:
-
+ public:
   struct Flags {
     bool read_only;
     bool is_external;
     bool is_exported;
     bool is_thread_local;
 
-    template<typename Stream>
+    template <typename Stream>
     friend Stream &operator<<(Stream &os, const Flags &self) {
       os << "RO " << self.read_only << ", "
          << "External: " << self.is_external << ", "
@@ -330,8 +321,8 @@ public:
     uint64_t size;
     Flags flags;
 
-    template<typename Stream>
-    friend Stream& operator<<(Stream &os, const data_t &self) {
+    template <typename Stream>
+    friend Stream &operator<<(Stream &os, const data_t &self) {
       os << std::hex << "0x" << self.ea << std::dec << " of size " << self.size
          << " and flags: " << self.flags;
       return os;
@@ -346,9 +337,10 @@ public:
   std::string_view Data();
   void SetFlags(const Flags &flags);
 
-  DataXref AddXref(uint64_t ea, uint64_t target_ea, uint64_t width, FixupKind fixup);
-  DataXref AddXref(uint64_t ea, uint64_t target_ea,
-                   uint64_t width, FixupKind fixup, const SymbolTableEntry &name);
+  DataXref AddXref(uint64_t ea, uint64_t target_ea, uint64_t width,
+                   FixupKind fixup);
+  DataXref AddXref(uint64_t ea, uint64_t target_ea, uint64_t width,
+                   FixupKind fixup, const SymbolTableEntry &name);
 
   // FIXME: This does not remove xrefs, maybe add either:
   // void EraseAll()
@@ -357,7 +349,7 @@ public:
   void Erase();
 
 
-private:
+ private:
   friend class MemoryRange;
   friend class Module;
   friend class Workspace;
@@ -372,8 +364,7 @@ private:
 // TODO: Insert for empty like .bbs
 class MemoryRange : public details::Internals,
                     public interface::HasEa<MemoryRange> {
-public:
-
+ public:
   struct data_t {
     uint64_t ea;
     uint64_t range;
@@ -381,9 +372,7 @@ public:
 
   data_t operator*() const;
 
-  Segment AddSegment(uint64_t ea,
-                     uint64_t size,
-                     const Segment::Flags &flags,
+  Segment AddSegment(uint64_t ea, uint64_t size, const Segment::Flags &flags,
                      const std::string &name);
 
   // Cached
@@ -391,7 +380,8 @@ public:
 
   // FIXME: This does not remove Segments or BBs
   void Erase();
-private:
+
+ private:
   friend class Workspace;
   friend class Module;
 
@@ -408,16 +398,15 @@ class CodeXref : public details::Internals,
                  public interface::HasEa<CodeXref>,
                  public interface::HasSymbolTableEntry<CodeXref> {
 
-public:
-
+ public:
   struct data_t {
     uint64_t ea;
     uint64_t target_ea;
     OperandType op_type;
     std::optional<int64_t> mask;
 
-    template<typename Stream>
-    friend Stream& operator<<(Stream &os, const data_t &obj) {
+    template <typename Stream>
+    friend Stream &operator<<(Stream &os, const data_t &obj) {
       os << std::hex << obj.ea << " -> " << obj.target_ea << std::dec
          << static_cast<int>(obj.op_type);
       return os;
@@ -428,7 +417,7 @@ public:
 
   void Erase();
 
-private:
+ private:
   friend class Module;
   friend class BasicBlock;
   friend class interface::HasEa<CodeXref>;
@@ -445,8 +434,7 @@ class DataXref : public details::Internals,
                  public interface::HasEa<DataXref>,
                  public interface::HasSymbolTableEntry<DataXref> {
 
-public:
-
+ public:
   struct data_t {
     uint64_t ea;
     uint64_t target_ea;
@@ -457,7 +445,8 @@ public:
   data_t operator*() const;
 
   void Erase();
-private:
+
+ private:
   friend class Segment;
 
   friend class interface::HasEa<DataXref>;
@@ -467,14 +456,14 @@ private:
 class GlobalVar : public details::Internals,
                   public interface::HasEa<GlobalVar> {
 
-public:
+ public:
   struct data_t {
     uint64_t ea;
     std::string name;
     uint64_t size;
 
-    template<typename Stream>
-    friend Stream& operator<<(Stream &os, const data_t &self) {
+    template <typename Stream>
+    friend Stream &operator<<(Stream &os, const data_t &self) {
       os << std::hex << "0x" << self.ea << std::dec << " of size " << self.size
          << " with name " << self.name;
       return os;
@@ -485,7 +474,7 @@ public:
 
   void Erase();
 
-private:
+ private:
   using details::Internals::Internals;
 
   friend details::ObjectIterator_impl;
@@ -495,7 +484,7 @@ private:
 
 class ExternalVar : public details::Internals,
                     public interface::HasEa<ExternalVar> {
-public:
+ public:
   struct data_t {
     uint64_t ea;
     std::string name;
@@ -504,8 +493,8 @@ public:
     bool is_weak;
     bool is_thread_local;
 
-    template<typename Stream>
-    friend Stream& operator<<(Stream &os, const data_t &self) {
+    template <typename Stream>
+    friend Stream &operator<<(Stream &os, const data_t &self) {
       os << std::hex << "0x" << self.ea << std::dec << " of size " << self.size
          << " with name " << self.name;
       return os;
@@ -515,7 +504,7 @@ public:
   data_t operator*() const;
   void Erase();
 
-private:
+ private:
   using details::Internals::Internals;
 
   friend details::ObjectIterator_impl;
@@ -524,8 +513,7 @@ private:
 };
 
 class ExceptionFrame : public details::Internals {
-public:
-
+ public:
   struct data_t {
     uint64_t start_ea;
     uint64_t end_ea;
@@ -536,7 +524,7 @@ public:
   data_t operator*();
   void Erase();
 
-private:
+ private:
   using details::Internals::Internals;
 
   friend details::ObjectIterator_impl;
@@ -544,16 +532,15 @@ private:
 };
 
 class MemoryLocation : public details::Internals {
-public:
-
+ public:
   struct data_t {
     std::string reg;
     std::optional<int64_t> offset;
 
-    template<typename Stream>
-    friend Stream& operator<<(Stream &os, const data_t &self) {
-      os << self.reg
-         << ", offset: " << ((self.offset) ? std::to_string(*self.offset) : "(not set)");
+    template <typename Stream>
+    friend Stream &operator<<(Stream &os, const data_t &self) {
+      os << self.reg << ", offset: "
+         << ((self.offset) ? std::to_string(*self.offset) : "(not set)");
       return os;
     }
   };
@@ -561,7 +548,7 @@ public:
   data_t operator*() const;
   void Erase();
 
-private:
+ private:
   using details::Internals::Internals;
 
   friend class Workspace;
@@ -569,23 +556,21 @@ private:
 };
 
 class ValueDecl : public details::Internals {
-public:
-
+ public:
   struct data_t {
     std::string type;
     maybe_str reg;
     maybe_str name;
     std::optional<MemoryLocation> mem_loc;
 
-    template<typename Stream>
+    template <typename Stream>
     friend Stream &operator<<(Stream &os, const data_t &self) {
-      os << self.type
-         <<  ", reg: " << ((self.reg) ? *self.reg : "(not set)")
-         <<  ", name: " << ((self.name) ? *self.name : "(not set)") << std::endl;
+      os << self.type << ", reg: " << ((self.reg) ? *self.reg : "(not set)")
+         << ", name: " << ((self.name) ? *self.name : "(not set)") << std::endl;
       os << "mem_loc: ";
       if (self.mem_loc) {
         os << **self.mem_loc;
-      } else{
+      } else {
         os << "(not set)";
       }
       return os;
@@ -595,7 +580,7 @@ public:
   data_t operator*() const;
   void Erase();
 
-private:
+ private:
   using details::Internals::Internals;
   friend class Workspace;
   friend class FuncDecl;
@@ -604,7 +589,7 @@ private:
 
 
 class FuncDecl : public details::Internals {
-public:
+ public:
   using ValueDecls = std::vector<ValueDecl>;
   using ValueDecl_it = WeakObjectIterator<ValueDecl>;
 
@@ -617,19 +602,20 @@ public:
     bool is_noreturn;
     CallingConv cc;
 
-    template<typename Stream>
+    template <typename Stream>
     friend Stream &operator<<(Stream &os, const data_t &self) {
-      os << "varargs: " << self.is_variadic << ", noreturn: " << self.is_noreturn
-         << ", cc: " << to_string(self.cc) << std::endl;
+      os << "varargs: " << self.is_variadic
+         << ", noreturn: " << self.is_noreturn << ", cc: " << to_string(self.cc)
+         << std::endl;
       os << "Ret_addr: " << *self.ret_address << std::endl;
       os << "Ret_stack_ptr" << *self.return_stack_ptr << std::endl;
       os << "Params:" << std::endl;
-      for (auto &param: self.params) {
+      for (auto &param : self.params) {
         os << "\t" << *param << std::endl;
       }
 
       os << "Rets:" << std::endl;
-      for (auto &ret: self.rets) {
+      for (auto &ret : self.rets) {
         os << "\t" << *ret << std::endl;
       }
       return os;
@@ -641,21 +627,21 @@ public:
   void AddParam(const ValueDecl &val_dec);
   void AddRet(const ValueDecl &val_dec);
 
-  template<typename Container>
+  template <typename Container>
   void AddParams(const Container &val_decs) {
     for (auto &val_dec : val_decs) {
       AddParam(val_dec);
     }
   }
 
-  template<typename Container>
+  template <typename Container>
   void AddRets(const Container &val_decs) {
     for (auto &val_dec : val_decs) {
       AddRet(val_dec);
     }
   }
 
-private:
+ private:
   using details::Internals::Internals;
   friend class Function;
   friend class ExternalFunction;
@@ -663,7 +649,7 @@ private:
 };
 
 class PreservedRegs : public details::Internals {
-public:
+ public:
   using PreservationRange = std::pair<int64_t, std::optional<int64_t>>;
   using Ranges = std::vector<PreservationRange>;
   using Regs = std::vector<std::string>;
@@ -673,8 +659,8 @@ public:
     Regs regs;
     Ranges ranges;
 
-    template<typename Stream>
-    friend Stream& operator<<(Stream &os, const data_t &self) {
+    template <typename Stream>
+    friend Stream &operator<<(Stream &os, const data_t &self) {
       os << "Alive: " << self.is_alive << std::endl;
       os << "Regs: ";
       for (auto &reg : self.regs) {
@@ -686,7 +672,6 @@ public:
            << ((end) ? std::to_string(*end) : "(not set)") << " ] ";
       }
       return os;
-
     }
   };
 
@@ -697,7 +682,7 @@ public:
 
   void Erase();
 
-private:
+ private:
   using details::Internals::Internals;
 
   friend class Module;
@@ -708,30 +693,32 @@ private:
 // One object file -- compiled binary or shared library for example.
 class Module : public details::Internals {
 
-public:
-  ExternalVar AddExternalVar(uint64_t ea, const std::string &name, uint64_t size,
-                             bool is_weak=false, bool is_thread_local=false);
+ public:
+  ExternalVar AddExternalVar(uint64_t ea, const std::string &name,
+                             uint64_t size, bool is_weak = false,
+                             bool is_thread_local = false);
 
   GlobalVar AddGlobalVar(uint64_t ea, const std::string &name, uint64_t size);
 
   Function AddFunction(uint64_t ea, bool is_entrypoint);
 
-  MemoryRange AddMemoryRange(uint64_t ea, uint64_t range, std::string_view data);
+  MemoryRange AddMemoryRange(uint64_t ea, uint64_t range,
+                             std::string_view data);
 
   MemoryRange AddMemoryRange(uint64_t ea, std::string_view data);
 
   // Zero-initialized MemoryRange
   MemoryRange AddMemoryRange(uint64_t ea, uint64_t range);
 
-  BasicBlock AddBasicBlock(uint64_t ea, std::optional<uint64_t> size, const MemoryRange &memory);
+  BasicBlock AddBasicBlock(uint64_t ea, std::optional<uint64_t> size,
+                           const MemoryRange &memory);
 
   SymbolTableEntry AddSymbolTableEntry(const std::string &name,
                                        SymbolVisibility type);
 
-  ExternalFunction AddExternalFunction(uint64_t ea,
-                                       const SymbolTableEntry &name,
-                                       CallingConv cc,
-                                       bool has_return, bool is_weak);
+  ExternalFunction
+  AddExternalFunction(uint64_t ea, const SymbolTableEntry &name, CallingConv cc,
+                      bool has_return, bool is_weak);
 
   PreservedRegs AddPreservedRegs(const PreservedRegs::Ranges &ranges,
                                  const PreservedRegs::Regs &regs,
@@ -759,12 +746,12 @@ public:
   // FIXME: This should probably also delete all module-binded data?
   // void Erase();
 
-  template<typename ...Targets>
-  bool MatchEa(uint64_t ea, Targets ...targets) {
-    return util::Match(*this, this->_id, ea, std::forward<Targets>(targets) ...);
+  template <typename... Targets>
+  bool MatchEa(uint64_t ea, Targets... targets) {
+    return util::Match(*this, this->_id, ea, std::forward<Targets>(targets)...);
   }
 
-private:
+ private:
   using details::Internals::Internals;
 
   friend class Workspace;
@@ -772,8 +759,7 @@ private:
 
 
 // Top-level object, encapsulates several separate object files.
-struct Workspace
-{
+struct Workspace {
   Workspace(const std::string &db_name);
 
   void CreateSchema();
@@ -784,48 +770,39 @@ struct Workspace
 
   Function AddFunction(const Module &module, uint64_t ea, bool is_entrypoint);
 
-  BasicBlock AddBasicBlock(const Module &module,
-                           uint64_t ea,
+  BasicBlock AddBasicBlock(const Module &module, uint64_t ea,
                            std::optional<uint64_t> size,
                            const MemoryRange &range);
 
-  MemoryRange AddMemoryRange(const Module &module,
-                             uint64_t ea,
-                             uint64_t range,
+  MemoryRange AddMemoryRange(const Module &module, uint64_t ea, uint64_t range,
                              std::string_view data);
 
-  MemoryRange AddMemoryRange(const Module &module,
-                             uint64_t ea,
+  MemoryRange AddMemoryRange(const Module &module, uint64_t ea,
                              std::string_view data);
 
-  Segment AddSegment(const Module &module,
-                     uint64_t ea,
-                     uint64_t size,
-                     const Segment::Flags &flags,
-                     const std::string &name,
+  Segment AddSegment(const Module &module, uint64_t ea, uint64_t size,
+                     const Segment::Flags &flags, const std::string &name,
                      MemoryRange &mem);
 
   MemoryLocation AddMemoryLoc(const std::string &reg);
   MemoryLocation AddMemoryLoc(const std::string &reg, int64_t offset);
 
-  ValueDecl AddValueDecl(const std::string &type,
-                         maybe_str reg,
-                         maybe_str name,
+  ValueDecl AddValueDecl(const std::string &type, maybe_str reg, maybe_str name,
                          std::optional<MemoryLocation> mem_loc);
 
   FuncDecl AddFuncDecl(const ValueDecl &ret_address,
                        const ValueDecl &ret_stack_addr,
                        const FuncDecl::ValueDecls &params,
-                       const FuncDecl::ValueDecls &rets,
-                       bool is_variadic, bool is_noreturn, CallingConv cc);
+                       const FuncDecl::ValueDecls &rets, bool is_variadic,
+                       bool is_noreturn, CallingConv cc);
 
-private:
+ private:
   friend class details::Construct;
 
-  Workspace(std::shared_ptr<Context> c) :_ctx(std::move(c)) {}
+  Workspace(std::shared_ptr<Context> c) : _ctx(std::move(c)) {}
 
   std::shared_ptr<Context> _ctx;
 };
 
 
-} // namespace mcsema::ws
+}  // namespace mcsema::ws

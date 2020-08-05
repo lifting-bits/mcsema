@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <llvm/IR/CallingConv.h>
+
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -23,8 +25,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-#include <llvm/IR/CallingConv.h>
 
 namespace llvm {
 class Constant;
@@ -138,10 +138,7 @@ struct NativeExternalVariable : public NativeVariable {
 
 // A cross-reference to something.
 struct NativeXref {
-  enum FixupKind {
-    kAbsoluteFixup,
-    kThreadLocalOffsetFixup
-  };
+  enum FixupKind { kAbsoluteFixup, kThreadLocalOffsetFixup };
 
   uint64_t width = 0;  // In bytes.
   uint64_t ea = 0;  // Location of the xref within its segment.
@@ -150,7 +147,8 @@ struct NativeXref {
 
   uint64_t target_ea = 0;
   std::string target_name;
-  const NativeSegment *target_segment = nullptr;  // Target segment of the xref, if any.
+  const NativeSegment *target_segment =
+      nullptr;  // Target segment of the xref, if any.
 
   FixupKind fixup_kind;
 
@@ -212,7 +210,6 @@ struct NativeModule {
   std::vector<std::unique_ptr<NativeVariable>> dead_vars;
 };
 
-NativeModule *ReadProtoBuf(const std::string &file_name,
-                           uint64_t pointer_size);
+NativeModule *ReadProtoBuf(const std::string &file_name, uint64_t pointer_size);
 
 }  // namespace mcsema

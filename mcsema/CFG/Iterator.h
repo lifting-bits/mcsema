@@ -16,15 +16,16 @@
 
 #pragma once
 
-#include <memory>
 #include <mcsema/CFG/Util.h>
+
+#include <memory>
 
 namespace mcsema::ws {
 
 namespace details {
-  struct DataIterator_impl;
-  struct ObjectIterator_impl;
-} // namespace details
+struct DataIterator_impl;
+struct ObjectIterator_impl;
+}  // namespace details
 
 class Module;
 class BasicBlock;
@@ -38,7 +39,7 @@ class Function;
  */
 
 // Fetch returns objects
-template<typename Entry>
+template <typename Entry>
 struct WeakObjectIterator {
   using data_t = Entry;
   using maybe_data_t = std::optional<data_t>;
@@ -47,7 +48,7 @@ struct WeakObjectIterator {
 
   ~WeakObjectIterator();
 
-private:
+ private:
   friend Module;
   friend Function;
   friend BasicBlock;
@@ -59,7 +60,7 @@ private:
 };
 
 // Fetch returns Entry::data_t
-template<typename Entry>
+template <typename Entry>
 struct WeakDataIterator {
 
   using data_t = typename Entry::data_t;
@@ -69,7 +70,7 @@ struct WeakDataIterator {
 
   ~WeakDataIterator();
 
-private:
+ private:
   friend Module;
   friend BasicBlock;
 
@@ -79,4 +80,4 @@ private:
   Impl_t impl;
 };
 
-} // namespace mcsema::ws
+}  // namespace mcsema::ws

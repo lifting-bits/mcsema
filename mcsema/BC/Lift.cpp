@@ -14,27 +14,27 @@
  * limitations under the License.
  */
 
+#include "mcsema/BC/Lift.h"
+
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstIterator.h>
 #include <llvm/IR/Intrinsics.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Metadata.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/MDBuilder.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
-
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/Scalar.h>
-#include <llvm/Transforms/Utils/Local.h>
 #include <llvm/Transforms/Utils/Cloning.h>
+#include <llvm/Transforms/Utils/Local.h>
 #include <llvm/Transforms/Utils/ValueMapper.h>
 
 #include <memory>
@@ -42,23 +42,21 @@
 #include <unordered_set>
 #include <vector>
 
+#include "mcsema/Arch/Arch.h"
+#include "mcsema/BC/Callback.h"
+#include "mcsema/BC/External.h"
+#include "mcsema/BC/Function.h"
+#include "mcsema/BC/Legacy.h"
+#include "mcsema/BC/Optimize.h"
+#include "mcsema/BC/Segment.h"
+#include "mcsema/BC/Util.h"
+#include "mcsema/CFG/CFG.h"
 #include "remill/Arch/Arch.h"
 #include "remill/Arch/Instruction.h"
 #include "remill/BC/ABI.h"
 #include "remill/BC/IntrinsicTable.h"
 #include "remill/BC/Lifter.h"
 #include "remill/BC/Util.h"
-
-#include "mcsema/Arch/Arch.h"
-#include "mcsema/BC/Callback.h"
-#include "mcsema/BC/External.h"
-#include "mcsema/BC/Function.h"
-#include "mcsema/BC/Legacy.h"
-#include "mcsema/BC/Lift.h"
-#include "mcsema/BC/Optimize.h"
-#include "mcsema/BC/Segment.h"
-#include "mcsema/BC/Util.h"
-#include "mcsema/CFG/CFG.h"
 
 DECLARE_bool(legacy_mode);
 DECLARE_bool(explicit_args);
@@ -75,8 +73,7 @@ static void ExportFunctions(const NativeModule *cfg_module) {
         << "Cannot find lifted version of exported function "
         << cfg_func->lifted_name;
 
-    LOG(INFO)
-        << "Exporting function " << cfg_func->name;
+    LOG(INFO) << "Exporting function " << cfg_func->name;
 
     auto ep = GetNativeToLiftedEntryPoint(cfg_func);
     ep->setLinkage(llvm::GlobalValue::ExternalLinkage);
@@ -90,9 +87,8 @@ static void ExportVariables(const NativeModule *cfg_module) {
   for (auto ea : cfg_module->exported_vars) {
     auto cfg_var = cfg_module->ea_to_var.at(ea)->Get();
     auto var = gModule->getGlobalVariable(cfg_var->lifted_name);
-    CHECK(var != nullptr)
-        << "Cannot find lifted version of exported variable "
-        << cfg_var->name;
+    CHECK(var != nullptr) << "Cannot find lifted version of exported variable "
+                          << cfg_var->name;
 
     var->setName(cfg_var->name);
     var->setLinkage(llvm::GlobalValue::ExternalLinkage);
@@ -129,10 +125,11 @@ static void DefineDebugGetRegState(void) {
 
   auto state_ptr_type = reg_state->getType();
   auto reg_func_type = llvm::FunctionType::get(state_ptr_type, false);
+
   // ExternalWeakLinkage causes crash with --explicit_args. The function is not available in the library
-  get_reg_state = llvm::Function::Create(
-      reg_func_type, llvm::GlobalValue::ExternalLinkage,
-      "__mcsema_debug_get_reg_state", gModule);
+  get_reg_state =
+      llvm::Function::Create(reg_func_type, llvm::GlobalValue::ExternalLinkage,
+                             "__mcsema_debug_get_reg_state", gModule);
 
   llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", get_reg_state));
   ir.CreateRet(reg_state);

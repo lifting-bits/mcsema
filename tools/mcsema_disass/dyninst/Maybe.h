@@ -17,7 +17,7 @@
 #pragma once
 
 // Replace with std::optional once C++17 is supported
-template<typename T>
+template <typename T>
 struct Maybe {
   T val;
   bool contains;
@@ -27,11 +27,12 @@ struct Maybe {
   Maybe(const Maybe<T> &other) : val(other.val), contains(other.contains) {}
 
   Maybe(Maybe<T> &&other) noexcept(std::is_nothrow_move_constructible<T>::value)
-    : val(std::move(other.val)), contains(other.contains) {
+      : val(std::move(other.val)),
+        contains(other.contains) {
     other.contains = false;
   }
 
-  Maybe& operator=(Maybe<T> other) {
+  Maybe &operator=(Maybe<T> other) {
     using std::swap;
     swap(val, other.val);
     swap(contains, other.contains);
@@ -50,27 +51,27 @@ struct Maybe {
     return contains;
   }
 
-  const T* operator->() const {
+  const T *operator->() const {
     return &val;
   }
 
-  T* operator->() {
+  T *operator->() {
     return &val;
   }
 
-  const T& operator*() const {
+  const T &operator*() const {
     return val;
   }
 
-  T& operator*() {
+  T &operator*() {
     return val;
   }
 
-  constexpr T& value() {
+  constexpr T &value() {
     return val;
   }
 
-  constexpr const T& value() const {
+  constexpr const T &value() const {
     return val;
   }
 };

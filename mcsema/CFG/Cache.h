@@ -20,16 +20,17 @@
 #include <unordered_map>
 
 namespace mcsema::ws {
+
 // FIXME: This could inherit from sqlite::Database, but is it worth it?
-template<typename DB>
+template <typename DB>
 struct Base {
   DB &db;
 
-  Base( DB &db_) : db(db_) {}
+  Base(DB &db_) : db(db_) {}
 };
 
 
-template<typename Table, typename Data, typename Key, typename Next>
+template <typename Table, typename Data, typename Key, typename Next>
 struct Cache : Next {
 
   using Next::Next;
@@ -40,39 +41,38 @@ struct Cache : Next {
 
   std::unordered_map<Key_t, Data> cache;
 
-  #define ENABLE_IF(ret) \
-    std::enable_if_t<std::is_same_v<Table_, Table_t>, ret>
+#define ENABLE_IF(ret) std::enable_if_t<std::is_same_v<Table_, Table_t>, ret>
 
-  template< typename Table_, const auto &query_str>
+  template <typename Table_, const auto &query_str>
   auto Find(Key_t id) -> ENABLE_IF(std::string_view) {
     auto entry = cache.find(id);
 
     if (entry == cache.end()) {
       return Fetch<Table_, query_str>(std::move(id));
     }
-    return { entry->second };
+    return {entry->second};
   }
 
-  template<typename Table_, const auto &query_str>
+  template <typename Table_, const auto &query_str>
   auto Fetch(Key_t id) -> ENABLE_IF(std::string_view) {
-    auto data = Next::db.template query<query_str>(id)
-                        .template GetScalar<Data_t>();
+    auto data =
+        Next::db.template query<query_str>(id).template GetScalar<Data_t>();
     if (!data)
       return {};
-    auto [it, _] = cache.insert( { std::move(id), std::move(*data) } );
-    return { it->second };
+    auto [it, _] = cache.insert({std::move(id), std::move(*data)});
+    return {it->second};
   }
 
-  template<typename Table_>
+  template <typename Table_>
   auto Evict(Key_t id) -> ENABLE_IF(void) {
     cache.erase(std::move(id));
   }
 
-  #undef ENABLE_IF
+#undef ENABLE_IF
 };
 
 class MemoryRange;
-template<typename DB>
+template <typename DB>
 using MemoryRangeCache = Cache<MemoryRange, std::string, int64_t, Base<DB>>;
 
-} // namespace mcsema::ws
+}  // namespace mcsema::ws

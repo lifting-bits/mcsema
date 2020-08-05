@@ -14,8 +14,28 @@
  * limitations under the License.
  */
 
+#include "mcsema/BC/Optimize.h"
+
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <llvm/ADT/Triple.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/DataLayout.h>
+#include <llvm/IR/DebugInfo.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/InstIterator.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IR/MDBuilder.h>
+#include <llvm/IR/Metadata.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
+#include <llvm/Transforms/IPO.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm/Transforms/Scalar.h>
+#include <llvm/Transforms/Utils/Cloning.h>
+#include <llvm/Transforms/Utils/Local.h>
+#include <llvm/Transforms/Utils/ValueMapper.h>
 
 #include <algorithm>
 #include <limits>
@@ -24,39 +44,15 @@
 #include <utility>
 #include <vector>
 
-#include <llvm/ADT/Triple.h>
-
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/DebugInfo.h>
-#include <llvm/IR/InstIterator.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LegacyPassManager.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Metadata.h>
-#include <llvm/IR/MDBuilder.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/Type.h>
-
-#include <llvm/Transforms/IPO.h>
-#include <llvm/Transforms/IPO/PassManagerBuilder.h>
-#include <llvm/Transforms/Scalar.h>
-#include <llvm/Transforms/Utils/Local.h>
-#include <llvm/Transforms/Utils/Cloning.h>
-#include <llvm/Transforms/Utils/ValueMapper.h>
-
+#include "mcsema/Arch/Arch.h"
+#include "mcsema/BC/Util.h"
 #include "remill/Arch/Arch.h"
 #include "remill/BC/ABI.h"
 #include "remill/BC/Compat/TargetLibraryInfo.h"
 #include "remill/BC/DeadStoreEliminator.h"
 #include "remill/BC/Util.h"
 
-#include "mcsema/Arch/Arch.h"
-#include "mcsema/BC/Optimize.h"
-#include "mcsema/BC/Util.h"
-
-DEFINE_bool(disable_optimizer, false,
-            "Disable interprocedural optimizations?");
+DEFINE_bool(disable_optimizer, false, "Disable interprocedural optimizations?");
 
 DEFINE_bool(keep_memops, false,
             "Should the memory intrinsics be replaced or not?");
@@ -113,16 +109,16 @@ static void RunO3(void) {
   llvm::legacy::FunctionPassManager func_manager(gModule);
   llvm::legacy::PassManager module_manager;
 
-  auto TLI = new llvm::TargetLibraryInfoImpl(
-      llvm::Triple(gModule->getTargetTriple()));
+  auto TLI =
+      new llvm::TargetLibraryInfoImpl(llvm::Triple(gModule->getTargetTriple()));
 
   TLI->disableAllFunctions();  // `-fno-builtin`.
 
   llvm::PassManagerBuilder builder;
   builder.OptLevel = 3;
   builder.SizeLevel = 2;
-  builder.Inliner = llvm::createFunctionInliningPass(
-      std::numeric_limits<int>::max());
+  builder.Inliner =
+      llvm::createFunctionInliningPass(std::numeric_limits<int>::max());
   builder.LibraryInfo = TLI;  // Deleted by `llvm::~PassManagerBuilder`.
   builder.DisableUnrollLoops = false;  // Unroll loops!
   builder.DisableUnitAtATime = false;
@@ -147,10 +143,10 @@ static void RunO3(void) {
 // Get a list of all ISELs.
 static std::vector<llvm::GlobalVariable *> FindISELs(void) {
   std::vector<llvm::GlobalVariable *> isels;
-  remill::ForEachISel(
-      gModule, [&](llvm::GlobalVariable *isel, llvm::Function *) {
-        isels.push_back(isel);
-      });
+  remill::ForEachISel(gModule,
+                      [&](llvm::GlobalVariable *isel, llvm::Function *) {
+                        isels.push_back(isel);
+                      });
   return isels;
 }
 
@@ -202,9 +198,9 @@ static void RemoveIntrinsics(void) {
     RemoveFunction(remill_used);
   }
 
-//  if (auto intrinsics = gModule->getFunction("__remill_intrinsics")) {
-//    intrinsics->eraseFromParent();
-//  }
+  //  if (auto intrinsics = gModule->getFunction("__remill_intrinsics")) {
+  //    intrinsics->eraseFromParent();
+  //  }
 
   RemoveFunction("__remill_basic_block");
   RemoveFunction("__remill_defer_inlining");
@@ -307,8 +303,7 @@ static void ReplaceMemWriteOp(const char *name, llvm::Type *val_type) {
 }
 
 static void LowerMemOps(void) {
-  ReplaceMemReadOp("__remill_read_memory_8",
-                   llvm::Type::getInt8Ty(*gContext));
+  ReplaceMemReadOp("__remill_read_memory_8", llvm::Type::getInt8Ty(*gContext));
   ReplaceMemReadOp("__remill_read_memory_16",
                    llvm::Type::getInt16Ty(*gContext));
   ReplaceMemReadOp("__remill_read_memory_32",
@@ -344,8 +339,7 @@ static void LowerMemOps(void) {
 void OptimizeModule(void) {
   auto isels = FindISELs();
   RemoveIntrinsics();
-  LOG(INFO)
-      << "Optimizing module.";
+  LOG(INFO) << "Optimizing module.";
 
   PrivatizeISELs(isels);
 

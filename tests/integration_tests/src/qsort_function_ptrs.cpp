@@ -44,13 +44,13 @@ int many() {
 }
 
 
-using zTy = int(*)();
+using zTy = int (*)();
 
-template<typename baseTy>
-using fTy = int(baseTy*, size_t, int);
+template <typename baseTy>
+using fTy = int(baseTy *, size_t, int);
 
 
-int compare(const void* a, const void* b) {
+int compare(const void *a, const void *b) {
   printf("Comparing:\n");
   zTy arg1 = *(zTy *) a;
   printf("\tArg1 %i\n", arg1());
@@ -60,17 +60,19 @@ int compare(const void* a, const void* b) {
 
   int rhs = arg1();
   int lhs = arg2();
-  if (rhs < lhs) return -1;
-  if (rhs > lhs) return 1;
+  if (rhs < lhs)
+    return -1;
+  if (rhs > lhs)
+    return 1;
   return 0;
 }
 
-template<typename Func>
+template <typename Func>
 int firstLevel(Func *f, size_t size, int iter) {
   int base = f[0]();
   for (auto i = 0U; i < iter; ++i) {
-   base += f[i % size]();
-   printf("Iter: %i \tbase: %i\n", i, base);
+    base += f[i % size]();
+    printf("Iter: %i \tbase: %i\n", i, base);
   }
 
   printf("Before sort:\n");
@@ -88,9 +90,8 @@ int firstLevel(Func *f, size_t size, int iter) {
   return base;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   int a = atoi(argv[1]);
-  int(*funcs[])() = {two, many, four, zero, one};
-  int result = firstLevel<int(*)()>(funcs, 5, a);
+  int (*funcs[])() = {two, many, four, zero, one};
+  int result = firstLevel<int (*)()>(funcs, 5, a);
 }
-

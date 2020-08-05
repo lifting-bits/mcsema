@@ -14,24 +14,21 @@
  * limitations under the License.
  */
 
+#include "remill/Arch/Arch.h"
+
 #include <glog/logging.h>
-
-#include <unordered_set>
-
 #include <llvm/ADT/ArrayRef.h>
-
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
-
-#include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
+#include <llvm/Support/raw_ostream.h>
 
-#include "remill/Arch/Arch.h"
+#include <unordered_set>
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Util.h"
@@ -43,12 +40,11 @@ extern llvm::LLVMContext *gContext;
 const remill::Arch *gArch = nullptr;
 
 bool InitArch(const std::string &os, const std::string &arch) {
-  LOG(INFO)
-      << "Initializing for " << arch << " code on " << os;
+  LOG(INFO) << "Initializing for " << arch << " code on " << os;
 
   gArch = remill::GetTargetArch(*gContext);
-  gWordType = llvm::Type::getIntNTy(
-      *gContext, static_cast<unsigned>(gArch->address_size));
+  gWordType = llvm::Type::getIntNTy(*gContext,
+                                    static_cast<unsigned>(gArch->address_size));
   return true;
 }
 

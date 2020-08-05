@@ -14,33 +14,30 @@
  * limitations under the License.
  */
 
+#include "Instruction.h"
+
 #include <glog/logging.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/DataLayout.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/InstIterator.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
 
 #include <sstream>
 #include <string>
 #include <vector>
 
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/InstIterator.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/Type.h>
-
-#include "Instruction.h"
-#include "remill/Arch/Arch.h"
-#include "remill/Arch/Instruction.h"
-#include "remill/BC/Util.h"
-
 #include "mcsema/Arch/Arch.h"
-
 #include "mcsema/BC/Callback.h"
 #include "mcsema/BC/Instruction.h"
 #include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Util.h"
-
 #include "mcsema/CFG/CFG.h"
+#include "remill/Arch/Arch.h"
+#include "remill/Arch/Instruction.h"
+#include "remill/BC/Util.h"
 
 namespace mcsema {
 
@@ -59,8 +56,8 @@ static llvm::Value *LoadRegValue(llvm::BasicBlock *block,
 }
 
 static llvm::Value *LoadAddressRegVal(llvm::BasicBlock *block,
-                                         const remill::Operand::Register &reg,
-                                         llvm::ConstantInt *zero) {
+                                      const remill::Operand::Register &reg,
+                                      llvm::ConstantInt *zero) {
   if (reg.name.empty()) {
     return zero;
   }
@@ -69,8 +66,7 @@ static llvm::Value *LoadAddressRegVal(llvm::BasicBlock *block,
   auto value_type = llvm::dyn_cast<llvm::IntegerType>(value->getType());
   auto word_type = zero->getType();
 
-  CHECK(value_type)
-      << "Register " << reg.name << " expected to be an integer.";
+  CHECK(value_type) << "Register " << reg.name << " expected to be an integer.";
 
   auto value_size = value_type->getBitWidth();
   auto word_size = word_type->getBitWidth();
@@ -121,20 +117,20 @@ InstructionLifter::~InstructionLifter(void) {}
 
 InstructionLifter::InstructionLifter(const remill::IntrinsicTable *intrinsics_,
                                      TranslationContext &ctx_)
-      : remill::InstructionLifter(gArch, intrinsics_),
-        ctx(ctx_),
-        inst_ptr(nullptr),
-        block(nullptr),
-        mem_ref(nullptr),
-        disp_ref(nullptr),
-        imm_ref(nullptr),
-        mem_ref_used(false),
-        disp_ref_used(false),
-        imm_ref_used(false) {}
+    : remill::InstructionLifter(gArch, intrinsics_),
+      ctx(ctx_),
+      inst_ptr(nullptr),
+      block(nullptr),
+      mem_ref(nullptr),
+      disp_ref(nullptr),
+      imm_ref(nullptr),
+      mem_ref_used(false),
+      disp_ref_used(false),
+      imm_ref_used(false) {}
 
 // Lift a single instruction into a basic block.
-remill::LiftStatus InstructionLifter::LiftIntoBlock(
-    remill::Instruction &inst, llvm::BasicBlock *block_) {
+remill::LiftStatus InstructionLifter::LiftIntoBlock(remill::Instruction &inst,
+                                                    llvm::BasicBlock *block_) {
 
   inst_ptr = &inst;
   block = block_;
@@ -152,24 +148,21 @@ remill::LiftStatus InstructionLifter::LiftIntoBlock(
   // able to match cross-reference information to the instruction's operands.
   if (remill::kLiftedInstruction == status) {
     if (mem_ref && !mem_ref_used) {
-      LOG(FATAL)
-          << "Unused memory reference operand to " << std::hex
-          << ctx.cfg_inst->mem->target_ea << " in instruction "
-          << inst.Serialize() << std::dec;
+      LOG(FATAL) << "Unused memory reference operand to " << std::hex
+                 << ctx.cfg_inst->mem->target_ea << " in instruction "
+                 << inst.Serialize() << std::dec;
     }
 
     if (imm_ref && !imm_ref_used) {
-      LOG(FATAL)
-          << "Unused immediate operand reference to " << std::hex
-          << ctx.cfg_inst->imm->target_ea << " in instruction "
-          << inst.Serialize() << std::dec;
+      LOG(FATAL) << "Unused immediate operand reference to " << std::hex
+                 << ctx.cfg_inst->imm->target_ea << " in instruction "
+                 << inst.Serialize() << std::dec;
     }
 
     if (disp_ref && !disp_ref_used) {
-      LOG(FATAL)
-          << "Unused displacement operand reference to " << std::hex
-          << ctx.cfg_inst->disp->target_ea << " in instruction "
-          << inst.Serialize() << std::dec;
+      LOG(FATAL) << "Unused displacement operand reference to " << std::hex
+                 << ctx.cfg_inst->disp->target_ea << " in instruction "
+                 << inst.Serialize() << std::dec;
     }
   }
 
@@ -226,12 +219,11 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
     // to swap into the lifted context.
     if (cfg_func->is_external) {
       if (IsSelfReferential(cfg_xref)) {
-        LOG(WARNING)
-            << "Reference from " << std::hex << cfg_xref->ea
-            << " to self-referential function reference "
-            << cfg_xref->target_name << " at " << cfg_xref->target_ea
-            << " being lifted as address into "
-            << cfg_xref->target_segment->name << std::dec;
+        LOG(WARNING) << "Reference from " << std::hex << cfg_xref->ea
+                     << " to self-referential function reference "
+                     << cfg_xref->target_name << " at " << cfg_xref->target_ea
+                     << " being lifted as address into "
+                     << cfg_xref->target_segment->name << std::dec;
 
         return LiftEA(cfg_xref->target_segment, cfg_xref->target_ea);
 
@@ -242,9 +234,9 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
       func = GetNativeToLiftedCallback(cfg_func);
     }
 
-    CHECK(func != nullptr)
-        << "Can't resolve reference to function "
-        << cfg_func->name << " from " << std::hex << inst_ptr->pc << std::dec;
+    CHECK(func != nullptr) << "Can't resolve reference to function "
+                           << cfg_func->name << " from " << std::hex
+                           << inst_ptr->pc << std::dec;
 
     func_val = func;
 
@@ -261,6 +253,7 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
     // an extra layer of indirection here.
     //
 #if 0
+
     // TODO(akshayk): Discuss a better solution to handle the weak external functions
     // It causes the garbage address for _ZNSt12out_of_rangeD1Ev
 
@@ -283,23 +276,24 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
       return cfg_var->address;
     }
 
-    LOG(ERROR)
-        << "Variable " << cfg_var->name << " at " << std::hex << cfg_var->ea
-        << std::dec << " was not lifted.";
+    LOG(ERROR) << "Variable " << cfg_var->name << " at " << std::hex
+               << cfg_var->ea << std::dec << " was not lifted.";
+
     // Fall through.
   }
 
   CHECK(cfg_xref->target_segment != nullptr)
-      << "A non-function, non-variable cross-reference from "
-      << std::hex << inst_ptr->pc << " to " << cfg_xref->target_ea << std::dec
+      << "A non-function, non-variable cross-reference from " << std::hex
+      << inst_ptr->pc << " to " << cfg_xref->target_ea << std::dec
       << " must be in a known segment.";
 
   return LiftEA(cfg_xref->target_segment, cfg_xref->target_ea);
 }
 
-llvm::Value *InstructionLifter::LiftImmediateOperand(
-    remill::Instruction &inst, llvm::BasicBlock *block,
-    llvm::Argument *arg, remill::Operand &op) {
+llvm::Value *InstructionLifter::LiftImmediateOperand(remill::Instruction &inst,
+                                                     llvm::BasicBlock *block,
+                                                     llvm::Argument *arg,
+                                                     remill::Operand &op) {
   auto arg_type = arg->getType();
   if (imm_ref) {
     imm_ref_used = true;
@@ -308,10 +302,10 @@ llvm::Value *InstructionLifter::LiftImmediateOperand(
     auto arg_size = data_layout.getTypeSizeInBits(arg_type);
 
     CHECK(arg_size <= gArch->address_size)
-        << "Immediate operand size " << op.size << " of "
-        << op.Serialize() << " in instuction " << std::hex << inst.pc
-        << " is wider than the architecture pointer size ("
-        << std::dec << gArch->address_size << ").";
+        << "Immediate operand size " << op.size << " of " << op.Serialize()
+        << " in instuction " << std::hex << inst.pc
+        << " is wider than the architecture pointer size (" << std::dec
+        << gArch->address_size << ").";
 
     if (arg_type != imm_ref->getType() && arg_size < gArch->address_size) {
       llvm::IRBuilder<> ir(block);
@@ -321,22 +315,23 @@ llvm::Value *InstructionLifter::LiftImmediateOperand(
     return imm_ref;
   }
 
-  return this->remill::InstructionLifter::LiftImmediateOperand(
-      inst, block, arg, op);
+  return this->remill::InstructionLifter::LiftImmediateOperand(inst, block, arg,
+                                                               op);
 }
 
 // Lift an indirect memory operand to a value.
-llvm::Value *InstructionLifter::LiftAddressOperand(
-    remill::Instruction &inst, llvm::BasicBlock *block,
-    llvm::Argument *arg, remill::Operand &op) {
+llvm::Value *InstructionLifter::LiftAddressOperand(remill::Instruction &inst,
+                                                   llvm::BasicBlock *block,
+                                                   llvm::Argument *arg,
+                                                   remill::Operand &op) {
 
   auto &mem = op.addr;
 
   // A higher layer will resolve any code refs; this is a static address and
   // we want to preserve it in the register state structure.
   if (mem.IsControlFlowTarget()) {
-    return this->remill::InstructionLifter::LiftAddressOperand(
-        inst, block, arg, op);
+    return this->remill::InstructionLifter::LiftAddressOperand(inst, block, arg,
+                                                               op);
   }
 
   // Check if the instruction is referring to stack variable
@@ -348,10 +343,9 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
       auto var_offset = llvm::ConstantInt::get(
           word_type, static_cast<uint64_t>(map_it->second), true);
       base = ir.CreateAdd(base, var_offset);
-      LOG(INFO)
-        << "Lifting stack variable access at : " << std::hex << map_it->first
-        << " var_offset " << map_it->second  << std::dec
-        << " variable name " << ctx.cfg_inst->stack_var->name;
+      LOG(INFO) << "Lifting stack variable access at : " << std::hex
+                << map_it->first << " var_offset " << map_it->second << std::dec
+                << " variable name " << ctx.cfg_inst->stack_var->name;
 
       if (!mem.index_reg.name.empty()) {
         auto zero = llvm::ConstantInt::get(word_type, 0, false);
@@ -378,8 +372,8 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
 
   } else {
     LOG_IF(ERROR, mem_ref != nullptr)
-        << "IDA probably incorrectly decoded memory operand "
-        << op.Serialize() << " of instruction " << std::hex << inst.pc
+        << "IDA probably incorrectly decoded memory operand " << op.Serialize()
+        << " of instruction " << std::hex << inst.pc
         << " as an absolute memory reference when it should be treated as a "
         << "displacement memory reference.";
 
@@ -396,14 +390,15 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
     }
   }
 
-  return this->remill::InstructionLifter::LiftAddressOperand(
-      inst, block, arg, op);
+  return this->remill::InstructionLifter::LiftAddressOperand(inst, block, arg,
+                                                             op);
 }
 
 // Lift the register operand to a value.
-llvm::Value *InstructionLifter::LiftRegisterOperand(
-    remill::Instruction &inst, llvm::BasicBlock *block,
-    llvm::Argument *arg, remill::Operand &op) {
+llvm::Value *InstructionLifter::LiftRegisterOperand(remill::Instruction &inst,
+                                                    llvm::BasicBlock *block,
+                                                    llvm::Argument *arg,
+                                                    remill::Operand &op) {
 
   auto &reg = op.reg;
 
@@ -413,23 +408,22 @@ llvm::Value *InstructionLifter::LiftRegisterOperand(
     if ((IsFramePointerReg(reg) || IsStackPointerReg(reg)) &&
         (op.action == remill::Operand::kActionRead)) {
       llvm::IRBuilder<> ir(block);
-      auto variable = ir.CreatePtrToInt(
-          ctx.cfg_inst->stack_var->llvm_var, word_type);
+      auto variable =
+          ir.CreatePtrToInt(ctx.cfg_inst->stack_var->llvm_var, word_type);
       auto map_it = ctx.cfg_inst->stack_var->refs.find(ctx.cfg_inst->ea);
       if (map_it != ctx.cfg_inst->stack_var->refs.end()) {
         auto var_offset = llvm::ConstantInt::get(
             word_type, static_cast<uint64_t>(map_it->second), true);
         variable = ir.CreateAdd(variable, var_offset);
       }
-      LOG(INFO)
-          << "Lifting stack variable reference at : " << std::hex
-          << ctx.cfg_inst->ea << std::dec;
+      LOG(INFO) << "Lifting stack variable reference at : " << std::hex
+                << ctx.cfg_inst->ea << std::dec;
       return variable;
     }
   }
 
-  return this->remill::InstructionLifter::LiftRegisterOperand(
-      inst, block, arg, op);
+  return this->remill::InstructionLifter::LiftRegisterOperand(inst, block, arg,
+                                                              op);
 }
 
 }  // namespace mcsema

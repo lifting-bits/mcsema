@@ -14,26 +14,25 @@
  * limitations under the License.
  */
 
+#include "remill/BC/Util.h"
+
 #include <glog/logging.h>
-
-#include <string>
-
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Metadata.h>
 #include <llvm/IR/MDBuilder.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
-#include "remill/Arch/Arch.h"
-#include "remill/Arch/Name.h"
-#include "remill/BC/Util.h"
-#include "remill/BC/Version.h"
-#include "remill/OS/OS.h"
+#include <string>
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Util.h"
+#include "remill/Arch/Arch.h"
+#include "remill/Arch/Name.h"
+#include "remill/BC/Version.h"
+#include "remill/OS/OS.h"
 
 namespace mcsema {
 
@@ -62,10 +61,10 @@ llvm::Constant *LiftEA(const NativeSegment *cfg_seg, uint64_t ea) {
   CHECK(ea < (cfg_seg->ea + cfg_seg->size));
 
   auto seg = gModule->getGlobalVariable(cfg_seg->lifted_name, true);
-  CHECK(seg != nullptr)
-      << "Cannot find global variable " << cfg_seg->lifted_name
-      << " for segment " << cfg_seg->name
-      << " when trying to lift EA " << std::hex << ea;
+  CHECK(seg != nullptr) << "Cannot find global variable "
+                        << cfg_seg->lifted_name << " for segment "
+                        << cfg_seg->name << " when trying to lift EA "
+                        << std::hex << ea;
 
   auto offset = ea - cfg_seg->ea;
   return llvm::ConstantExpr::getAdd(

@@ -15,11 +15,11 @@
  */
 
 #include "SectionManager.h"
-#include "Util.h"
 
 #include <CFG.h>
-
 #include <glog/logging.h>
+
+#include "Util.h"
 
 using namespace Dyninst;
 using namespace SymtabAPI;
@@ -37,12 +37,13 @@ bool SectionManager::IsInRegion(const SymtabAPI::Region *r, Address a) const {
   return true;
 }
 
-bool SectionManager::IsInRegion(const std::string &region_name, Address addr) const {
+bool SectionManager::IsInRegion(const std::string &region_name,
+                                Address addr) const {
   return IsInRegion(GetRegion(region_name), addr);
 }
 
 bool SectionManager::IsInRegions(std::vector<std::string> sections,
-                                  Dyninst::Address addr) const {
+                                 Dyninst::Address addr) const {
   for (auto &s : regions) {
     for (auto &name : sections) {
       if (name == s.name) {
@@ -82,8 +83,7 @@ SectionManager::GetRegion(const std::string &name) const {
   return GetRegion_impl<const Dyninst::SymtabAPI::Region *>(*this, name);
 }
 
-Dyninst::SymtabAPI::Region *
-SectionManager::GetRegion(const std::string &name) {
+Dyninst::SymtabAPI::Region *SectionManager::GetRegion(const std::string &name) {
   return GetRegion_impl<Dyninst::SymtabAPI::Region *>(*this, name);
 }
 
@@ -96,7 +96,7 @@ void SectionManager::AddRegion(Dyninst::SymtabAPI::Region *r) {
     }
   }
   static std::array<std::string, 1> no_write = {
-    ".fini_array",
+      ".fini_array",
   };
 
   bool should_write = true;

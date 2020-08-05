@@ -21,11 +21,9 @@
 
 namespace llvm {
 namespace CallingConv {
-  enum {
-    McSemaCall = 144
-  };
-} // namespace CallingConv
-} // namespace llvm
+enum { McSemaCall = 144 };
+}  // namespace CallingConv
+}  // namespace llvm
 
 namespace mcsema {
 struct NativeModule;

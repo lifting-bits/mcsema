@@ -16,37 +16,36 @@
 
 #pragma once
 
-#include "SectionManager.h"
-#include "ExternalFunctionManager.h"
-#include "MagicSection.h"
-#include "Util.h"
-#include "OffsetTable.h"
-
 #include <CFG.pb.h>
 #include <CodeObject.h>
-#include <Expression.h>
-#include <Symtab.h>
-#include <Instruction.h>
 #include <Dereference.h>
+#include <Expression.h>
+#include <Instruction.h>
+#include <Symtab.h>
 
-#include <unordered_set>
-#include <unordered_map>
 #include <sstream>
+#include <unordered_map>
+#include <unordered_set>
+
+#include "ExternalFunctionManager.h"
+#include "MagicSection.h"
+#include "OffsetTable.h"
+#include "SectionManager.h"
+#include "Util.h"
 
 using SymbolMap = std::unordered_map<Dyninst::Address, std::string>;
 
 struct SectionParser;
 
 class CFGWriter {
-public:
-  CFGWriter(mcsema::Module &m,
-            Dyninst::SymtabAPI::Symtab &symtab,
+ public:
+  CFGWriter(mcsema::Module &m, Dyninst::SymtabAPI::Symtab &symtab,
             Dyninst::ParseAPI::CodeObject &codeObj,
             ExternalFunctionManager &extFuncM);
 
   void Write();
 
-private:
+ private:
   void WriteDataVariables(Dyninst::SymtabAPI::Region *region,
                           mcsema::Segment *segment,
                           SectionParser &section_parser);
@@ -60,44 +59,41 @@ private:
   void WriteFunctionBlocks(Dyninst::ParseAPI::Function *func,
                            mcsema::Function *cfg_internal_func);
 
-  std::set<Dyninst::Address> WriteBlock(
-      Dyninst::ParseAPI::Block *block,
-      Dyninst::ParseAPI::Function *func,
-      mcsema::Function *cfg_internal_func,
-      std::set<Dyninst::ParseAPI::Block *> &written);
+  std::set<Dyninst::Address>
+  WriteBlock(Dyninst::ParseAPI::Block *block, Dyninst::ParseAPI::Function *func,
+             mcsema::Function *cfg_internal_func,
+             std::set<Dyninst::ParseAPI::Block *> &written);
 
   void WriteInstruction(Dyninst::InstructionAPI::Instruction *instruction,
                         Dyninst::Address addr, mcsema::Block *cfgBlock,
-                        bool is_last=false);
+                        bool is_last = false);
   void HandleCallInstruction(Dyninst::InstructionAPI::Instruction *instruction,
                              Dyninst::Address addr,
                              mcsema::Instruction *cfgInstruction,
-                             bool is_last=false);
+                             bool is_last = false);
   void
   HandleNonCallInstruction(Dyninst::InstructionAPI::Instruction *instruction,
                            Dyninst::Address addr,
                            mcsema::Instruction *cfgInstruction,
-                           mcsema::Block *cfg_block,
-                           bool is_last=false);
+                           mcsema::Block *cfg_block, bool is_last = false);
 
   void WriteFunction(Dyninst::ParseAPI::Function *func,
                      mcsema::Function *cfg_internal_func);
 
   void WriteExternalFunctions();
   void WriteInternalData();
-  void WriteRelocations(Dyninst::SymtabAPI::Region*, mcsema::Segment *);
-  void WriteGOT(Dyninst::SymtabAPI::Region*, mcsema::Segment *);
+  void WriteRelocations(Dyninst::SymtabAPI::Region *, mcsema::Segment *);
+  void WriteGOT(Dyninst::SymtabAPI::Region *, mcsema::Segment *);
 
   Dyninst::Address immediateNonCall(Dyninst::InstructionAPI::Immediate *imm,
                                     Dyninst::Address addr,
                                     mcsema::Instruction *cfgInstruction);
   Dyninst::Address dereferenceNonCall(Dyninst::InstructionAPI::Dereference *,
-                                      Dyninst::Address,
-                                      mcsema::Instruction *);
+                                      Dyninst::Address, mcsema::Instruction *);
 
-  bool HandleXref(mcsema::Instruction *, Dyninst::Address, bool force=true);
+  bool HandleXref(mcsema::Instruction *, Dyninst::Address, bool force = true);
 
-  bool IsNoReturn(const std::string& str);
+  bool IsNoReturn(const std::string &str);
   void GetNoReturns();
 
   void CheckDisplacement(Dyninst::InstructionAPI::Expression *,
@@ -116,7 +112,8 @@ private:
   std::unordered_set<std::string> no_ret_funcs;
 
   std::map<Dyninst::Address, CrossXref<mcsema::Segment>> code_xrefs_to_resolve;
-  std::map<Dyninst::Address, CrossXref<mcsema::Instruction>> inst_xrefs_to_resolve;
+  std::map<Dyninst::Address, CrossXref<mcsema::Instruction>>
+      inst_xrefs_to_resolve;
 
   std::vector<OffsetTable> offset_tables;
 

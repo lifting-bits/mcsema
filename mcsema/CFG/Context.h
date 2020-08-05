@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include <string>
-
-#include <mcsema/CFG/SQLiteWrapper.h>
 #include <mcsema/CFG/Cache.h>
+#include <mcsema/CFG/SQLiteWrapper.h>
+
+#include <string>
 
 namespace mcsema::ws {
 
@@ -32,14 +32,14 @@ static inline std::string Name() {
 
 // General context every object of front API has. Handles db and cache.
 class Context {
-public:
+ public:
   Context(const std::string &db_name) : _db_name(db_name), db(db_name) {}
 
   using DB_t = sqlite::Database;
   using Result_t = sqlite::QueryResult;
   std::string _db_name;
   DB_t db;
-  mcsema::ws::MemoryRangeCache<DB_t> cache = ( db );
+  mcsema::ws::MemoryRangeCache<DB_t> cache = (db);
 };
 
-} // namespace mcsema::ws
+}  // namespace mcsema::ws

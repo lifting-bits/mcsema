@@ -14,26 +14,25 @@
  * limitations under the License.
  */
 
+#include "mcsema/Arch/ABI.h"
+
 #include <glog/logging.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DataLayout.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Instruction.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
 
 #include <algorithm>
 #include <utility>
 #include <vector>
 
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/Instruction.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/Type.h>
-
-#include "mcsema/Arch/ABI.h"
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Util.h"
-
 #include "remill/Arch/Arch.h"
 #include "remill/Arch/Name.h"
 #include "remill/BC/Util.h"
@@ -72,8 +71,7 @@ static ValueKind KindOfValue(llvm::Type *type) {
       case 4: return kI32;
       case 2: return kI16;
       case 1: return kI8;
-      default:
-        return kInvalidKind;
+      default: return kInvalidKind;
     }
   } else if (type->isX86_FP80Ty()) {
     return kF80;
@@ -93,25 +91,18 @@ static const char *StackPointerName(void) {
   }
 
   switch (gArch->arch_name) {
-    case remill::kArchAArch64LittleEndian:
-      sp_name = "SP";
-      break;
+    case remill::kArchAArch64LittleEndian: sp_name = "SP"; break;
 
     case remill::kArchX86:
     case remill::kArchX86_AVX:
-    case remill::kArchX86_AVX512:
-      sp_name = "ESP";
-      break;
+    case remill::kArchX86_AVX512: sp_name = "ESP"; break;
 
     case remill::kArchAMD64:
     case remill::kArchAMD64_AVX:
-    case remill::kArchAMD64_AVX512:
-      sp_name = "RSP";
-      break;
+    case remill::kArchAMD64_AVX512: sp_name = "RSP"; break;
     default:
-      LOG(FATAL)
-          << "Can't get stack pointer name for architecture: "
-          << remill::GetArchName(gArch->arch_name);
+      LOG(FATAL) << "Can't get stack pointer name for architecture: "
+                 << remill::GetArchName(gArch->arch_name);
       return nullptr;
   }
 
@@ -120,23 +111,17 @@ static const char *StackPointerName(void) {
 
 static const char *ThreadPointerNameX86(void) {
   switch (gArch->os_name) {
-    case remill::kOSLinux:
-      return "GS_BASE";
-    case remill::kOSWindows:
-      return "FS_BASE";
-    default:
-      return nullptr;
+    case remill::kOSLinux: return "GS_BASE";
+    case remill::kOSWindows: return "FS_BASE";
+    default: return nullptr;
   }
 }
 
 static const char *ThreadPointerNameAMD64(void) {
   switch (gArch->os_name) {
-    case remill::kOSLinux:
-      return "FS_BASE";
-    case remill::kOSWindows:
-      return "GS_BASE";
-    default:
-      return nullptr;
+    case remill::kOSLinux: return "FS_BASE";
+    case remill::kOSWindows: return "GS_BASE";
+    default: return nullptr;
   }
 }
 
@@ -147,73 +132,54 @@ static const char *ThreadPointerName(void) {
   }
 
   switch (gArch->arch_name) {
-    case remill::kArchAArch64LittleEndian:
-      tp_name = "TPIDR_EL0";
-      break;
+    case remill::kArchAArch64LittleEndian: tp_name = "TPIDR_EL0"; break;
 
     case remill::kArchX86:
     case remill::kArchX86_AVX:
-    case remill::kArchX86_AVX512:
-      tp_name = ThreadPointerNameX86();
-      break;
+    case remill::kArchX86_AVX512: tp_name = ThreadPointerNameX86(); break;
 
     case remill::kArchAMD64:
     case remill::kArchAMD64_AVX:
-    case remill::kArchAMD64_AVX512:
-      tp_name = ThreadPointerNameAMD64();
-      break;
+    case remill::kArchAMD64_AVX512: tp_name = ThreadPointerNameAMD64(); break;
 
-    default:
-      break;
+    default: break;
   }
 
-  LOG_IF(ERROR, !tp_name)
-      << "Can't get thread pointer name for architecture "
-      << remill::GetArchName(gArch->arch_name) << " and OS "
-      << remill::GetOSName(gArch->os_name);
+  LOG_IF(ERROR, !tp_name) << "Can't get thread pointer name for architecture "
+                          << remill::GetArchName(gArch->arch_name) << " and OS "
+                          << remill::GetOSName(gArch->os_name);
   return tp_name;
 }
 
 static uint64_t GetVectorRegSize(void) {
   switch (gArch->arch_name) {
     case remill::kArchAMD64:
-    case remill::kArchX86:
-      return 16;
+    case remill::kArchX86: return 16;
     case remill::kArchAMD64_AVX:
-    case remill::kArchX86_AVX:
-      return 32;
+    case remill::kArchX86_AVX: return 32;
     case remill::kArchAMD64_AVX512:
-    case remill::kArchX86_AVX512:
-      return 64;
-    case remill::kArchAArch64LittleEndian:
-      return 16;
+    case remill::kArchX86_AVX512: return 64;
+    case remill::kArchAArch64LittleEndian: return 16;
     default:
-      LOG(FATAL)
-          << "Unknown vector register size for arch "
-          << GetArchName(gArch->arch_name);
+      LOG(FATAL) << "Unknown vector register size for arch "
+                 << GetArchName(gArch->arch_name);
       return 0;
   }
 }
 
 struct VectorRegistersInfo {
-  const char* base_name;
+  const char *base_name;
   size_t num_vec_regs;
 };
 
 static VectorRegistersInfo GetVectorRegisterInfo() {
-  switch(gArch->arch_name) {
-    case remill::kArchAArch64LittleEndian:
-      return {"V", 32};
-    case remill::kArchAMD64_AVX:
-      return {"YMM", 16};
-    case remill::kArchX86_AVX:
-      return {"YMM", 8};
-    case remill::kArchAMD64_AVX512:
-      return {"ZMM", 32};
-    case remill::kArchX86_AVX512:
-      return {"ZMM", 8};
-    default:
-      return {"XMM", 8};
+  switch (gArch->arch_name) {
+    case remill::kArchAArch64LittleEndian: return {"V", 32};
+    case remill::kArchAMD64_AVX: return {"YMM", 16};
+    case remill::kArchX86_AVX: return {"YMM", 8};
+    case remill::kArchAMD64_AVX512: return {"ZMM", 32};
+    case remill::kArchX86_AVX512: return {"ZMM", 8};
+    default: return {"XMM", 8};
   }
 }
 
@@ -235,9 +201,7 @@ struct CallingConventionInfo {
 
     if (gArch->IsX86()) {
       static const std::vector<PackedReturnInfo> return_info = {
-        {{"EAX", "EDX"},
-        llvm::Type::getIntNPtrTy(*gContext, ptr_size),
-        kI64},
+          {{"EAX", "EDX"}, llvm::Type::getIntNPtrTy(*gContext, ptr_size), kI64},
       };
       for (const auto &entry : return_info) {
         if (entry.accepted_kinds & val_kind) {
@@ -248,27 +212,23 @@ struct CallingConventionInfo {
     return not_found;
   }
 
-  const ConstraintTable &GetArgumentTable(
-      llvm::CallingConv::ID cc) const {
+  const ConstraintTable &GetArgumentTable(llvm::CallingConv::ID cc) const {
     for (const auto &t : arg_tables) {
       if (t.first == cc) {
         return t.second;
       }
     }
-    LOG(FATAL)
-        << "Unknown ABI/calling convention: " << cc;
+    LOG(FATAL) << "Unknown ABI/calling convention: " << cc;
     return gInvalidTable;
   }
 
-  const ConstraintTable &GetReturnTable(
-      llvm::CallingConv::ID cc) const {
+  const ConstraintTable &GetReturnTable(llvm::CallingConv::ID cc) const {
     for (const auto &t : ret_tables) {
       if (t.first == cc) {
         return t.second;
       }
     }
-    LOG(FATAL)
-        << "Unknown ABI/calling convention: " << cc;
+    LOG(FATAL) << "Unknown ABI/calling convention: " << cc;
     return gInvalidTable;
   }
 
@@ -291,13 +251,9 @@ struct CallingConventionInfo {
     const auto &vector_base_name = vector_reg_info.base_name;
     if (gArch->IsAMD64()) {
       std::vector<ArgConstraint> amd64_sysv_args = {
-        {"RDI", kIntegralLeast64},
-        {"RSI", kIntegralLeast64},
-        {"RDX", kIntegralLeast64},
-        {"RCX", kIntegralLeast64},
-        {"R8", kIntegralLeast64},
-        {"R9", kIntegralLeast64}
-      };
+          {"RDI", kIntegralLeast64}, {"RSI", kIntegralLeast64},
+          {"RDX", kIntegralLeast64}, {"RCX", kIntegralLeast64},
+          {"R8", kIntegralLeast64},  {"R9", kIntegralLeast64}};
 
       for (unsigned i = 0; i < 8; ++i) {
         auto name = vector_base_name + std::to_string(i);
@@ -306,12 +262,10 @@ struct CallingConventionInfo {
       arg_tables.emplace_back(llvm::CallingConv::X86_64_SysV,
                               std::move(amd64_sysv_args));
 
-      std::vector<ArgConstraint> amd64_win64_args = {
-        {"RCX", kIntegralLeast64},
-        {"RDX", kIntegralLeast64},
-        {"R8", kIntegralLeast64},
-        {"R9", kIntegralLeast64}
-      };
+      std::vector<ArgConstraint> amd64_win64_args = {{"RCX", kIntegralLeast64},
+                                                     {"RDX", kIntegralLeast64},
+                                                     {"R8", kIntegralLeast64},
+                                                     {"R9", kIntegralLeast64}};
 
       for (auto i = 0U; i < 4; ++i) {
         auto name = vector_base_name + std::to_string(i);
@@ -338,59 +292,37 @@ struct CallingConventionInfo {
                               ConstraintTable{});
 
       // cdecl takes all args on the stack.
-      arg_tables.emplace_back(llvm::CallingConv::C,
-                              ConstraintTable{});
+      arg_tables.emplace_back(llvm::CallingConv::C, ConstraintTable{});
     } else if (gArch->IsAArch64()) {
       std::vector<ArgConstraint> aarch64_args = {
-          {"X0", kIntegralLeast64},
-          {"X1", kIntegralLeast64},
-          {"X2", kIntegralLeast64},
-          {"X3", kIntegralLeast64},
-          {"X4", kIntegralLeast64},
-          {"X5", kIntegralLeast64},
-          {"X6", kIntegralLeast64},
-          {"X7", kIntegralLeast64},
+          {"X0", kIntegralLeast64}, {"X1", kIntegralLeast64},
+          {"X2", kIntegralLeast64}, {"X3", kIntegralLeast64},
+          {"X4", kIntegralLeast64}, {"X5", kIntegralLeast64},
+          {"X6", kIntegralLeast64}, {"X7", kIntegralLeast64},
 
-          {"D0", kF32 | kF64},
-          {"D1", kF32 | kF64},
-          {"D2", kF32 | kF64},
-          {"D3", kF32 | kF64},
-          {"D4", kF32 | kF64},
-          {"D5", kF32 | kF64},
-          {"D6", kF32 | kF64},
-          {"D7", kF32 | kF64},
-          {"D8", kF32 | kF64},
-          {"D9", kF32 | kF64},
-          {"D10", kF32 | kF64},
-          {"D11", kF32 | kF64},
-          {"D12", kF32 | kF64},
-          {"D13", kF32 | kF64},
-          {"D14", kF32 | kF64},
-          {"D15", kF32 | kF64},
-          {"D16", kF32 | kF64},
-          {"D17", kF32 | kF64},
-          {"D18", kF32 | kF64},
-          {"D19", kF32 | kF64},
-          {"D20", kF32 | kF64},
-          {"D21", kF32 | kF64},
-          {"D22", kF32 | kF64},
-          {"D23", kF32 | kF64},
-          {"D24", kF32 | kF64},
-          {"D25", kF32 | kF64},
-          {"D26", kF32 | kF64},
-          {"D27", kF32 | kF64},
-          {"D28", kF32 | kF64},
-          {"D29", kF32 | kF64},
-          {"D30", kF32 | kF64},
-          {"D31", kF32 | kF64},
+          {"D0", kF32 | kF64},      {"D1", kF32 | kF64},
+          {"D2", kF32 | kF64},      {"D3", kF32 | kF64},
+          {"D4", kF32 | kF64},      {"D5", kF32 | kF64},
+          {"D6", kF32 | kF64},      {"D7", kF32 | kF64},
+          {"D8", kF32 | kF64},      {"D9", kF32 | kF64},
+          {"D10", kF32 | kF64},     {"D11", kF32 | kF64},
+          {"D12", kF32 | kF64},     {"D13", kF32 | kF64},
+          {"D14", kF32 | kF64},     {"D15", kF32 | kF64},
+          {"D16", kF32 | kF64},     {"D17", kF32 | kF64},
+          {"D18", kF32 | kF64},     {"D19", kF32 | kF64},
+          {"D20", kF32 | kF64},     {"D21", kF32 | kF64},
+          {"D22", kF32 | kF64},     {"D23", kF32 | kF64},
+          {"D24", kF32 | kF64},     {"D25", kF32 | kF64},
+          {"D26", kF32 | kF64},     {"D27", kF32 | kF64},
+          {"D28", kF32 | kF64},     {"D29", kF32 | kF64},
+          {"D30", kF32 | kF64},     {"D31", kF32 | kF64},
       };
 
-      for(auto i = 0U; i < 8; ++i) {
+      for (auto i = 0U; i < 8; ++i) {
         auto vec_reg_name = vector_base_name + std::to_string(i);
         aarch64_args.push_back({vec_reg_name, kVec});
       }
-      arg_tables.emplace_back(llvm::CallingConv::C,
-                              std::move(aarch64_args));
+      arg_tables.emplace_back(llvm::CallingConv::C, std::move(aarch64_args));
     }
   }
 
@@ -400,10 +332,8 @@ struct CallingConventionInfo {
     const auto &vector_base_name = vector_reg_info.base_name;
 
     if (gArch->IsAMD64()) {
-      ConstraintTable sysv64_table = {
-        {"RAX", kIntegralLeast64},
-        {"RDX", kIntegralLeast64}
-      };
+      ConstraintTable sysv64_table = {{"RAX", kIntegralLeast64},
+                                      {"RDX", kIntegralLeast64}};
 
       for (auto i = 0U; i < size; ++i) {
         auto name = vector_base_name + std::to_string(i);
@@ -420,35 +350,30 @@ struct CallingConventionInfo {
         win64_table.push_back({name, kF32 | kF64 | kVec});
       }
       win64_table.push_back({"ST0", kF80});
-      ret_tables.emplace_back(llvm::CallingConv::Win64,
-                              std::move(win64_table));
+      ret_tables.emplace_back(llvm::CallingConv::Win64, std::move(win64_table));
     } else if (gArch->IsX86()) {
       ConstraintTable x86_table = {
-        {"EAX", kIntegralLeast32},
-        {"ST0", kF80},
+          {"EAX", kIntegralLeast32},
+          {"ST0", kF80},
       };
-      ret_tables.emplace_back(llvm::CallingConv::X86_StdCall,
-                              x86_table);
-      ret_tables.emplace_back(llvm::CallingConv::X86_FastCall,
-                              x86_table);
+      ret_tables.emplace_back(llvm::CallingConv::X86_StdCall, x86_table);
+      ret_tables.emplace_back(llvm::CallingConv::X86_FastCall, x86_table);
       ret_tables.emplace_back(llvm::CallingConv::X86_ThisCall,
                               std::move(x86_table));
 
       ConstraintTable cdecl_table = {
-        {"EAX", kIntegralLeast32 | kF32},
-        {"ST0", kF80},
+          {"EAX", kIntegralLeast32 | kF32},
+          {"ST0", kF80},
       };
-      ret_tables.emplace_back(llvm::CallingConv::C,
-                              std::move(cdecl_table));
+      ret_tables.emplace_back(llvm::CallingConv::C, std::move(cdecl_table));
 
     } else if (gArch->IsAArch64()) {
       ConstraintTable AArch64_table = {
-        {"X0", kIntegralLeast64},
-        {"D0", kF64},
-        {"S0", kF32},
+          {"X0", kIntegralLeast64},
+          {"D0", kF64},
+          {"S0", kF32},
       };
-      ret_tables.emplace_back(llvm::CallingConv::C,
-                              std::move(AArch64_table));
+      ret_tables.emplace_back(llvm::CallingConv::C, std::move(AArch64_table));
     }
   }
 
@@ -459,7 +384,7 @@ struct CallingConventionInfo {
 };
 
 const CallingConventionInfo::ConstraintTable
-CallingConventionInfo::gInvalidTable;
+    CallingConventionInfo::gInvalidTable;
 
 static uint64_t DefaultUsedStackBytes(llvm::CallingConv::ID cc) {
   switch (cc) {
@@ -474,12 +399,12 @@ static uint64_t DefaultUsedStackBytes(llvm::CallingConv::ID cc) {
     case llvm::CallingConv::X86_ThisCall:
       return 4;  // Size of return address on the stack.
 
-    default:
-      return 0;
+    default: return 0;
   }
 }
 
-static llvm::Type* RetrieveArgumentType(llvm::Type *original_type, unsigned index) {
+static llvm::Type *RetrieveArgumentType(llvm::Type *original_type,
+                                        unsigned index) {
   if (original_type->isPointerTy()) {
     return original_type;
   }
@@ -491,7 +416,7 @@ static llvm::Type* RetrieveArgumentType(llvm::Type *original_type, unsigned inde
 }
 
 // llvm::CompositeType as common parent does not provide getNumElements
-static uint64_t GetNumberOfElements(llvm::Type* original_type) {
+static uint64_t GetNumberOfElements(llvm::Type *original_type) {
   if (auto struct_type = llvm::dyn_cast<llvm::StructType>(original_type)) {
     return struct_type->getNumElements();
   } else {
@@ -499,46 +424,39 @@ static uint64_t GetNumberOfElements(llvm::Type* original_type) {
   }
 }
 
-static void ExtractFromVector(llvm::BasicBlock *block,
-                              llvm::Value *ret_val,
-                              llvm::Value *reg_ptr,
-                              size_t count,
-                              size_t start=0) {
+static void ExtractFromVector(llvm::BasicBlock *block, llvm::Value *ret_val,
+                              llvm::Value *reg_ptr, size_t count,
+                              size_t start = 0) {
 
   llvm::IRBuilder<> ir(block);
 
   for (size_t i = 0; i < count; ++i) {
     auto offset = ir.CreateGEP(reg_ptr, GetConstantInt(64, i));
-    auto extract = ir.CreateExtractElement(ret_val,
-        GetConstantInt(64, i + start));
+    auto extract =
+        ir.CreateExtractElement(ret_val, GetConstantInt(64, i + start));
     ir.CreateStore(extract, offset);
   }
 }
 
-static llvm::Value *InsertIntoVector(llvm::BasicBlock *block,
-                                     llvm::Value *base_value,
-                                     llvm::Value *reg_ptr,
-                                     size_t count,
-                                     size_t start=0) {
+static llvm::Value *
+InsertIntoVector(llvm::BasicBlock *block, llvm::Value *base_value,
+                 llvm::Value *reg_ptr, size_t count, size_t start = 0) {
 
   llvm::IRBuilder<> ir(block);
   for (size_t i = 0; i < count; ++i) {
     auto offset = ir.CreateGEP(reg_ptr, GetConstantInt(64, i));
     auto load = ir.CreateLoad(offset);
-    base_value = ir.CreateInsertElement(
-        base_value,
-        load,
-        GetConstantInt(64, i + start));
+    base_value =
+        ir.CreateInsertElement(base_value, load, GetConstantInt(64, i + start));
   }
   return base_value;
 }
 
 // Scan through the register table. If we can match this argument request
 // to a register then do so.
-static const char *GetVarImpl(
-    ValueKind val_kind,
-    const std::vector<ArgConstraint> &table,
-    uint64_t &bitmap) {
+static const char *GetVarImpl(ValueKind val_kind,
+                              const std::vector<ArgConstraint> &table,
+                              uint64_t &bitmap) {
 
   for (auto i = 0U; i < table.size(); ++i) {
     const auto &reg_loc = table[i];
@@ -555,14 +473,13 @@ static const char *GetVarImpl(
 
 // In special cases one type can be returned via two registers
 static bool TryStorePackedType(llvm::BasicBlock *block, llvm::Value *ret_val) {
-  const auto &regs = CallingConventionInfo::GetPackedReturn(
-      KindOfValue(ret_val->getType()));
+  const auto &regs =
+      CallingConventionInfo::GetPackedReturn(KindOfValue(ret_val->getType()));
 
   if (regs.names.empty() || regs.accepted_kinds == kInvalidKind) {
-    LOG(INFO)
-      << "Could not store return type "
-      << remill::LLVMThingToString(ret_val->getType())
-      << " as packed type";
+    LOG(INFO) << "Could not store return type "
+              << remill::LLVMThingToString(ret_val->getType())
+              << " as packed type";
     return false;
   }
 
@@ -575,6 +492,7 @@ static bool TryStorePackedType(llvm::BasicBlock *block, llvm::Value *ret_val) {
   auto ptr_ret_val = ir.CreateBitCast(ret_val_alloca, regs.unit_ptr_type);
 
   for (auto i = 0U; i < regs.names.size(); ++i) {
+
     // Get partial value from offset
     auto partial_value_ptr = ir.CreateGEP(ptr_ret_val, GetConstantInt(64, i));
     auto partial_value = ir.CreateLoad(partial_value_ptr);
@@ -582,8 +500,7 @@ static bool TryStorePackedType(llvm::BasicBlock *block, llvm::Value *ret_val) {
     llvm::Value *dest_loc = remill::FindVarInFunction(block, regs.names[i]);
 
     // Store actual value
-    dest_loc = ir.CreateBitCast(dest_loc,
-                                regs.unit_ptr_type);
+    dest_loc = ir.CreateBitCast(dest_loc, regs.unit_ptr_type);
     ir.CreateStore(partial_value, dest_loc);
   }
   return true;
@@ -633,9 +550,8 @@ static llvm::Function *ReadIntFromMemFunc(uint64_t size_bytes) {
   } else if (1 == size_bytes) {
     return gModule->getFunction("__remill_read_memory_8");
   } else {
-    LOG(FATAL)
-        << "Cannot find function to read " << size_bytes
-        << "-byte integer from memory.";
+    LOG(FATAL) << "Cannot find function to read " << size_bytes
+               << "-byte integer from memory.";
     return nullptr;
   }
 }
@@ -650,9 +566,8 @@ static llvm::Function *WriteIntToMemFunc(uint64_t size_bytes) {
   } else if (1 == size_bytes) {
     return gModule->getFunction("__remill_write_memory_8");
   } else {
-    LOG(FATAL)
-        << "Cannot find function to read " << size_bytes
-        << "-byte integer from memory.";
+    LOG(FATAL) << "Cannot find function to read " << size_bytes
+               << "-byte integer from memory.";
     return nullptr;
   }
 }
@@ -661,9 +576,9 @@ static llvm::Function *WriteIntToMemFunc(uint64_t size_bytes) {
 // be of vector type, for example: <2 x float> will go into one %xmm.
 // External library must be compiled for the same architecture that
 // is passed to mcsema-lift, otherwise types may be wrong.
-llvm::Value *CallingConvention::LoadVectorArgument(
-    llvm::BasicBlock *block,
-    llvm::VectorType *goal_type) {
+llvm::Value *
+CallingConvention::LoadVectorArgument(llvm::BasicBlock *block,
+                                      llvm::VectorType *goal_type) {
 
   llvm::IRBuilder<> ir(block);
   llvm::Value *base_value = llvm::Constant::getNullValue(goal_type);
@@ -671,34 +586,31 @@ llvm::Value *CallingConvention::LoadVectorArgument(
   llvm::Type *under_type = goal_type->getElementType();
   llvm::DataLayout dl(gModule);
   const size_t num_elements = goal_type->getNumElements();
-  const ssize_t element_size = static_cast<ssize_t>(
-      dl.getTypeAllocSize(under_type));
+  const ssize_t element_size =
+      static_cast<ssize_t>(dl.getTypeAllocSize(under_type));
   const ssize_t reg_size = static_cast<ssize_t>(GetVectorRegSize());
   const ssize_t reg_element_capacity = reg_size / element_size;
   ssize_t remaining = static_cast<ssize_t>(num_elements);
 
   for (ssize_t i = 0; remaining > 0; ++i, remaining -= reg_size) {
     auto reg_var_name = GetVarForNextArgument(goal_type);
-    LOG_IF(FATAL, !reg_var_name)
-        << "Could not find available vector register";
+    LOG_IF(FATAL, !reg_var_name) << "Could not find available vector register";
 
     llvm::Value *dest_loc = remill::FindVarInFunction(block, reg_var_name);
-    dest_loc = ir.CreateBitCast(dest_loc,
-                                llvm::PointerType::get(under_type, 0));
+    dest_loc =
+        ir.CreateBitCast(dest_loc, llvm::PointerType::get(under_type, 0));
 
     const auto count = std::min(reg_element_capacity, remaining);
     base_value = InsertIntoVector(
-        block, base_value, dest_loc,
-        static_cast<size_t>(count),
+        block, base_value, dest_loc, static_cast<size_t>(count),
         static_cast<size_t>(i * reg_element_capacity));
   }
   return base_value;
 }
 
 
-llvm::Value *CallingConvention::LoadNextSimpleArgument(
-    llvm::BasicBlock *block,
-    llvm::Type *goal_type) {
+llvm::Value *CallingConvention::LoadNextSimpleArgument(llvm::BasicBlock *block,
+                                                       llvm::Type *goal_type) {
   if (!goal_type) {
     goal_type = gWordType;
   }
@@ -762,9 +674,9 @@ llvm::Value *CallingConvention::LoadNextSimpleArgument(
     val = ir.CreateIntToPtr(ir.CreateCall(func, args), goal_type);
 
   } else {
-    LOG(FATAL)
-        << "Can't handle reading an " << remill::LLVMThingToString(goal_type)
-        << " value from the stack";
+    LOG(FATAL) << "Can't handle reading an "
+               << remill::LLVMThingToString(goal_type)
+               << " value from the stack";
   }
 
   // Bump the stack pointer.
@@ -782,7 +694,7 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
 
   llvm::IRBuilder<> ir(block);
 
-  std::vector<llvm::Value*> underlying_values;
+  std::vector<llvm::Value *> underlying_values;
   llvm::Type *goal_type = target_type;
 
   if (target_type->isPointerTy() && !is_byval) {
@@ -790,11 +702,10 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
   }
 
   if (auto struct_type = llvm::dyn_cast<llvm::StructType>(goal_type)) {
-    std::vector<llvm::Value*> underlying_values;
+    std::vector<llvm::Value *> underlying_values;
     for (unsigned i = 0; i < struct_type->getNumElements(); ++i) {
       llvm::Type *under_type = struct_type->getElementType(i);
-      underlying_values.push_back(
-          LoadNextSimpleArgument(block, under_type));
+      underlying_values.push_back(LoadNextSimpleArgument(block, under_type));
     }
 
     llvm::IRBuilder<> ir(block);
@@ -807,6 +718,7 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
     return ir.CreateLoad(alloc_struct);
 
   } else if (is_byval) {
+
     // byval attribute says that caller makes a copy of argument on the stack
     // this happens if type of argument is bigger than 128 bits.
     auto stack_ptr = LoadStackPointer(block);
@@ -832,29 +744,27 @@ void CallingConvention::StoreVectorRetValue(llvm::BasicBlock *block,
 
   const size_t num_elements = goal_type->getNumElements();
   const ssize_t reg_size = static_cast<ssize_t>(GetVectorRegSize());
-  const ssize_t element_size = static_cast<ssize_t>(
-      dl.getTypeAllocSize(under_type));
+  const ssize_t element_size =
+      static_cast<ssize_t>(dl.getTypeAllocSize(under_type));
   const ssize_t reg_element_capacity = reg_size / element_size;
   ssize_t remaining = static_cast<ssize_t>(num_elements);
 
   for (ssize_t i = 0U; remaining > 0; ++i, remaining -= reg_element_capacity) {
     auto reg_var_name = GetVarForNextReturn(goal_type);
-    LOG_IF(FATAL, !reg_var_name)
-        << "Could not find available vector register";
+    LOG_IF(FATAL, !reg_var_name) << "Could not find available vector register";
     llvm::Value *dest_loc = remill::FindVarInFunction(block, reg_var_name);
 
     // Clear out whatever was already there
-    auto storage_type = llvm::dyn_cast<llvm::PointerType>(
-        dest_loc->getType())->getElementType();
+    auto storage_type = llvm::dyn_cast<llvm::PointerType>(dest_loc->getType())
+                            ->getElementType();
     ir.CreateStore(llvm::Constant::getNullValue(storage_type), dest_loc);
 
-    dest_loc = ir.CreateBitCast(dest_loc,
-                                llvm::PointerType::get(under_type, 0));
+    dest_loc =
+        ir.CreateBitCast(dest_loc, llvm::PointerType::get(under_type, 0));
 
     const auto count = std::min(reg_element_capacity, remaining);
     const auto already_done = i * reg_element_capacity;
-    ExtractFromVector(block, ret_val, dest_loc,
-                      static_cast<size_t>(count),
+    ExtractFromVector(block, ret_val, dest_loc, static_cast<size_t>(count),
                       static_cast<size_t>(already_done));
   }
 }
@@ -873,7 +783,7 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
   llvm::IRBuilder<> ir(block);
 
   for (unsigned i = 0; i < GetNumberOfElements(val_type); ++i) {
-    llvm::Value* target_val = ret_val;
+    llvm::Value *target_val = ret_val;
 
     if (val_type->isStructTy()) {
       target_val = ir.CreateExtractValue(ret_val, i);
@@ -895,10 +805,9 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
         return;
       }
 
-      LOG(FATAL)
-          << "Cannot decide how to store "
-          << remill::LLVMThingToString(under_type)
-          << " part of " << remill::LLVMThingToString(val_type);
+      LOG(FATAL) << "Cannot decide how to store "
+                 << remill::LLVMThingToString(under_type) << " part of "
+                 << remill::LLVMThingToString(val_type);
     }
 
     // If it's a pointer then convert it to a pointer-sized integer.
@@ -926,11 +835,10 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
         target_val = ir.CreateZExt(target_val, under_type);
 
       } else if (size > gArch->address_size) {
-        LOG(ERROR)
-            << "Truncating value of type "
-            << remill::LLVMThingToString(under_type)
-            << " to store it into variable " << val_var
-            << " of type " << remill::LLVMThingToString(gWordType);
+        LOG(ERROR) << "Truncating value of type "
+                   << remill::LLVMThingToString(under_type)
+                   << " to store it into variable " << val_var << " of type "
+                   << remill::LLVMThingToString(gWordType);
         target_val = ir.CreateTrunc(target_val, gWordType);
         under_type = gWordType;
       }
@@ -946,15 +854,15 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
     llvm::Value *dest_loc = remill::FindVarInFunction(block, val_var);
 
     // Clear out whatever was already there.
-    auto storage_type = llvm::dyn_cast<llvm::PointerType>(
-        dest_loc->getType())->getElementType();
+    auto storage_type = llvm::dyn_cast<llvm::PointerType>(dest_loc->getType())
+                            ->getElementType();
     ir.CreateStore(llvm::Constant::getNullValue(storage_type), dest_loc);
 
     // Add in the new value.
-    dest_loc = ir.CreateBitCast(dest_loc, llvm::PointerType::get(under_type, 0));
+    dest_loc =
+        ir.CreateBitCast(dest_loc, llvm::PointerType::get(under_type, 0));
     ir.CreateStore(target_val, dest_loc);
   }
-
 }
 
 void CallingConvention::StoreArguments(
@@ -970,9 +878,8 @@ void CallingConvention::StoreArguments(
     auto arg_type = arg_val->getType();
     if (auto reg_var_name = GetVarForNextArgument(arg_type)) {
       auto reg_ptr = remill::FindVarInFunction(block, reg_var_name);
-      ir.CreateStore(
-          arg_val,
-          ir.CreateBitCast(reg_ptr, llvm::PointerType::get(arg_type, 0)));
+      ir.CreateStore(arg_val, ir.CreateBitCast(reg_ptr, llvm::PointerType::get(
+                                                            arg_type, 0)));
     } else {
       stack_arg_vals.push_back(arg_val);
     }
@@ -1011,8 +918,8 @@ void CallingConvention::StoreArguments(
 
       if (dl.getTypeSizeInBits(arg_type) <
           dl.getTypeAllocSizeInBits(arg_type)) {
-        arg_type = llvm::Type::getIntNTy(
-            *gContext, static_cast<unsigned>(alloc_size * 8));
+        arg_type = llvm::Type::getIntNTy(*gContext,
+                                         static_cast<unsigned>(alloc_size * 8));
         arg_val = ir.CreateZExt(arg_val, arg_type);
       }
 
@@ -1060,8 +967,8 @@ void CallingConvention::FreeArguments(llvm::BasicBlock *block) {
   auto sp = LoadStackPointer(block);
 
   llvm::IRBuilder<> ir(block);
-  sp = ir.CreateAdd(
-      sp, llvm::ConstantInt::get(gWordType, num_stored_stack_bytes));
+  sp = ir.CreateAdd(sp,
+                    llvm::ConstantInt::get(gWordType, num_stored_stack_bytes));
 
   StoreStackPointer(block, sp);
 }
@@ -1082,14 +989,13 @@ void CallingConvention::AllocateReturnAddress(llvm::BasicBlock *block) {
     }
 
     auto addr_size_bytes = llvm::ConstantInt::get(gWordType, addr_size);
-    StoreStackPointer(
-        block, ir.CreateSub(LoadStackPointer(block), addr_size_bytes));
+    StoreStackPointer(block,
+                      ir.CreateSub(LoadStackPointer(block), addr_size_bytes));
 
   } else {
-    LOG(FATAL)
-        << "Cannot allocate space for return address for architecture "
-        << remill::GetArchName(gArch->arch_name) << " and calling convention "
-        << cc;
+    LOG(FATAL) << "Cannot allocate space for return address for architecture "
+               << remill::GetArchName(gArch->arch_name)
+               << " and calling convention " << cc;
   }
 }
 
@@ -1111,14 +1017,12 @@ void CallingConvention::FreeReturnAddress(llvm::BasicBlock *block) {
     auto ret_addr = ir.CreateCall(read_ret_addr, read_ret_addr_args);
     remill::StoreProgramCounter(block, ret_addr);
 
-    StoreStackPointer(
-        block, ir.CreateAdd(sp, addr_size_bytes));
+    StoreStackPointer(block, ir.CreateAdd(sp, addr_size_bytes));
 
   } else {
-    LOG(FATAL)
-        << "Cannot allocate space for return address for architecture "
-        << remill::GetArchName(gArch->arch_name) << " and calling convention "
-        << cc;
+    LOG(FATAL) << "Cannot allocate space for return address for architecture "
+               << remill::GetArchName(gArch->arch_name)
+               << " and calling convention " << cc;
   }
 }
 
@@ -1132,9 +1036,9 @@ llvm::Value *CallingConvention::LoadReturnValue(llvm::BasicBlock *block,
 
   //auto val_var = ReturnValVar(cc, val_type);
   auto val_var = GetVarForNextReturn(val_type);
-  return ir.CreateLoad(ir.CreateBitCast(
-      remill::FindVarInFunction(block, val_var),
-      llvm::PointerType::get(val_type, 0)));
+  return ir.CreateLoad(
+      ir.CreateBitCast(remill::FindVarInFunction(block, val_var),
+                       llvm::PointerType::get(val_type, 0)));
 }
 
 llvm::Value *CallingConvention::LoadStackPointer(llvm::BasicBlock *block) {
@@ -1149,9 +1053,8 @@ void CallingConvention::StoreStackPointer(llvm::BasicBlock *block,
   if (val_type->isPointerTy()) {
     new_val = ir.CreatePtrToInt(new_val, gWordType);
   }
-  ir.CreateStore(
-      new_val,
-      remill::FindVarInFunction(block, StackPointerVarName()));
+  ir.CreateStore(new_val,
+                 remill::FindVarInFunction(block, StackPointerVarName()));
 }
 
 void CallingConvention::StoreThreadPointer(llvm::BasicBlock *block,
@@ -1161,9 +1064,8 @@ void CallingConvention::StoreThreadPointer(llvm::BasicBlock *block,
   if (val_type->isPointerTy()) {
     new_val = ir.CreatePtrToInt(new_val, gWordType);
   }
-  ir.CreateStore(
-      new_val,
-      remill::FindVarInFunction(block, ThreadPointerVarName()));
+  ir.CreateStore(new_val,
+                 remill::FindVarInFunction(block, ThreadPointerVarName()));
 }
 
 // Return the address of the base of the TLS data.
@@ -1180,9 +1082,8 @@ llvm::Value *GetTLSBaseAddress(llvm::IRBuilder<> &ir) {
   if (gArch->IsAArch64()) {
 
 #if LLVM_VERSION(3, 7) >= LLVM_VERSION_NUMBER
-    LOG(ERROR)
-        << "LLVM 3.7 and below have no AArch64 thread pointer-related "
-        << "intrinsics; using NULL as the base of TLS.";
+    LOG(ERROR) << "LLVM 3.7 and below have no AArch64 thread pointer-related "
+               << "intrinsics; using NULL as the base of TLS.";
     return llvm::ConstantInt::get(gWordType, 0);
 
 #elif LLVM_VERSION(3, 8) >= LLVM_VERSION_NUMBER
@@ -1193,9 +1094,8 @@ llvm::Value *GetTLSBaseAddress(llvm::IRBuilder<> &ir) {
         gModule, llvm::Intrinsic::arm_thread_pointer);
     return ir.CreatePtrToInt(ir.CreateCall(func), gWordType);
 #else
-    LOG(ERROR)
-        << "Assuming the `thread.pointer` intrinsic gets us the base "
-        << "of thread-local storage.";
+    LOG(ERROR) << "Assuming the `thread.pointer` intrinsic gets us the base "
+               << "of thread-local storage.";
     auto func = llvm::Intrinsic::getDeclaration(
         gModule, llvm::Intrinsic::thread_pointer);
     return ir.CreatePtrToInt(ir.CreateCall(func), gWordType);
@@ -1238,10 +1138,9 @@ llvm::Value *GetTLSBaseAddress(llvm::IRBuilder<> &ir) {
     }
   }
 
-  LOG(FATAL)
-      << "Cannot generate code to find the thread base pointer for arch "
-      << remill::GetArchName(gArch->arch_name) << " and OS "
-      << remill::GetOSName(gArch->os_name);
+  LOG(FATAL) << "Cannot generate code to find the thread base pointer for arch "
+             << remill::GetArchName(gArch->arch_name) << " and OS "
+             << remill::GetOSName(gArch->os_name);
   return nullptr;
 }
 

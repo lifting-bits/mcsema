@@ -14,20 +14,21 @@
  * limitations under the License.
  */
 
-#include <glog/logging.h>
-#include <gflags/gflags.h>
+#include "mcsema/BC/Function.h"
 
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfo.h>
-#include <llvm/IR/InstIterator.h>
-#include <llvm/IR/InlineAsm.h>
-#include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IR/InlineAsm.h>
+#include <llvm/IR/InstIterator.h>
+#include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Metadata.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/MDBuilder.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/PassManager.h>
 #include <llvm/IR/Type.h>
@@ -37,6 +38,15 @@
 #include <unordered_set>
 #include <vector>
 
+#include "mcsema/Arch/Arch.h"
+#include "mcsema/BC/Callback.h"
+#include "mcsema/BC/Instruction.h"
+#include "mcsema/BC/Legacy.h"
+#include "mcsema/BC/Lift.h"
+#include "mcsema/BC/Optimize.h"
+#include "mcsema/BC/Segment.h"
+#include "mcsema/BC/Util.h"
+#include "mcsema/CFG/CFG.h"
 #include "remill/Arch/Arch.h"
 #include "remill/Arch/Instruction.h"
 #include "remill/BC/ABI.h"
@@ -46,37 +56,29 @@
 #include "remill/BC/Util.h"
 #include "remill/BC/Version.h"
 
-#include "mcsema/Arch/Arch.h"
-#include "mcsema/BC/Callback.h"
-#include "mcsema/BC/Function.h"
-#include "mcsema/BC/Instruction.h"
-#include "mcsema/BC/Legacy.h"
-#include "mcsema/BC/Lift.h"
-#include "mcsema/BC/Optimize.h"
-#include "mcsema/BC/Segment.h"
-#include "mcsema/BC/Util.h"
-#include "mcsema/CFG/CFG.h"
-
 DECLARE_bool(legacy_mode);
 
 DEFINE_bool(add_reg_tracer, false,
             "Add a debug function that prints out the register state before "
             "each lifted instruction execution.");
 
-DEFINE_bool(add_breakpoints, false,
-            "Add 'breakpoint' functions between every lifted instruction. This "
-            "allows one to set a breakpoint, in the lifted code, just before a "
-            "specific lifted instruction is executed. This is a debugging aid.");
+DEFINE_bool(
+    add_breakpoints, false,
+    "Add 'breakpoint' functions between every lifted instruction. This "
+    "allows one to set a breakpoint, in the lifted code, just before a "
+    "specific lifted instruction is executed. This is a debugging aid.");
 
 DEFINE_bool(check_pc_at_breakpoints, false,
             "Check whether or not the emulated program counter is correct at "
             "each injected 'breakpoint' function. This is a debugging aid.");
 
-DEFINE_string(exception_personality_func, "__gxx_personality_v0",
-              "Add a personality function for lifting exception handling "
-              "routine. Assigned __gxx_personality_v0 as default for c++ ABTs.");
+DEFINE_string(
+    exception_personality_func, "__gxx_personality_v0",
+    "Add a personality function for lifting exception handling "
+    "routine. Assigned __gxx_personality_v0 as default for c++ ABTs.");
 
-DEFINE_bool(stack_protector, false, "Annotate functions so that if the bitcode "
+DEFINE_bool(stack_protector, false,
+            "Annotate functions so that if the bitcode "
             "is compiled with -fstack-protector-all then the stack protection "
             "guards will be added.");
 
@@ -91,7 +93,8 @@ static llvm::Function *GetPersonalityFunction(void) {
 
   // The personality function is lifted as global variable. Check and erase the
   // variable before declaring it as the function.
-  if (auto personality_func = gModule->getGlobalVariable(personality_func_name)) {
+  if (auto personality_func =
+          gModule->getGlobalVariable(personality_func_name)) {
     personality_func->eraseFromParent();
   }
 
@@ -107,9 +110,9 @@ static llvm::Function *GetPersonalityFunction(void) {
 static llvm::Function *GetRegTracer(void) {
   auto reg_tracer = gModule->getFunction("__mcsema_reg_tracer");
   if (!reg_tracer) {
-    reg_tracer = llvm::Function::Create(
-        LiftedFunctionType(), llvm::GlobalValue::ExternalLinkage,
-        "__mcsema_reg_tracer", gModule);
+    reg_tracer = llvm::Function::Create(LiftedFunctionType(),
+                                        llvm::GlobalValue::ExternalLinkage,
+                                        "__mcsema_reg_tracer", gModule);
   }
   return reg_tracer;
 }
@@ -124,9 +127,9 @@ static llvm::Function *GetBreakPoint(uint64_t pc) {
     return func;
   }
 
-  func = llvm::Function::Create(
-      LiftedFunctionType(), llvm::GlobalValue::ExternalLinkage,
-      func_name, gModule);
+  func = llvm::Function::Create(LiftedFunctionType(),
+                                llvm::GlobalValue::ExternalLinkage, func_name,
+                                gModule);
 
   // Make sure to keep this function around (along with `ExternalLinkage`).
   func->removeFnAttr(llvm::Attribute::ReadNone);
@@ -146,9 +149,8 @@ static llvm::Function *GetBreakPoint(uint64_t pc) {
 
   if (FLAGS_check_pc_at_breakpoints) {
     auto trap = llvm::Intrinsic::getDeclaration(gModule, llvm::Intrinsic::trap);
-    auto are_eq = ir.CreateICmpEQ(
-        remill::NthArgument(func, remill::kPCArgNum),
-        llvm::ConstantInt::get(gWordType, pc));
+    auto are_eq = ir.CreateICmpEQ(remill::NthArgument(func, remill::kPCArgNum),
+                                  llvm::ConstantInt::get(gWordType, pc));
 
     auto not_eq_bb = llvm::BasicBlock::Create(*gContext, "", func);
     auto eq_bb = llvm::BasicBlock::Create(*gContext, "", func);
@@ -163,11 +165,11 @@ static llvm::Function *GetBreakPoint(uint64_t pc) {
 
   // Basically some empty inline assembly that tells the compiler not to
   // optimize away the `state` pointer before each `breakpoint_XXX` function.
-  auto asm_func_type = llvm::FunctionType::get(
-      llvm::Type::getVoidTy(*gContext), state_ptr_type, false);
+  auto asm_func_type = llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext),
+                                               state_ptr_type, false);
 
-  auto asm_func = llvm::InlineAsm::get(
-      asm_func_type, "", "*m,~{dirflag},~{fpsr},~{flags}", true);
+  auto asm_func = llvm::InlineAsm::get(asm_func_type, "",
+                                       "*m,~{dirflag},~{fpsr},~{flags}", true);
 
   ir.CreateCall(asm_func, state_ptr);
   ir.CreateRet(remill::NthArgument(func, remill::kMemoryPointerArgNum));
@@ -189,16 +191,12 @@ static llvm::Function *GetExceptionHandlerPrologue(void) {
   auto dword_type = llvm::Type::getInt32Ty(*gContext);
   auto exception_handler = gModule->getFunction("__mcsema_exception_ret");
   if (exception_handler == nullptr) {
-    llvm::Type* args_type[] = {
-        gWordType,
-        gWordType,
-        dword_type
-    };
-    auto func_type = llvm::FunctionType::get(
-        llvm::Type::getVoidTy(*gContext), args_type, false);
-    exception_handler = llvm::Function::Create(
-        func_type, llvm::Function::ExternalWeakLinkage,
-        "__mcsema_exception_ret", gModule);
+    llvm::Type *args_type[] = {gWordType, gWordType, dword_type};
+    auto func_type = llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext),
+                                             args_type, false);
+    exception_handler =
+        llvm::Function::Create(func_type, llvm::Function::ExternalWeakLinkage,
+                               "__mcsema_exception_ret", gModule);
   }
   return exception_handler;
 }
@@ -208,10 +206,10 @@ static llvm::Function *GetExceptionHandlerPrologue(void) {
 static llvm::Function *GetExceptionTypeIndex(void) {
   auto get_index_func = gModule->getFunction("__mcsema_get_type_index");
   if (!get_index_func) {
-    get_index_func = llvm::Function::Create(
-        llvm::FunctionType::get(gWordType, false),
-        llvm::GlobalValue::ExternalWeakLinkage,
-        "__mcsema_get_type_index", gModule);
+    get_index_func =
+        llvm::Function::Create(llvm::FunctionType::get(gWordType, false),
+                               llvm::GlobalValue::ExternalWeakLinkage,
+                               "__mcsema_get_type_index", gModule);
   }
 
   return get_index_func;
@@ -219,10 +217,9 @@ static llvm::Function *GetExceptionTypeIndex(void) {
 
 // Add a call to another function, and then update the memory pointer with the
 // result of the function.
-static void InlineSubFuncCall(llvm::BasicBlock *block,
-                              llvm::Function *sub) {
-  auto call = llvm::CallInst::Create(
-      sub, remill::LiftedFunctionArgs(block), "", block);
+static void InlineSubFuncCall(llvm::BasicBlock *block, llvm::Function *sub) {
+  auto call =
+      llvm::CallInst::Create(sub, remill::LiftedFunctionArgs(block), "", block);
   call->setCallingConv(sub->getCallingConv());
   auto mem_ptr = remill::LoadMemoryPointerRef(block);
   (void) new llvm::StoreInst(call, mem_ptr, block);
@@ -231,38 +228,38 @@ static void InlineSubFuncCall(llvm::BasicBlock *block,
 // Add a invoke to another function and then update the memory pointer with the
 // result of the function. It also needs to stash the stack and frame pointer which
 // can be restored before handling the exception handler.
-static void InlineSubFuncInvoke(llvm::BasicBlock *block,
-                                llvm::Function *sub, llvm::BasicBlock *if_normal,
+static void InlineSubFuncInvoke(llvm::BasicBlock *block, llvm::Function *sub,
+                                llvm::BasicBlock *if_normal,
                                 llvm::BasicBlock *if_exception,
                                 const NativeFunction *cfg_func) {
-  llvm::IRBuilder <> ir(block);
+  llvm::IRBuilder<> ir(block);
   auto get_sp_func = gModule->getFunction("__mcsema_get_stack_pointer");
   if (!get_sp_func) {
-    get_sp_func = llvm::Function::Create(
-        llvm::FunctionType::get(gWordType, false),
-        llvm::GlobalValue::ExternalLinkage,
-        "__mcsema_get_stack_pointer", gModule);
+    get_sp_func =
+        llvm::Function::Create(llvm::FunctionType::get(gWordType, false),
+                               llvm::GlobalValue::ExternalLinkage,
+                               "__mcsema_get_stack_pointer", gModule);
   }
   auto sp_var = ir.CreateCall(get_sp_func);
   ir.CreateStore(sp_var, cfg_func->stack_ptr_var);
 
   auto get_bp_func = gModule->getFunction("__mcsema_get_frame_pointer");
   if (!get_bp_func) {
-    get_bp_func = llvm::Function::Create(
-        llvm::FunctionType::get(gWordType, false),
-        llvm::GlobalValue::ExternalLinkage,
-        "__mcsema_get_frame_pointer", gModule);
+    get_bp_func =
+        llvm::Function::Create(llvm::FunctionType::get(gWordType, false),
+                               llvm::GlobalValue::ExternalLinkage,
+                               "__mcsema_get_frame_pointer", gModule);
   }
   auto bp_var = ir.CreateCall(get_bp_func);
   ir.CreateStore(bp_var, cfg_func->frame_ptr_var);
-  auto invoke = ir.CreateInvoke(
-      sub, if_normal, if_exception, remill::LiftedFunctionArgs(block), "");
+  auto invoke = ir.CreateInvoke(sub, if_normal, if_exception,
+                                remill::LiftedFunctionArgs(block), "");
   invoke->setCallingConv(sub->getCallingConv());
 }
 
 // Find an external function associated with this indirect jump.
-static llvm::Function *DevirtualizeIndirectFlow(
-    const NativeFunction *cfg_func, llvm::Function *fallback) {
+static llvm::Function *DevirtualizeIndirectFlow(const NativeFunction *cfg_func,
+                                                llvm::Function *fallback) {
   if (cfg_func->is_external) {
     return GetLiftedToNativeExitPoint(cfg_func);
   } else if (auto func = gModule->getFunction(cfg_func->lifted_name)) {
@@ -273,8 +270,8 @@ static llvm::Function *DevirtualizeIndirectFlow(
 }
 
 // Find an external function associated with this indirect jump.
-static llvm::Function *DevirtualizeIndirectFlow(
-    TranslationContext &ctx, llvm::Function *fallback) {
+static llvm::Function *DevirtualizeIndirectFlow(TranslationContext &ctx,
+                                                llvm::Function *fallback) {
   if (ctx.cfg_inst->flow) {
     if (auto cfg_func = ctx.cfg_inst->flow->func) {
       return DevirtualizeIndirectFlow(cfg_func, fallback);
@@ -333,23 +330,21 @@ static llvm::Function *FindFunction(TranslationContext &ctx,
   if (cfg_func) {
     auto lifted_func = gModule->getFunction(cfg_func->lifted_name);
     if (lifted_func) {
-      LOG(WARNING)
-          << "Cannot find target of instruction at " << std::hex
-          << ctx.cfg_inst->ea << "; the static target "
-          << std::hex << target_pc << " is not associated with a lifted"
-          << " subroutine, but is associated with the function at " << std::hex
-          << cfg_func->ea << " in the CFG." << std::dec;
+      LOG(WARNING) << "Cannot find target of instruction at " << std::hex
+                   << ctx.cfg_inst->ea << "; the static target " << std::hex
+                   << target_pc << " is not associated with a lifted"
+                   << " subroutine, but is associated with the function at "
+                   << std::hex << cfg_func->ea << " in the CFG." << std::dec;
 
       return lifted_func;
     }
   }
 
-  LOG(ERROR)
-      << "Cannot find target of instruction at " << std::hex
-      << ctx.cfg_inst->ea << "; the static target "
-      << std::hex << target_pc << " is not associated with a lifted"
-      << " subroutine, and it does not have a known call target."
-      << std::dec;
+  LOG(ERROR) << "Cannot find target of instruction at " << std::hex
+             << ctx.cfg_inst->ea << "; the static target " << std::hex
+             << target_pc << " is not associated with a lifted"
+             << " subroutine, and it does not have a known call target."
+             << std::dec;
 
   return ctx.lifter->intrinsics->error;
 }
@@ -376,13 +371,12 @@ static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
 
     // Terminate the block with an unreachable inst.
     } else {
-      LOG(ERROR)
-          << "Adding missing block " << std::hex << pc << " in function "
-          << ctx.cfg_func->lifted_name << " as a jump to the error intrinsic."
-          << std::dec;
+      LOG(ERROR) << "Adding missing block " << std::hex << pc << " in function "
+                 << ctx.cfg_func->lifted_name
+                 << " as a jump to the error intrinsic." << std::dec;
 
-      remill::AddTerminatingTailCall(
-          block, ctx.lifter->intrinsics->missing_block);
+      remill::AddTerminatingTailCall(block,
+                                     ctx.lifter->intrinsics->missing_block);
     }
   }
   return block;
@@ -394,15 +388,16 @@ static void CreateLandingPad(TranslationContext &ctx,
   std::stringstream ss;
 
   auto dword_type = llvm::Type::getInt32Ty(*gContext);
+
   // `__mcsema_exception_ret` argument list
   std::vector<llvm::Value *> args(3);
   auto is_catch = (eh_entry->action_index != 0);
   ss << "landingpad_" << std::hex << eh_entry->lp_ea;
-  auto landing_bb = llvm::BasicBlock::Create(
-      *gContext, ss.str(), ctx.lifted_func);
+  auto landing_bb =
+      llvm::BasicBlock::Create(*gContext, ss.str(), ctx.lifted_func);
 
-  std::vector<llvm::Type *> elem_types = {
-      llvm::Type::getInt8PtrTy(*gContext), dword_type};
+  std::vector<llvm::Type *> elem_types = {llvm::Type::getInt8PtrTy(*gContext),
+                                          dword_type};
 
   // TODO(akshayk): Should this struct be packed?
   llvm::IRBuilder<> ir(landing_bb);
@@ -417,13 +412,14 @@ static void CreateLandingPad(TranslationContext &ctx,
 
   lpad->setCleanup(!is_catch);
 
-  if(is_catch) {
+  if (is_catch) {
     std::stringstream g_variable_name_ss;
-    std::vector<llvm::Constant *>array_value_const;
+    std::vector<llvm::Constant *> array_value_const;
     auto catch_all = false;
     unsigned long catch_all_index = 0;
 
     for (auto &it : eh_entry->type_var) {
+
       // Check the ttype variables are not null
       auto type = it.second;
       CHECK_NOTNULL(type);
@@ -458,14 +454,13 @@ static void CreateLandingPad(TranslationContext &ctx,
     // value is a dummy, and it is used to avoid further index computation.
     g_variable_name_ss << "gvar_landingpad_" << std::hex << eh_entry->lp_ea;
     auto g_variable_name = g_variable_name_ss.str();
-    auto array_type = llvm::ArrayType::get(
-        dword_type, eh_entry->type_var.size() + 1);
+    auto array_type =
+        llvm::ArrayType::get(dword_type, eh_entry->type_var.size() + 1);
 
     if (!gModule->getOrInsertGlobal(g_variable_name, array_type)) {
-      LOG_IF(ERROR, 1)
-          << "Can't create the global variable " << g_variable_name
-          << " for the landing pad at" << std::hex << eh_entry->lp_ea
-          << std::dec;
+      LOG_IF(ERROR, 1) << "Can't create the global variable " << g_variable_name
+                       << " for the landing pad at" << std::hex
+                       << eh_entry->lp_ea << std::dec;
     }
 
     auto gvar_landingpad = gModule->getGlobalVariable(g_variable_name);
@@ -476,8 +471,8 @@ static void CreateLandingPad(TranslationContext &ctx,
 
     std::reverse(array_value_const.begin(), array_value_const.end());
     llvm::ArrayRef<llvm::Constant *> array_value(array_value_const);
-    llvm::Constant* const_array = llvm::ConstantArray::get(
-        array_type, array_value);
+    llvm::Constant *const_array =
+        llvm::ConstantArray::get(array_type, array_value);
     gvar_landingpad->setInitializer(const_array);
     auto type_index_value2 = ir.CreateCall(GetExceptionTypeIndex());
     auto type_index_value1 = llvm::ConstantInt::get(dword_type, 0);
@@ -557,15 +552,12 @@ static void LiftConditionalBranch(TranslationContext &ctx,
   auto block_true = GetOrCreateBlock(ctx, inst.branch_taken_pc);
   auto block_false = GetOrCreateBlock(ctx, inst.branch_not_taken_pc);
   llvm::IRBuilder<> cond_ir(source);
-  cond_ir.CreateCondBr(
-      remill::LoadBranchTaken(source),
-      block_true,
-      block_false);
+  cond_ir.CreateCondBr(remill::LoadBranchTaken(source), block_true,
+                       block_false);
 }
 
 // Lift an indirect jump into a switch instruction.
-static void LiftIndirectJump(TranslationContext &ctx,
-                             llvm::BasicBlock *block,
+static void LiftIndirectJump(TranslationContext &ctx, llvm::BasicBlock *block,
                              remill::Instruction &inst) {
 
   auto exit_point = GetLiftedToNativeExitPoint(kExitPointJump);
@@ -600,10 +592,9 @@ static void LiftIndirectJump(TranslationContext &ctx,
     for (auto &block_entry : ctx.cfg_func->blocks) {
       auto target_ea = block_entry.first;
       if (!succ_eas.count(target_ea)) {
-        LOG(WARNING)
-            << "Adding block " << std::hex << target_ea
-            << " with no predecessors as additional target of the "
-            << " indirect jump at " << inst.pc << std::dec;
+        LOG(WARNING) << "Adding block " << std::hex << target_ea
+                     << " with no predecessors as additional target of the "
+                     << " indirect jump at " << inst.pc << std::dec;
         block_map[target_ea] = GetOrCreateBlock(ctx, target_ea);
       }
     }
@@ -612,16 +603,16 @@ static void LiftIndirectJump(TranslationContext &ctx,
   // We have no jump table information, so assume that it's an indirect tail
   // call, so just go native.
   if (block_map.empty()) {
-    LOG(INFO)
-        << "Indirect jump at " << std::hex << inst.pc << std::dec
-        << " looks like a thunk; falling back to " << fallback->getName().str();
+    LOG(INFO) << "Indirect jump at " << std::hex << inst.pc << std::dec
+              << " looks like a thunk; falling back to "
+              << fallback->getName().str();
     remill::AddTerminatingTailCall(block, fallback);
     return;
   }
 
   // Create a "default" fall-back block for the switch.
-  auto fallback_block = llvm::BasicBlock::Create(
-      *gContext, "", block->getParent());
+  auto fallback_block =
+      llvm::BasicBlock::Create(*gContext, "", block->getParent());
 
   remill::AddTerminatingTailCall(fallback_block, fallback);
 
@@ -629,28 +620,26 @@ static void LiftIndirectJump(TranslationContext &ctx,
   auto switch_index = remill::LoadProgramCounter(block);
 
   if (ctx.cfg_inst->offset_table) {
-    LOG(INFO)
-        << "Indirect jump at " << std::hex << ctx.cfg_inst->ea
-        << " is a jump through an offset table with offset "
-        << std::hex << ctx.cfg_inst->offset_table->target_ea << std::dec;
+    LOG(INFO) << "Indirect jump at " << std::hex << ctx.cfg_inst->ea
+              << " is a jump through an offset table with offset " << std::hex
+              << ctx.cfg_inst->offset_table->target_ea << std::dec;
 
     llvm::IRBuilder<> ir(block);
     switch_index = ir.CreateAdd(
         ir.CreateSub(switch_index,
                      LiftEA(ctx.cfg_inst->offset_table->target_segment,
                             ctx.cfg_inst->offset_table->target_ea)),
-        llvm::ConstantInt::get(
-            gWordType, ctx.cfg_inst->offset_table->target_ea));
+        llvm::ConstantInt::get(gWordType,
+                               ctx.cfg_inst->offset_table->target_ea));
 
     remill::StoreProgramCounter(block, switch_index);
   }
 
-  auto switch_inst = llvm::SwitchInst::Create(
-      switch_index, fallback_block, num_blocks, block);
+  auto switch_inst =
+      llvm::SwitchInst::Create(switch_index, fallback_block, num_blocks, block);
 
-  LOG(INFO)
-      << "Indirect jump at " << std::hex << inst.pc
-      << " has " << std::dec << num_blocks << " targets";
+  LOG(INFO) << "Indirect jump at " << std::hex << inst.pc << " has " << std::dec
+            << num_blocks << " targets";
 
   // Add the cases.
   for (auto ea_to_block : block_map) {
@@ -662,8 +651,7 @@ static void LiftIndirectJump(TranslationContext &ctx,
 
 // Returns `true` if `instr` should end a basic block and if a terminator was
 // added to end the block.
-static bool TryLiftTerminator(TranslationContext &ctx,
-                              llvm::BasicBlock *block,
+static bool TryLiftTerminator(TranslationContext &ctx, llvm::BasicBlock *block,
                               remill::Instruction &inst) {
   switch (inst.category) {
     case remill::Instruction::kCategoryInvalid:
@@ -672,12 +660,11 @@ static bool TryLiftTerminator(TranslationContext &ctx,
       return true;
 
     case remill::Instruction::kCategoryNormal:
-    case remill::Instruction::kCategoryNoOp:
-      return false;
+    case remill::Instruction::kCategoryNoOp: return false;
 
     case remill::Instruction::kCategoryDirectJump:
-      llvm::BranchInst::Create(
-          GetOrCreateBlock(ctx, inst.branch_taken_pc), block);
+      llvm::BranchInst::Create(GetOrCreateBlock(ctx, inst.branch_taken_pc),
+                               block);
       return true;
 
     case remill::Instruction::kCategoryIndirectJump:
@@ -690,10 +677,9 @@ static bool TryLiftTerminator(TranslationContext &ctx,
       // new subroutine.
       if (inst.branch_taken_pc != inst.next_pc) {
         auto targ_func = FindFunction(ctx, inst.branch_taken_pc);
-        DLOG(INFO)
-            << "Function " << ctx.lifted_func->getName().str()
-            << " calls " << targ_func->getName().str()
-            << " at " << std::hex << inst.pc << std::dec;
+        DLOG(INFO) << "Function " << ctx.lifted_func->getName().str()
+                   << " calls " << targ_func->getName().str() << " at "
+                   << std::hex << inst.pc << std::dec;
         if (!ctx.cfg_inst->lp_ea) {
           InlineSubFuncCall(block, targ_func);
         } else {
@@ -706,22 +692,20 @@ static bool TryLiftTerminator(TranslationContext &ctx,
         }
 
       } else {
-        LOG(WARNING)
-            << "Not adding a subroutine self-call at "
-            << std::hex << inst.pc << std::dec;
+        LOG(WARNING) << "Not adding a subroutine self-call at " << std::hex
+                     << inst.pc << std::dec;
       }
       return false;
 
     case remill::Instruction::kCategoryIndirectFunctionCall:
       InlineSubFuncCall(
-          block,
-          DevirtualizeIndirectFlow(
-              ctx, GetLiftedToNativeExitPoint(kExitPointFunctionCall)));
+          block, DevirtualizeIndirectFlow(
+                     ctx, GetLiftedToNativeExitPoint(kExitPointFunctionCall)));
       return false;
 
     case remill::Instruction::kCategoryFunctionReturn:
-      llvm::ReturnInst::Create(
-          *gContext, remill::LoadMemoryPointer(block), block);
+      llvm::ReturnInst::Create(*gContext, remill::LoadMemoryPointer(block),
+                               block);
       return true;
 
     case remill::Instruction::kCategoryConditionalBranch:
@@ -738,8 +722,7 @@ static bool TryLiftTerminator(TranslationContext &ctx,
 }
 
 // Lift a decoded instruction into `block`.
-static bool LiftInstIntoBlock(TranslationContext &ctx,
-                              llvm::BasicBlock *block,
+static bool LiftInstIntoBlock(TranslationContext &ctx, llvm::BasicBlock *block,
                               bool is_last) {
   remill::Instruction inst;
 
@@ -751,19 +734,17 @@ static bool LiftInstIntoBlock(TranslationContext &ctx,
   }
 
   if (!gArch->DecodeInstruction(inst_addr, bytes, inst)) {
-    LOG(ERROR)
-        << "Unable to decode instruction " << inst.Serialize()
-        << " at " << std::hex << inst_addr << std::dec;
+    LOG(ERROR) << "Unable to decode instruction " << inst.Serialize() << " at "
+               << std::hex << inst_addr << std::dec;
 
     remill::AddTerminatingTailCall(block, ctx.lifter->intrinsics->error);
     return false;
   }
 
   DLOG_IF(WARNING, bytes.size() != inst.NumBytes())
-      << "Size of decoded instruction at " << std::hex << inst_addr
-      << " (" << std::dec << inst.NumBytes()
-      << ") doesn't match input instruction size ("
-      << bytes.size() << ").";
+      << "Size of decoded instruction at " << std::hex << inst_addr << " ("
+      << std::dec << inst.NumBytes()
+      << ") doesn't match input instruction size (" << bytes.size() << ").";
 
   if (FLAGS_add_reg_tracer) {
     InlineSubFuncCall(block, GetRegTracer());
@@ -778,8 +759,7 @@ static bool LiftInstIntoBlock(TranslationContext &ctx,
   auto ret = true;
   if (TryLiftTerminator(ctx, block, inst)) {
     if (!is_last) {
-      LOG(ERROR)
-          << "Ending block early at " << std::hex << inst_addr;
+      LOG(ERROR) << "Ending block early at " << std::hex << inst_addr;
       ret = false;
     }
   }
@@ -814,8 +794,8 @@ static void LiftBlockIntoFunction(TranslationContext &ctx) {
     LOG_IF(WARNING, cfg_inst->does_not_return && !is_last)
         << "Instruction at " << std::hex << cfg_inst->ea
         << " has a local no-return, but is not the last instruction"
-        << " in its block (" << std::hex << block_pc
-        << "). Terminating anyway." << std::dec;
+        << " in its block (" << std::hex << block_pc << "). Terminating anyway."
+        << std::dec;
   }
 
   const auto &follows = ctx.cfg_block->successor_eas;
@@ -829,17 +809,17 @@ static void LiftBlockIntoFunction(TranslationContext &ctx) {
       remill::AddTerminatingTailCall(block, ctx.lifter->intrinsics->error);
 
     } else if (follows.size() == 1) {
-      (void) llvm::BranchInst::Create(
-          GetOrCreateBlock(ctx, *(follows.begin())), block);
+      (void) llvm::BranchInst::Create(GetOrCreateBlock(ctx, *(follows.begin())),
+                                      block);
 
     } else {
-      LOG(ERROR)
-          << "Block " << std::hex << block_pc << " has no terminator, and"
-          << " instruction at " << std::hex << ctx.cfg_inst->ea
-          << " is not a local no-return function call." << std::dec;
+      LOG(ERROR) << "Block " << std::hex << block_pc
+                 << " has no terminator, and"
+                 << " instruction at " << std::hex << ctx.cfg_inst->ea
+                 << " is not a local no-return function call." << std::dec;
 
-      remill::AddTerminatingTailCall(
-          block, ctx.lifter->intrinsics->missing_block);
+      remill::AddTerminatingTailCall(block,
+                                     ctx.lifter->intrinsics->missing_block);
     }
   }
 }
@@ -852,13 +832,13 @@ static void AllocStackVars(llvm::BasicBlock *bb,
   llvm::Type *array_type = nullptr;
 
   for (auto s : cfg_func->stack_vars) {
-    switch(s->size){
+    switch (s->size) {
       case 1:
       case 2:
       case 4:
       case 8:
-        array_type = llvm::Type::getIntNTy(
-            *gContext, static_cast<unsigned>(s->size * 8U));
+        array_type = llvm::Type::getIntNTy(*gContext,
+                                           static_cast<unsigned>(s->size * 8U));
         array_size = llvm::ConstantInt::get(gWordType, 1);
         break;
 
@@ -868,25 +848,24 @@ static void AllocStackVars(llvm::BasicBlock *bb,
         break;
     }
 
-    LOG(INFO)
-        << "Inserting " << s->size << "-byte variable " << s->name
-        << " into function" << cfg_func->name;
+    LOG(INFO) << "Inserting " << s->size << "-byte variable " << s->name
+              << " into function" << cfg_func->name;
 
     // TODO(kumarak): Alignment of `alloca`s?
     s->llvm_var = ir.CreateAlloca(array_type, array_size, s->name);
   }
 
-  cfg_func->stack_ptr_var = ir.CreateAlloca(
-      llvm::Type::getInt64Ty(*gContext),
-      llvm::ConstantInt::get(gWordType, 1), "stack_ptr_var");
+  cfg_func->stack_ptr_var =
+      ir.CreateAlloca(llvm::Type::getInt64Ty(*gContext),
+                      llvm::ConstantInt::get(gWordType, 1), "stack_ptr_var");
 
-  cfg_func->frame_ptr_var = ir.CreateAlloca(
-      llvm::Type::getInt64Ty(*gContext),
-      llvm::ConstantInt::get(gWordType, 1), "frame_ptr_var");
+  cfg_func->frame_ptr_var =
+      ir.CreateAlloca(llvm::Type::getInt64Ty(*gContext),
+                      llvm::ConstantInt::get(gWordType, 1), "frame_ptr_var");
 }
 
-static llvm::Function *LiftFunction(
-    const NativeModule *cfg_module, const NativeFunction *cfg_func) {
+static llvm::Function *LiftFunction(const NativeModule *cfg_module,
+                                    const NativeFunction *cfg_func) {
 
   CHECK(!cfg_func->is_external)
       << "Should not lift external function " << cfg_func->name;
@@ -905,15 +884,13 @@ static llvm::Function *LiftFunction(
   // CFG decoding process. In practice, though, that only really
   // affects externals.
   if (!lifted_func->empty()) {
-    LOG(WARNING)
-        << "Asking to re-insert function: " << cfg_func->lifted_name
-        << "; returning current function instead";
+    LOG(WARNING) << "Asking to re-insert function: " << cfg_func->lifted_name
+                 << "; returning current function instead";
     return lifted_func;
   }
 
   if (cfg_func->blocks.empty()) {
-    LOG(ERROR)
-        << "Function " << cfg_func->lifted_name << " is empty!";
+    LOG(ERROR) << "Function " << cfg_func->lifted_name << " is empty!";
     remill::AddTerminatingTailCall(lifted_func, intrinsics->missing_block);
     return lifted_func;
   }
@@ -951,8 +928,8 @@ static llvm::Function *LiftFunction(
     auto &cfg_block = block_info.second;
     std::stringstream ss;
     ss << "block_" << std::hex << block_info.first;
-    ctx.ea_to_block[block_info.first] = llvm::BasicBlock::Create(
-        *gContext, ss.str(), lifted_func);
+    ctx.ea_to_block[block_info.first] =
+        llvm::BasicBlock::Create(*gContext, ss.str(), lifted_func);
   }
 
   // Allocate the stack variable recovered in the function
@@ -1001,12 +978,10 @@ void DeclareLiftedFunctions(const NativeModule *cfg_module) {
       lifted_func = remill::DeclareLiftedFunction(gModule, func_name);
 
       // make local functions 'static'
-      LOG(INFO)
-          << "Inserted function: " << func_name;
+      LOG(INFO) << "Inserted function: " << func_name;
 
     } else {
-      LOG(INFO)
-          << "Already inserted function: " << func_name << ", skipping.";
+      LOG(INFO) << "Already inserted function: " << func_name << ", skipping.";
     }
   }
 }
@@ -1024,18 +999,17 @@ bool DefineLiftedFunctions(const NativeModule *cfg_module) {
   func_pass_manager.doInitialization();
 
   for (auto &entry : cfg_module->ea_to_func) {
-    auto cfg_func = reinterpret_cast<const NativeFunction *>(
-        entry.second->Get());
+    auto cfg_func =
+        reinterpret_cast<const NativeFunction *>(entry.second->Get());
     if (cfg_func->is_external) {
       continue;
     }
 
     auto lifted_func = LiftFunction(cfg_module, cfg_func);
     if (!lifted_func) {
-      LOG(ERROR)
-          << "Could lift function: " << cfg_func->name << " at "
-          << std::hex << cfg_func->ea << " into " << cfg_func->lifted_name
-          << std::dec;
+      LOG(ERROR) << "Could lift function: " << cfg_func->name << " at "
+                 << std::hex << cfg_func->ea << " into "
+                 << cfg_func->lifted_name << std::dec;
       return false;
     }
     func_pass_manager.run(*lifted_func);

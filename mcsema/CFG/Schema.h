@@ -34,9 +34,9 @@ struct Schema {
 
 namespace schema {
 
-template<typename C, typename T1, typename T2>
+template <typename C, typename T1, typename T2>
 struct Other {
-  using type = std::conditional_t< std::is_same_v<C, T1>, T2, T1>;
+  using type = std::conditional_t<std::is_same_v<C, T1>, T2, T1>;
 };
 
 // Many of the simple tables that implement the storage follow the same structure,
@@ -46,13 +46,13 @@ struct Other {
 //              them would be derived automatically as well, but it sounds like non-trivial
 //              work.
 
-template<typename T1, typename T2>
+template <typename T1, typename T2>
 struct NMTable {
 
-  template<typename C>
+  template <typename C>
   using other = typename Other<C, T1, T2>::type;
 
-  template<typename C>
+  template <typename C>
   using self = C;
 
   using fst = T1;
@@ -126,5 +126,5 @@ struct ExtFuncSpec : NMTable<ExternalFunction, FuncDecl> {
   using table = ExtFuncSpec;
 };
 
-} // namespace schema
-} // namespace mcsema::ws
+}  // namespace schema
+}  // namespace mcsema::ws

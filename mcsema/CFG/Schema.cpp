@@ -16,18 +16,18 @@
 
 
 #include <mcsema/CFG/Context.h>
-#include <mcsema/CFG/Schema.h>
 #include <mcsema/CFG/Enums.h>
+#include <mcsema/CFG/Schema.h>
 
 namespace mcsema::ws {
 
-template<typename Table>
+template <typename Table>
 int64_t RowCount(Context &ctx) {
   return ctx.db.template query<Table::is_populated>()
-               .template GetScalar_r<int64_t>();
+      .template GetScalar_r<int64_t>();
 }
 
-template<typename E>
+template <typename E>
 constexpr auto lower(E e) {
   return static_cast<std::underlying_type_t<E>>(e);
 }
@@ -35,23 +35,22 @@ constexpr auto lower(E e) {
 void Schema::CreateEnums(Context &ctx) {
   auto &db = ctx.db;
 
-  static Query action_enum = R"(create table if not exists exception_frame_actions(
+  static Query action_enum =
+      R"(create table if not exists exception_frame_actions(
         rowid integer PRIMARY KEY NOT NULL,
         action text NOT NULL
         ))";
   db.template query<action_enum>();
 
   static Query populate_action_enum =
-    R"(insert into exception_frame_actions(rowid, action) values(?1, ?2))";
+      R"(insert into exception_frame_actions(rowid, action) values(?1, ?2))";
 
   if (!RowCount<schema::ExceptionFrameAction>(ctx)) {
-    db.template query<populate_action_enum>(
-        lower(    Action::Cleanup),
-        to_string(Action::Cleanup));
+    db.template query<populate_action_enum>(lower(Action::Cleanup),
+                                            to_string(Action::Cleanup));
 
-    db.template query<populate_action_enum>(
-        lower(    Action::Catch),
-        to_string(Action::Catch));
+    db.template query<populate_action_enum>(lower(Action::Catch),
+                                            to_string(Action::Catch));
   }
   // rowid corresponds to llvm value for given cc
   static Query cc = R"(create table if not exists calling_conventions(
@@ -60,7 +59,8 @@ void Schema::CreateEnums(Context &ctx) {
         ))";
   db.template query<cc>();
 
-  static Query populate_cc = R"(insert into calling_conventions(rowid, name) values(?1, ?2))";
+  static Query populate_cc =
+      R"(insert into calling_conventions(rowid, name) values(?1, ?2))";
   if (!RowCount<schema::CallingConv>(ctx)) {
     for (auto cc : AllCCs()) {
       db.template query<populate_cc>(lower(cc), to_string(cc));
@@ -74,7 +74,7 @@ void Schema::CreateEnums(Context &ctx) {
   db.template query<operand_types>();
 
   static Query populate_operad_types =
-    R"(insert into operand_types(rowid, type) values(?1, ?2))";
+      R"(insert into operand_types(rowid, type) values(?1, ?2))";
 
   if (!RowCount<schema::OperandType>(ctx)) {
     for (auto ot : AllOperandTypes()) {
@@ -89,7 +89,7 @@ void Schema::CreateEnums(Context &ctx) {
   db.template query<symtab_types>();
 
   static Query populate_symtab_types =
-    R"(insert into symtab_types(type, rowid) values(?2, ?1))";
+      R"(insert into symtab_types(type, rowid) values(?2, ?1))";
 
   if (!RowCount<schema::SymbolTableEntryType>(ctx)) {
     for (auto sv_ : AllSymbolVisibilities()) {
@@ -98,22 +98,21 @@ void Schema::CreateEnums(Context &ctx) {
   }
 
   static Query fixup_kinds =
-    R"(create table if not exists fixup_kinds(
+      R"(create table if not exists fixup_kinds(
       rowid INTEGER PRIMARY KEY,
       type text NOT NULL
       ))";
   db.template query<fixup_kinds>();
 
   static Query populate_fixup_kinds =
-    R"(insert into fixup_kinds(rowid, type) values(?1,?2))";
+      R"(insert into fixup_kinds(rowid, type) values(?1,?2))";
 
   if (!RowCount<schema::FixupKind>(ctx)) {
-    db.template query<populate_fixup_kinds>(
-        lower(    FixupKind::Absolute),
-        to_string(FixupKind::Absolute));
+    db.template query<populate_fixup_kinds>(lower(FixupKind::Absolute),
+                                            to_string(FixupKind::Absolute));
 
     db.template query<populate_fixup_kinds>(
-        lower(    FixupKind::OffsetFromThreadBase),
+        lower(FixupKind::OffsetFromThreadBase),
         to_string(FixupKind::OffsetFromThreadBase));
   }
 }
@@ -122,17 +121,17 @@ void Schema::CreateNMTables(Context &ctx) {
   auto &db = ctx.db;
 
   static Query q_func_2_block =
-    R"(create table if not exists function_to_block(
+      R"(create table if not exists function_to_block(
        function_rowid integer NOT NULL,
        bb_rowid integer NOT NULL,
        UNIQUE(function_rowid, bb_rowid),
        FOREIGN KEY(function_rowid) REFERENCES functions(rowid) ON DELETE CASCADE,
        FOREIGN KEY(bb_rowid) REFERENCES blocks(rowid) ON DELETE CASCADE
       ))";
-  db.template query< q_func_2_block >();
+  db.template query<q_func_2_block>();
 
   static Query q_bb_successors =
-    R"(CREATE TABLE IF NOT EXISTS bb_successors(
+      R"(CREATE TABLE IF NOT EXISTS bb_successors(
         from_rowid integer NOT NULL,
         to_rowid integer NOT NULL,
         UNIQUE(from_rowid, to_rowid),
@@ -142,7 +141,7 @@ void Schema::CreateNMTables(Context &ctx) {
   db.template query<q_bb_successors>();
 
   static Query q_exception_frame_2_type =
-    R"(CREATE TABLE IF NOT EXISTS frame_to_type(
+      R"(CREATE TABLE IF NOT EXISTS frame_to_type(
         frame_rowid integer NOT NULL,
         var_rowid integer NOT NULL,
         UNIQUE(frame_rowid, var_rowid),
@@ -152,7 +151,7 @@ void Schema::CreateNMTables(Context &ctx) {
   db.template query<q_exception_frame_2_type>();
 
   static Query q_exception_frame_2_func =
-    R"(CREATE TABLE IF NOT EXISTS frame_to_func(
+      R"(CREATE TABLE IF NOT EXISTS frame_to_func(
         frame_rowid integer NOT NULL,
         function_rowid integer NOT NULL,
         UNIQUE(frame_rowid, function_rowid),
@@ -161,7 +160,8 @@ void Schema::CreateNMTables(Context &ctx) {
         ))";
   db.template query<q_exception_frame_2_func>();
 
-  static Query q_func_decl_params = R"(CREATE TABLE IF NOT EXISTS func_decl_params(
+  static Query q_func_decl_params =
+      R"(CREATE TABLE IF NOT EXISTS func_decl_params(
         value_decl_rowid integer NOT NULL,
         func_decl_rowid integer NOT NULL,
         UNIQUE(value_decl_rowid, func_decl_rowid),
@@ -197,7 +197,8 @@ void Schema::CreateNMTables(Context &ctx) {
         ))";
   db.template query<q_ext_func_spec>();
 
-  static Query q_preservation_range = R"(CREATE TABLE IF NOT EXISTS preservation_range(
+  static Query q_preservation_range =
+      R"(CREATE TABLE IF NOT EXISTS preservation_range(
         preserved_regs_rowid integer NOT NULL,
         begin integer NOT NULL,
         end integer,
@@ -205,13 +206,13 @@ void Schema::CreateNMTables(Context &ctx) {
         ))";
   db.template query<q_preservation_range>();
 
-  static Query q_preserved_regs_regs = R"(CREATE TABLE IF NOT EXISTS preserved_regs_regs(
+  static Query q_preserved_regs_regs =
+      R"(CREATE TABLE IF NOT EXISTS preserved_regs_regs(
         preserved_regs_rowid integer NOT NULL,
         reg text NOT NULL,
         FOREIGN KEY(preserved_regs_rowid) REFERENCES preserved_regs(rowid)
         ))";
   db.template query<q_preserved_regs_regs>();
-
 }
 
 void Schema::CreateSchema(Context &ctx) {
@@ -220,14 +221,14 @@ void Schema::CreateSchema(Context &ctx) {
   CreateEnums(ctx);
 
   static Query c_module =
-    R"(create table if not exists modules(
+      R"(create table if not exists modules(
        name text UNIQUE,
        rowid INTEGER PRIMARY KEY
       ))";
   db.template query<c_module>();
 
   static Query c_module_meta =
-    R"(create table if not exists module_meta(
+      R"(create table if not exists module_meta(
        name text,
        arch text,
        os text))";
@@ -291,7 +292,8 @@ void Schema::CreateSchema(Context &ctx) {
   db.template query<symtabs>();
 
   // TODO: Signature
-  static Query external_functions = R"(create table if not exists external_functions(
+  static Query external_functions =
+      R"(create table if not exists external_functions(
         rowid INTEGER PRIMARY KEY,
         ea integer NOT NULL,
         calling_convention_rowid integer NOT NULL,
@@ -359,7 +361,8 @@ void Schema::CreateSchema(Context &ctx) {
         ))";
   db.template query<stack_vars>();
 
-  static Query exception_frames = R"(create table if not exists exception_frames(
+  static Query exception_frames =
+      R"(create table if not exists exception_frames(
         rowid INTEGER PRIMARY KEY,
         start_ea integer,
         end_ea integer,
@@ -380,7 +383,8 @@ void Schema::CreateSchema(Context &ctx) {
         FOREIGN KEY(module_rowid) REFERENCES modules(rowid)))";
   db.template query<external_vars>();
 
-  static Query memory_locations = R"(create table if not exists memory_locations(
+  static Query memory_locations =
+      R"(create table if not exists memory_locations(
         rowid INTEGER PRIMARY KEY,
         register text NOT NULL,
         offset integer,
@@ -436,4 +440,4 @@ void Schema::CreateTriggers(Context &ctx) {
   ctx.db.template query<delete_block>();
 }
 
-} // namespace mcsema::ws
+}  // namespace mcsema::ws

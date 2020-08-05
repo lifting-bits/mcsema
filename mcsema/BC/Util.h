@@ -17,11 +17,11 @@
 #ifndef MCSEMA_BC_UTIL_H_
 #define MCSEMA_BC_UTIL_H_
 
+#include <llvm/IR/IRBuilder.h>
+
 #include <cstdint>
 #include <list>
 #include <vector>
-
-#include <llvm/IR/IRBuilder.h>
 
 #include "mcsema/CFG/CFG.h"
 

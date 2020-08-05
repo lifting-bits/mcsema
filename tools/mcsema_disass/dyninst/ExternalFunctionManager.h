@@ -20,8 +20,8 @@
 
 #include <istream>
 #include <memory>
-#include <string>
 #include <set>
+#include <string>
 #include <unordered_map>
 
 #include "Maybe.h"
@@ -54,7 +54,7 @@ struct ExternalFunction {
 };
 
 class ExternalFunctionManager {
-public:
+ public:
   using ExternalFunction = ExternalFunction;
   /* The following methods can be used to register external
    * functions with the ExternalFunctionManager. If the same name is
@@ -86,9 +86,10 @@ public:
    */
   void ClearUsed();
   void MarkAsUsed(const std::string &name);
-  std::vector<ExternalFunction> GetAllUsed( std::vector<std::string>& uknowns) const;
+  std::vector<ExternalFunction>
+  GetAllUsed(std::vector<std::string> &uknowns) const;
 
-private:
+ private:
   std::unordered_map<std::string, ExternalFunction> external_funcs;
   std::set<std::string> used_funcs;
 };

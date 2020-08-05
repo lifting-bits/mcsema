@@ -39,8 +39,8 @@ class CallingConvention {
   explicit CallingConvention(llvm::CallingConv::ID cc_);
 
   llvm::Value *LoadNextArgument(llvm::BasicBlock *block,
-                                llvm::Type *goal_type=nullptr,
-                                bool is_byval=false);
+                                llvm::Type *goal_type = nullptr,
+                                bool is_byval = false);
 
   void StoreReturnValue(llvm::BasicBlock *block, llvm::Value *ret_val);
 
@@ -53,7 +53,7 @@ class CallingConvention {
   void FreeReturnAddress(llvm::BasicBlock *block);
 
   llvm::Value *LoadReturnValue(llvm::BasicBlock *block,
-                               llvm::Type *goal_type=nullptr);
+                               llvm::Type *goal_type = nullptr);
 
   llvm::Value *LoadStackPointer(llvm::BasicBlock *block);
 
@@ -70,8 +70,7 @@ class CallingConvention {
   }
 
  private:
-  void StoreVectorRetValue(llvm::BasicBlock *block,
-                           llvm::Value *ret_val,
+  void StoreVectorRetValue(llvm::BasicBlock *block, llvm::Value *ret_val,
                            llvm::VectorType *goal_type);
 
   llvm::Value *LoadVectorArgument(llvm::BasicBlock *block,
@@ -87,8 +86,8 @@ class CallingConvention {
   uint64_t used_return_bitmap;
   uint64_t num_loaded_stack_bytes;
   uint64_t num_stored_stack_bytes;
-  const char * const sp_name;
-  const char * const tp_name;
+  const char *const sp_name;
+  const char *const tp_name;
   const std::vector<ArgConstraint> &reg_table;
   const std::vector<ArgConstraint> &return_table;
   CallingConvention(void) = delete;

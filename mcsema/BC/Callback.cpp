@@ -14,35 +14,34 @@
  * limitations under the License.
  */
 
-#include <glog/logging.h>
+#include "mcsema/BC/Callback.h"
+
 #include <gflags/gflags.h>
+#include <glog/logging.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/InlineAsm.h>
+#include <llvm/IR/Instruction.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
 
 #include <sstream>
 #include <string>
 #include <vector>
 
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/Type.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/InlineAsm.h>
-#include <llvm/IR/Instruction.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/Module.h>
-
+#include "mcsema/Arch/ABI.h"
+#include "mcsema/Arch/Arch.h"
+#include "mcsema/BC/Legacy.h"
+#include "mcsema/BC/Segment.h"
+#include "mcsema/BC/Util.h"
+#include "mcsema/CFG/CFG.h"
 #include "remill/Arch/Arch.h"
 #include "remill/Arch/Name.h"
 #include "remill/BC/ABI.h"
 #include "remill/BC/Util.h"
 #include "remill/BC/Version.h"
-
-#include "mcsema/Arch/ABI.h"
-#include "mcsema/Arch/Arch.h"
-#include "mcsema/BC/Callback.h"
-#include "mcsema/BC/Legacy.h"
-#include "mcsema/BC/Segment.h"
-#include "mcsema/BC/Util.h"
-#include "mcsema/CFG/CFG.h"
 
 DECLARE_string(pc_annotation);
 
@@ -58,7 +57,7 @@ DEFINE_uint64(explicit_args_count, 8,
               "function, or to accept from an unknown function. This value is "
               "used when ");
 
-DEFINE_uint64(explicit_args_stack_size, 4096 * 256  /* 1 MiB */,
+DEFINE_uint64(explicit_args_stack_size, 4096 * 256 /* 1 MiB */,
               "Size of the stack of the emulated program when the program "
               "is lifted using --explicit_args.");
 
@@ -72,9 +71,9 @@ static llvm::Function *GetAttachCallFunc(void) {
   if (!handler) {
     auto void_type = llvm::Type::getVoidTy(*gContext);
     auto callback_type = llvm::FunctionType::get(void_type, false);
-    handler = llvm::Function::Create(
-        callback_type, llvm::GlobalValue::ExternalLinkage,
-        "__mcsema_attach_call", gModule);
+    handler = llvm::Function::Create(callback_type,
+                                     llvm::GlobalValue::ExternalLinkage,
+                                     "__mcsema_attach_call", gModule);
     handler->addFnAttr(llvm::Attribute::NoInline);
   }
   return handler;
@@ -89,13 +88,14 @@ static llvm::Function *DetachCallValueFunc(void) {
 }
 
 // Get a callback function for an internal function.
-static llvm::Function *ImplementNativeToLiftedCallback(
-    const NativeObject *cfg_func, const std::string &callback_name) {
+static llvm::Function *
+ImplementNativeToLiftedCallback(const NativeObject *cfg_func,
+                                const std::string &callback_name) {
 
   // If the native name of the function doesn't yet exist then add it in.
   auto func = gModule->getFunction(cfg_func->lifted_name);
-  CHECK(func != nullptr)
-      << "Cannot find lifted function " << cfg_func->lifted_name;
+  CHECK(func != nullptr) << "Cannot find lifted function "
+                         << cfg_func->lifted_name;
 
   auto attach_func = GetAttachCallFunc();
 
@@ -107,9 +107,8 @@ static llvm::Function *ImplementNativeToLiftedCallback(
   std::stringstream asm_str;
   switch (gArch->arch_name) {
     case remill::kArchInvalid:
-      LOG(FATAL)
-          << "Cannot generate native-to-lifted entrypoint thunk for "
-          << "unknown architecture.";
+      LOG(FATAL) << "Cannot generate native-to-lifted entrypoint thunk for "
+                 << "unknown architecture.";
       break;
     case remill::kArchAMD64:
     case remill::kArchAMD64_AVX:
@@ -134,16 +133,14 @@ static llvm::Function *ImplementNativeToLiftedCallback(
       break;
 
     case remill::kArchAArch64LittleEndian:
-      LOG(ERROR)
-          << "TODO: Create a native-to-lifted callback for the "
-          << GetArchName(gArch->arch_name) << " instruction set.";
+      LOG(ERROR) << "TODO: Create a native-to-lifted callback for the "
+                 << GetArchName(gArch->arch_name) << " instruction set.";
       asm_str << "nop;";
       break;
 
     default:
-      LOG(FATAL)
-          << "Cannot create native-to-lifted callback for the "
-          << GetArchName(gArch->arch_name) << " instruction set.";
+      LOG(FATAL) << "Cannot create native-to-lifted callback for the "
+                 << GetArchName(gArch->arch_name) << " instruction set.";
       break;
   }
 
@@ -166,9 +163,9 @@ static llvm::Function *ImplementNativeToLiftedCallback(
   asm_arg_types.push_back(llvm::PointerType::get(func->getType(), 0));
   asm_arg_types.push_back(llvm::PointerType::get(attach_func->getType(), 0));
   auto asm_func_type = llvm::FunctionType::get(void_type, asm_arg_types, false);
-  auto asm_func = llvm::InlineAsm::get(
-      asm_func_type, asm_str.str(), "*m,*m,~{dirflag},~{fpsr},~{flags}",
-      true /* hasSideEffects */);
+  auto asm_func = llvm::InlineAsm::get(asm_func_type, asm_str.str(),
+                                       "*m,*m,~{dirflag},~{fpsr},~{flags}",
+                                       true /* hasSideEffects */);
 
   // Make an initializer function that first calls `__mcsema_early_init`,
   // then calls the lifted bitcode function. When lifting C++ code, often
@@ -184,9 +181,9 @@ static llvm::Function *ImplementNativeToLiftedCallback(
   std::stringstream func_wrapper_name;
   func_wrapper_name << callback_name;
   func_wrapper_name << "_wrapper";
-  auto func_wrapper = llvm::Function::Create(
-      func->getFunctionType(), llvm::GlobalValue::InternalLinkage,
-	  func_wrapper_name.str(), gModule);
+  auto func_wrapper = llvm::Function::Create(func->getFunctionType(),
+                                             llvm::GlobalValue::InternalLinkage,
+                                             func_wrapper_name.str(), gModule);
   auto arg_it = func_wrapper->arg_begin();
 
   llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", func_wrapper));
@@ -248,14 +245,14 @@ static llvm::Constant *InitialStackPointerValue(void) {
   }
   std::vector<llvm::Constant *> indexes(2);
   indexes[0] = llvm::ConstantInt::get(gWordType, 0);
-  indexes[1] = llvm::ConstantInt::get(
-      gWordType, stack_type->getNumElements() - 8);
+  indexes[1] =
+      llvm::ConstantInt::get(gWordType, stack_type->getNumElements() - 8);
 
 #if LLVM_VERSION_NUMBER <= LLVM_VERSION(3, 6)
   auto gep = llvm::ConstantExpr::getInBoundsGetElementPtr(stack, indexes);
 #else
-  auto gep = llvm::ConstantExpr::getInBoundsGetElementPtr(
-      nullptr, stack, indexes);
+  auto gep =
+      llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, stack, indexes);
 #endif
   return llvm::ConstantExpr::getPtrToInt(gep, gWordType);
 }
@@ -267,8 +264,8 @@ static llvm::Constant *InitialThreadLocalStorage(void) {
     return tls;
   }
 
-  auto tls_type = llvm::ArrayType::get(
-      gWordType, 4096 / (gArch->address_size / 8));
+  auto tls_type =
+      llvm::ArrayType::get(gWordType, 4096 / (gArch->address_size / 8));
 
   auto tls_var = new llvm::GlobalVariable(
       *gModule, tls_type, false, llvm::GlobalValue::InternalLinkage,
@@ -282,8 +279,8 @@ static llvm::Constant *InitialThreadLocalStorage(void) {
 #if LLVM_VERSION_NUMBER <= LLVM_VERSION(3, 6)
   auto gep = llvm::ConstantExpr::getInBoundsGetElementPtr(tls_var, indexes);
 #else
-  auto gep = llvm::ConstantExpr::getInBoundsGetElementPtr(
-      nullptr, tls_var, indexes);
+  auto gep =
+      llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, tls_var, indexes);
 #endif
 
   tls = llvm::ConstantExpr::getPtrToInt(gep, gWordType);
@@ -296,9 +293,8 @@ static uint64_t GetStackPointerOffset(void) {
   CallingConvention cc(gArch->DefaultCallingConv());
   std::string sp_name(cc.StackPointerVarName());
   auto reg = gArch->RegisterByName(sp_name);
-  CHECK(reg != nullptr)
-      << "Could not identify stack pointer " << sp_name
-      << " register in State structure";
+  CHECK(reg != nullptr) << "Could not identify stack pointer " << sp_name
+                        << " register in State structure";
 
   return reg->offset;
 }
@@ -311,32 +307,30 @@ static llvm::GlobalVariable *GetStatePointer(void) {
   }
 
   auto lifted_func_type = LiftedFunctionType();
-  auto state_ptr_type = lifted_func_type->getFunctionParamType(
-      remill::kStatePointerArgNum);
-  auto state_type = llvm::dyn_cast<llvm::PointerType>(
-      state_ptr_type)->getElementType();
+  auto state_ptr_type =
+      lifted_func_type->getFunctionParamType(remill::kStatePointerArgNum);
+  auto state_type =
+      llvm::dyn_cast<llvm::PointerType>(state_ptr_type)->getElementType();
 
   // State is initialized with zeroes. Each callback/entrypoint set
   // appropriate value to stack pointer. This is needed because of
   // thread_local
   auto state_init = llvm::ConstantAggregateZero::get(state_type);
-  state_ptr = new llvm::GlobalVariable(
-      *gModule, state_type, false, llvm::GlobalValue::InternalLinkage,
-      state_init, "__mcsema_reg_state");
+  state_ptr = new llvm::GlobalVariable(*gModule, state_type, false,
+                                       llvm::GlobalValue::InternalLinkage,
+                                       state_init, "__mcsema_reg_state");
   state_ptr->setThreadLocal(true);
   return state_ptr;
 }
 
 static llvm::Function *CreateVerifyRegState(void) {
-  auto *func_type = llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext),
-                                            {}, false);
-  llvm::Constant *c_func = gModule->getOrInsertFunction(
-      "__mcsema_verify_reg_state",
-      func_type);
+  auto *func_type =
+      llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext), {}, false);
+  llvm::Constant *c_func =
+      gModule->getOrInsertFunction("__mcsema_verify_reg_state", func_type);
   auto func = llvm::dyn_cast<llvm::Function>(c_func);
-  CHECK(func) << "Could not cast "
-      << remill::LLVMThingToString(c_func)
-      << " to llvm::Function *";
+  CHECK(func) << "Could not cast " << remill::LLVMThingToString(c_func)
+              << " to llvm::Function *";
 
   auto sp_offset = GetStackPointerOffset();
   auto reg_state = GetStatePointer();
@@ -354,15 +348,14 @@ static llvm::Function *CreateVerifyRegState(void) {
 
   //TODO(lukas): remove after abi_libraries patch gets merged into master
   auto GetConstantInt = [&](unsigned size, uint64_t value) {
-    return llvm::ConstantInt::get(
-        llvm::Type::getIntNTy(*gContext, size), value);
+    return llvm::ConstantInt::get(llvm::Type::getIntNTy(*gContext, size),
+                                  value);
   };
   auto casted_reg_state = ir.CreateBitCast(reg_state, byte_ty);
-  auto rsp = ir.CreateGEP(casted_reg_state,
-                          GetConstantInt(64, sp_offset));
+  auto rsp = ir.CreateGEP(casted_reg_state, GetConstantInt(64, sp_offset));
   auto casted_rsp = ir.CreateBitCast(rsp, reg_ptr_ty);
-  auto rsp_val = ir.CreateLoad(casted_rsp,
-                               llvm::Type::getIntNTy(*gContext, ptr_size));
+  auto rsp_val =
+      ir.CreateLoad(casted_rsp, llvm::Type::getIntNTy(*gContext, ptr_size));
   auto comparison = ir.CreateICmpEQ(rsp_val, GetConstantInt(ptr_size, 0));
   ir.CreateCondBr(comparison, is_null_block, end_block);
 
@@ -406,8 +399,9 @@ void InsertVerifyFunction(llvm::Function *func) {
 // Implements a stub for an externally defined function in such a way that
 // the external is explicitly called, and arguments from the modeled CPU
 // state are passed into the external.
-static llvm::Function *ImplementExplicitArgsEntryPoint(
-    const NativeObject *cfg_func, const std::string &name) {
+static llvm::Function *
+ImplementExplicitArgsEntryPoint(const NativeObject *cfg_func,
+                                const std::string &name) {
 
   auto num_args = FLAGS_explicit_args_count;
   if (name == "main") {
@@ -417,12 +411,8 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
   // These function needs to be created with 0 arguments, otherwise
   // lift could crash when using both --explicit_args
   // and --libc_constructor (issue #424)
-  const static std::array<std::string, 4> zero_argument_functions = {{
-    "__libc_csu_init",
-    "__libc_csu_fini",
-    "init",
-    "fini"
-  }};
+  const static std::array<std::string, 4> zero_argument_functions = {
+      {"__libc_csu_init", "__libc_csu_fini", "init", "fini"}};
 
   for (const auto &zero_func_name : zero_argument_functions) {
     if (cfg_func->name == zero_func_name) {
@@ -432,7 +422,7 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
   }
 
   // Get correct return type -> i32 for main
-  auto ret_type = [&]() -> llvm::Type* {
+  auto ret_type = [&]() -> llvm::Type * {
     if (name == "main") {
       return llvm::Type::getInt32Ty(*gContext);
     }
@@ -447,9 +437,8 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
   auto pc_arg = remill::NthArgument(bb, remill::kPCArgNum);
   auto pc_type = pc_arg->getType();
 
-  LOG(INFO)
-      << "Generating explicit argument entrypoint function for "
-      << name << ", calling into " << cfg_func->lifted_name;
+  LOG(INFO) << "Generating explicit argument entrypoint function for " << name
+            << ", calling into " << cfg_func->lifted_name;
 
   std::vector<llvm::Type *> arg_types(num_args, pc_type);
 
@@ -510,8 +499,8 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
   args[remill::kStatePointerArgNum] = value_map[state_ptr_arg];
   args[remill::kPCArgNum] = value_map[pc_arg];
 
-  llvm::CallInst::Create(
-      gModule->getFunction(cfg_func->lifted_name), args, "", block);
+  llvm::CallInst::Create(gModule->getFunction(cfg_func->lifted_name), args, "",
+                         block);
 
   // Restore the old stack pointer.
   loader.StoreStackPointer(block, old_sp);
@@ -550,9 +539,10 @@ static llvm::Function *GetOrCreateCallback(const NativeObject *cfg_func,
 // Implements a stub for an externally defined function in such a way that,
 // when executed, this stub redirects control flow into the actual external
 // function.
-static void ImplementLiftedToNativeCallback(
-    llvm::Function *callback_func, llvm::Function *extern_func,
-    const NativeExternalFunction *cfg_func) {
+static void
+ImplementLiftedToNativeCallback(llvm::Function *callback_func,
+                                llvm::Function *extern_func,
+                                const NativeExternalFunction *cfg_func) {
 
   callback_func->addFnAttr(llvm::Attribute::NoInline);
 
@@ -564,8 +554,8 @@ static void ImplementLiftedToNativeCallback(
   // because it's likely that whatever was in the CFG makes no sense
   // in the lifted code.
   auto args = remill::LiftedFunctionArgs(block);
-  args[remill::kPCArgNum] = llvm::ConstantExpr::getPtrToInt(
-      extern_func, gWordType);
+  args[remill::kPCArgNum] =
+      llvm::ConstantExpr::getPtrToInt(extern_func, gWordType);
 
   llvm::IRBuilder<> ir(block);
   auto handler_call = ir.CreateCall(DetachCallValueFunc(), args);
@@ -575,9 +565,10 @@ static void ImplementLiftedToNativeCallback(
 // Implements a stub for an externally defined function in such a way that
 // the external is explicitly called, and arguments from the modeled CPU
 // state are passed into the external.
-static void ImplementExplicitArgsExitPoint(
-    llvm::Function *callback_func, llvm::Function *extern_func,
-    const NativeExternalFunction *cfg_func) {
+static void
+ImplementExplicitArgsExitPoint(llvm::Function *callback_func,
+                               llvm::Function *extern_func,
+                               const NativeExternalFunction *cfg_func) {
 
   remill::CloneBlockFunctionInto(callback_func);
 
@@ -592,21 +583,19 @@ static void ImplementExplicitArgsExitPoint(
     callback_func->addFnAttr(llvm::Attribute::StackProtectReq);
   }
 
-  LOG(INFO)
-      << "Generating " << cfg_func->num_args
-      << " argument getters in function "
-      << cfg_func->lifted_name << " for external " << cfg_func->name;
+  LOG(INFO) << "Generating " << cfg_func->num_args
+            << " argument getters in function " << cfg_func->lifted_name
+            << " for external " << cfg_func->name;
 
   auto func_type = extern_func->getFunctionType();
   auto num_params = func_type->getNumParams();
   CallingConvention loader(cfg_func->cc);
 
   if (num_params > cfg_func->num_args) {
-    LOG(ERROR)
-        << "Function " << cfg_func->name << " may be incorrectly "
-        << "specified in the CFG with " << cfg_func->num_args
-        << " whereas the bitcode function has " << num_params
-        << ": " << remill::LLVMThingToString(extern_func);
+    LOG(ERROR) << "Function " << cfg_func->name << " may be incorrectly "
+               << "specified in the CFG with " << cfg_func->num_args
+               << " whereas the bitcode function has " << num_params << ": "
+               << remill::LLVMThingToString(extern_func);
 
   } else if (num_params != cfg_func->num_args) {
     CHECK(num_params < cfg_func->num_args && func_type->isVarArg())
@@ -667,8 +656,8 @@ llvm::Function *GetNativeToLiftedEntryPoint(const NativeObject *cfg_func) {
 // internal code.
 llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func_) {
   CHECK(cfg_func_->is_external)
-      << "Cannot get exit point thunk for internal function "
-      << cfg_func_->name << " at " << std::hex << cfg_func_->ea;
+      << "Cannot get exit point thunk for internal function " << cfg_func_->name
+      << " at " << std::hex << cfg_func_->ea;
 
   auto cfg_func = reinterpret_cast<const NativeExternalFunction *>(cfg_func_);
   CHECK(cfg_func->name != cfg_func->lifted_name);
@@ -710,8 +699,7 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func_) {
 llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
   if (!FLAGS_explicit_args) {
     switch (kind) {
-      case kExitPointJump:
-        return gModule->getFunction("__remill_jump");
+      case kExitPointJump: return gModule->getFunction("__remill_jump");
       case kExitPointFunctionCall:
         return gModule->getFunction("__remill_function_call");
     }
@@ -745,7 +733,8 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
 
   auto pc = remill::LoadProgramCounter(block);
   auto func_ptr_ty = llvm::PointerType::get(
-      llvm::FunctionType::get(remill::AddressType(gModule), arg_types, false), 0);
+      llvm::FunctionType::get(remill::AddressType(gModule), arg_types, false),
+      0);
 
   llvm::IRBuilder<> ir(block);
   loader.StoreReturnValue(

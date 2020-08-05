@@ -16,36 +16,34 @@
 
 #pragma once
 
-#include "Util.h"
 #include "OffsetTable.h"
+#include "Util.h"
 
 struct SectionManager;
 
 namespace Dyninst {
-  namespace SymtabAPI {
-    class Region;
-  }
+namespace SymtabAPI {
+class Region;
 }
+}  // namespace Dyninst
 
 namespace mcsema {
-  class Segment;
+class Segment;
 }
-
 
 
 struct SectionParser {
   using CrossXrefMap = std::map<Dyninst::Address, CrossXref<mcsema::Segment>>;
 
-  SectionParser(DisassContext *disass_context,
-                SectionManager &section_manager) :
-    disass_context(disass_context),
-    section_manager(section_manager) {
+  SectionParser(DisassContext *disass_context, SectionManager &section_manager)
+      : disass_context(disass_context),
+        section_manager(section_manager){
 
-    };
+        };
 
   // More detailed parse for .data, .rodata
   void ParseVariables(Dyninst::SymtabAPI::Region *region,
-                         mcsema::Segment *segment);
+                      mcsema::Segment *segment);
 
   // Simple parse looking only for alligned xrefs
   void XrefsInSegment(Dyninst::SymtabAPI::Region *region,
@@ -59,16 +57,14 @@ struct SectionParser {
   }
 
 
-private:
+ private:
   DisassContext *disass_context;
   SectionManager &section_manager;
 
   bool TryXref(uint64_t offset, Dyninst::SymtabAPI::Region *region,
                mcsema::Segment *cfg_segment);
-  bool TryOffsetTable(uint64_t &offset,
-                      Dyninst::SymtabAPI::Region *region);
-  bool TryVar(uint64_t &offset,
-              Dyninst::SymtabAPI::Region *region,
+  bool TryOffsetTable(uint64_t &offset, Dyninst::SymtabAPI::Region *region);
+  bool TryVar(uint64_t &offset, Dyninst::SymtabAPI::Region *region,
               mcsema::Segment *cfg_segment);
 
   // For variable names

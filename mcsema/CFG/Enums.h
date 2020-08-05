@@ -30,19 +30,19 @@ enum class OS : unsigned char {
 
 static inline constexpr std::string_view to_string(OS os) {
   using namespace std::literals;
-  switch(os) {
-    case OS::Linux   : return "Linux"sv;
-    case OS::Windows : return "Windows"sv;
-    case OS::OSX     : return "OSX"sv;
+  switch (os) {
+    case OS::Linux: return "Linux"sv;
+    case OS::Windows: return "Windows"sv;
+    case OS::OSX: return "OSX"sv;
   }
 };
 
 static inline std::vector<OS> AllOS() {
-  return { OS::Linux, OS::Windows, OS::OSX };
+  return {OS::Linux, OS::Windows, OS::OSX};
 }
 
 /* Enums */
-enum class SymbolVisibility: unsigned char {
+enum class SymbolVisibility : unsigned char {
   Imported = 1,  // Names from another object file
   Exported = 2,  // Externally visible
   Internal = 3,  // Internal
@@ -57,20 +57,19 @@ enum class SymbolVisibility: unsigned char {
 
 static inline constexpr std::string_view to_string(SymbolVisibility sv) {
   using namespace std::literals;
-  switch(sv) {
-    case SymbolVisibility::Imported  : return "Imported"sv;
-    case SymbolVisibility::Exported  : return "Exported"sv;
-    case SymbolVisibility::Internal  : return "Internal"sv;
+  switch (sv) {
+    case SymbolVisibility::Imported: return "Imported"sv;
+    case SymbolVisibility::Exported: return "Exported"sv;
+    case SymbolVisibility::Internal: return "Internal"sv;
     case SymbolVisibility::Artificial: return "Artificial"sv;
-
   }
 }
 
 using SymbolVisibilities = std::vector<SymbolVisibility>;
 
 static inline SymbolVisibilities AllSymbolVisibilities() {
-  return { SymbolVisibility::Imported, SymbolVisibility::Exported,
-           SymbolVisibility::Internal, SymbolVisibility::Artificial };
+  return {SymbolVisibility::Imported, SymbolVisibility::Exported,
+          SymbolVisibility::Internal, SymbolVisibility::Artificial};
 }
 
 // Corresponds to llvm calling convention numbering
@@ -90,24 +89,30 @@ enum class CallingConv : unsigned char {
 static inline constexpr std::string_view to_string(CallingConv c) {
   using namespace std::literals;
   switch (c) {
-    case CallingConv::C                  : return "C"sv;
-    case CallingConv::X86_StdCall        : return "X86_StdCall"sv;
-    case CallingConv::X86_FastCall       : return "X86_FastCall"sv;
-    case CallingConv::X86_ThisCall       : return "X86_ThisCall"sv;
-    case CallingConv::X86_64_SysV        : return "X86_64_SysV"sv;
-    case CallingConv::Win64              : return "Win64"sv;
-    case CallingConv::X86_VectorCall     : return "X86_VectorCall"sv;
-    case CallingConv::X86_RegCall        : return "X86_RegCall"sv;
-    case CallingConv::AArch64_VectorCall : return "AArch64_VectorCall"sv;
+    case CallingConv::C: return "C"sv;
+    case CallingConv::X86_StdCall: return "X86_StdCall"sv;
+    case CallingConv::X86_FastCall: return "X86_FastCall"sv;
+    case CallingConv::X86_ThisCall: return "X86_ThisCall"sv;
+    case CallingConv::X86_64_SysV: return "X86_64_SysV"sv;
+    case CallingConv::Win64: return "Win64"sv;
+    case CallingConv::X86_VectorCall: return "X86_VectorCall"sv;
+    case CallingConv::X86_RegCall: return "X86_RegCall"sv;
+    case CallingConv::AArch64_VectorCall: return "AArch64_VectorCall"sv;
   }
 }
 
 using CallingConvs = std::vector<CallingConv>;
 
 static inline CallingConvs AllCCs() {
-  return { CallingConv::C, CallingConv::X86_StdCall, CallingConv::X86_FastCall,
-           CallingConv::X86_ThisCall, CallingConv::X86_64_SysV, CallingConv::Win64,
-           CallingConv::X86_VectorCall, CallingConv::X86_RegCall, CallingConv::AArch64_VectorCall };
+  return {CallingConv::C,
+          CallingConv::X86_StdCall,
+          CallingConv::X86_FastCall,
+          CallingConv::X86_ThisCall,
+          CallingConv::X86_64_SysV,
+          CallingConv::Win64,
+          CallingConv::X86_VectorCall,
+          CallingConv::X86_RegCall,
+          CallingConv::AArch64_VectorCall};
 }
 
 enum class OperandType : unsigned char {
@@ -120,46 +125,41 @@ enum class OperandType : unsigned char {
 
 static inline constexpr std::string_view to_string(OperandType ot) {
   using namespace std::literals;
-  switch(ot) {
-    case OperandType::Immediate          : return "Immediate"sv;
-    case OperandType::Memory             : return "Memory"sv;
-    case OperandType::MemoryDisplacement : return "MemoryDisplacement"sv;
-    case OperandType::ControlFlow        : return "ControlFlow"sv;
-    case OperandType::OffsetTable        : return "OffsetTable"sv;
+  switch (ot) {
+    case OperandType::Immediate: return "Immediate"sv;
+    case OperandType::Memory: return "Memory"sv;
+    case OperandType::MemoryDisplacement: return "MemoryDisplacement"sv;
+    case OperandType::ControlFlow: return "ControlFlow"sv;
+    case OperandType::OffsetTable: return "OffsetTable"sv;
   }
 }
 
 using OperandTypes = std::vector<OperandType>;
 
 static inline OperandTypes AllOperandTypes() {
-  return { OperandType::Immediate, OperandType::Memory, OperandType::MemoryDisplacement,
-           OperandType::ControlFlow, OperandType::OffsetTable };
+  return {OperandType::Immediate, OperandType::Memory,
+          OperandType::MemoryDisplacement, OperandType::ControlFlow,
+          OperandType::OffsetTable};
 }
 
-enum class FixupKind : unsigned char {
-  Absolute = 0,
-  OffsetFromThreadBase = 1
-};
+enum class FixupKind : unsigned char { Absolute = 0, OffsetFromThreadBase = 1 };
 
 static inline constexpr std::string_view to_string(FixupKind fk) {
   using namespace std::literals;
-  switch(fk) {
-    case FixupKind::Absolute             : return "Absolute"sv;
-    case FixupKind::OffsetFromThreadBase : return "OffsetFromThreadBase"sv;
+  switch (fk) {
+    case FixupKind::Absolute: return "Absolute"sv;
+    case FixupKind::OffsetFromThreadBase: return "OffsetFromThreadBase"sv;
   }
 }
 
-enum class Action : unsigned char {
-  Cleanup = 0,
-  Catch = 1
-};
+enum class Action : unsigned char { Cleanup = 0, Catch = 1 };
 
 static inline constexpr std::string_view to_string(Action a) {
   using namespace std::literals;
-  switch(a) {
-    case Action::Cleanup : return "Cleanup"sv;
-    case Action::Catch   : return "Catch"sv;
+  switch (a) {
+    case Action::Cleanup: return "Cleanup"sv;
+    case Action::Catch: return "Catch"sv;
   }
 }
 
-}// namespace mcsema::ws
+}  // namespace mcsema::ws

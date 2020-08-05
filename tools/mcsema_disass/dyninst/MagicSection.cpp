@@ -16,19 +16,19 @@
 
 #include "MagicSection.h"
 
-#include "ExternalFunctionManager.h"
-
 #include <glog/logging.h>
 
-mcsema::ExternalVariable *MagicSection::WriteExternalVariable(
-    mcsema::Module &module,
-    const std::string &name) {
+#include "ExternalFunctionManager.h"
+
+mcsema::ExternalVariable *
+MagicSection::WriteExternalVariable(mcsema::Module &module,
+                                    const std::string &name) {
   CHECK(start_ea) << "Magic section cannot start with 0!";
 
   Dyninst::Address unreal_ea = AllocSpace(ptr_byte_size);
 
-  LOG(INFO) << "External var " << name
-            << " is in magic_section at " << unreal_ea;
+  LOG(INFO) << "External var " << name << " is in magic_section at "
+            << unreal_ea;
   auto external_var = module.add_external_vars();
   external_var->set_name(name);
   external_var->set_ea(unreal_ea);
@@ -44,14 +44,15 @@ mcsema::ExternalVariable *MagicSection::WriteExternalVariable(
   return external_var;
 }
 
-mcsema::ExternalFunction *MagicSection::WriteExternalFunction(
-    mcsema::Module &module,
-    ExternalFunction &function) {
+mcsema::ExternalFunction *
+MagicSection::WriteExternalFunction(mcsema::Module &module,
+                                    ExternalFunction &function) {
   CHECK(start_ea) << "Magic section cannot start with 0!";
 
   Dyninst::Address unreal_ea = AllocSpace(ptr_byte_size);
-  LOG(INFO) << "External function " << function.symbol_name << " at 0x" << std::hex
-            << function.ea << " got magic_address at 0x" << unreal_ea;
+  LOG(INFO) << "External function " << function.symbol_name << " at 0x"
+            << std::hex << function.ea << " got magic_address at 0x"
+            << unreal_ea;
   function.imag_ea = unreal_ea;
   real_to_imag.insert({function.ea, unreal_ea});
   ext_funcs.push_back(function.Write(module));
@@ -71,8 +72,8 @@ Dyninst::Address MagicSection::AllocSpace(uint64_t byte_width) {
 Dyninst::Address MagicSection::GetAllocated(Dyninst::Address ea) {
   auto entry = real_to_imag.find(ea);
   if (entry == real_to_imag.end()) {
-     LOG(INFO) << "Trying to get magicSection address for not registered ea";
-     return 0;
+    LOG(INFO) << "Trying to get magicSection address for not registered ea";
+    return 0;
   }
   return entry->second;
 }
