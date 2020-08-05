@@ -19,9 +19,8 @@
 
 #include <glog/logging.h>
 
-mcsema::ExternalFunction *ExternalFunction::WriteHelper(
-    mcsema::Module &module,
-    uint64_t ea) {
+mcsema::ExternalFunction *ExternalFunction::WriteHelper(mcsema::Module &module,
+                                                        uint64_t ea) {
   auto cfg_external_func = module.add_external_funcs();
 
   cfg_external_func->set_name(symbol_name);
@@ -35,8 +34,7 @@ mcsema::ExternalFunction *ExternalFunction::WriteHelper(
   return cfg_external_func;
 }
 
-mcsema::ExternalFunction *ExternalFunction::Write(
-    mcsema::Module &module) {
+mcsema::ExternalFunction *ExternalFunction::Write(mcsema::Module &module) {
   WriteHelper(module, ea);
   return WriteHelper(module, imag_ea);
 }
@@ -47,8 +45,7 @@ ExternalFunction::CfgCC ExternalFunction::CfgCallingConvention() const {
       return mcsema::ExternalFunction::CallerCleanup;
     case CallingConvention::CalleeCleanup:
       return mcsema::ExternalFunction::CalleeCleanup;
-    default:
-      return mcsema::ExternalFunction::FastCall;
+    default: return mcsema::ExternalFunction::FastCall;
   }
 }
 
@@ -59,11 +56,11 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &name,
 
 void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
   if (s.empty()) {
-    return; // Empty line
+    return;  // Empty line
   } else if (s.front() == '#') {
-    return; // Comment line
+    return;  // Comment line
   } else if (s.substr(0, 5) == "DATA:") {
-    return; // Refers to external data, not a function
+    return;  // Refers to external data, not a function
   }
 
   std::string rest = s;
@@ -120,8 +117,8 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
 
         bool is_weak = true;
 
-        ExternalFunction func{symbolName, callConv, !noReturn, argCount,
-                              is_weak, signature};
+        ExternalFunction func{symbolName, callConv, !noReturn,
+                              argCount,   is_weak,  signature};
 
         external_funcs[symbolName] = std::move(func);
         return;
@@ -159,14 +156,16 @@ ExternalFunctionManager::GetExternalFunction(const std::string &name) {
   return external_func->second;
 }
 
-void ExternalFunctionManager::ClearUsed() { used_funcs.clear(); }
+void ExternalFunctionManager::ClearUsed() {
+  used_funcs.clear();
+}
 
 void ExternalFunctionManager::MarkAsUsed(const std::string &name) {
   used_funcs.insert(name);
 }
 
-std::vector<ExternalFunction> ExternalFunctionManager::GetAllUsed(
-    std::vector<std::string>& unknowns) const {
+std::vector<ExternalFunction>
+ExternalFunctionManager::GetAllUsed(std::vector<std::string> &unknowns) const {
 
   std::vector<ExternalFunction> result;
 

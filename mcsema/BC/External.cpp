@@ -17,22 +17,19 @@
 
 #include "mcsema/BC/External.h"
 
-#include <glog/logging.h>
+#include <anvill/Decl.h>
 #include <gflags/gflags.h>
-
-#include <sstream>
-#include <vector>
-
+#include <glog/logging.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
-
-#include <anvill/Decl.h>
-
 #include <remill/Arch/Arch.h>
 #include <remill/Arch/Name.h>
 #include <remill/BC/Annotate.h>
+
+#include <sstream>
+#include <vector>
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Callback.h"
@@ -84,8 +81,7 @@ llvm::Constant *NativeExternalFunction::Pointer(void) const {
 
     function = llvm::Function::Create(
         llvm::FunctionType::get(gWordType, param_types, false),
-        llvm::GlobalValue::ExternalLinkage,
-        name, gModule.get());
+        llvm::GlobalValue::ExternalLinkage, name, gModule.get());
 
     if (is_weak) {
       function->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);

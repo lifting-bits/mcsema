@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Copyright 2020, Trail of Bits, Inc. All rights reserved.
+
+# Get the list of changed C++ header and source files.
+STAGED_FILES=$( git diff --cached --name-only --diff-filter=ACM | grep -e '\.\(h\)\|\(cpp\)$' )
+
+if [[ "${STAGED_FILES}" = "" ]]; then
+  exit 0
+fi
+
+PYTHON3_EXE=$( which python3 )
+if [[ "$?" == 1 ]]; then
+  echo "\t\033[41mPlease install python3\033[0m"
+  exit 1
+fi
+
+CLANG_FORMAT_EXE=$( which clang-format )
+if [[ "$?" == 1 ]]; then
+  echo "\t\033[41mPlease install clang-format\033[0m"
+  exit 1
+fi
+
+THIS_FILE_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+NAME_OF_THIS_FILE_DIR=$( basename "${THIS_FILE_DIR}" )
+IN_SCRIPTS_DIR=0
+
+# This script being executed is located in the `scripts/` directory.
+if [[ "${NAME_OF_THIS_FILE_DIR}" == "scripts" ]] ; then
+  SCRIPTS_DIR="${THIS_FILE_DIR}"
+  SOURCE_DIR=$( cd "$( dirname "${SCRIPTS_DIR}" )" && pwd )
+  IN_SCRIPTS_DIR=1
+
+# This script being executed is located in the `.git/hooks` directory.
+elif [[ "${NAME_OF_THIS_FILE_DIR}" == "hooks" ]] ; then
+  GIT_DIR=$( cd "$( dirname "${SCRIPTS_DIR}" )" && pwd )
+  SOURCE_DIR=$( cd "$( dirname "${GIT_DIR}" )" && pwd )
+  SCRIPTS_DIR="${SOURCE_DIR}/scripts"
+
+# Not sure where this script is.
+else
+  echo "\t\033[41mScript '${BASH_SOURCE[0]}' is in an unexpected location\033[0m"
+  echo 1
+fi
+
+# Run our wrapper of `clang-format` on the files that have changed.
+${PYTHON3_EXE} "${SCRIPTS_DIR}/format-files" \
+    --source_dir "${SOURCE_DIR}" \
+    --format_exe "${CLANG_FORMAT_EXE}" \
+    --files ${STAGED_FILES} \
+    --check
+
+if [[ "$?" == 0 ]] ; then
+  for staged_file in ${STAGED_FILES} ; do
+    git add "${staged_file}"
+  done
+else
+  exit 1
+fi

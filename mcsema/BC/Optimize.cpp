@@ -17,39 +17,27 @@
 
 #include "mcsema/BC/Optimize.h"
 
+#include <anvill/Analyze.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-
-#include <algorithm>
-#include <limits>
-#include <set>
-#include <unordered_set>
-#include <utility>
-#include <vector>
-
 #include <llvm/ADT/Triple.h>
-
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfo.h>
-#include <llvm/IR/InstIterator.h>
 #include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IR/InstIterator.h>
 #include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Metadata.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/MDBuilder.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
-
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/Transforms/Scalar.h>
-#include <llvm/Transforms/Utils/Local.h>
 #include <llvm/Transforms/Utils/Cloning.h>
+#include <llvm/Transforms/Utils/Local.h>
 #include <llvm/Transforms/Utils/ValueMapper.h>
-
-#include <anvill/Analyze.h>
-
 #include <remill/Arch/Arch.h>
 #include <remill/BC/ABI.h>
 #include <remill/BC/Compat/GlobalValue.h>
@@ -57,6 +45,13 @@
 #include <remill/BC/Compat/TargetLibraryInfo.h>
 #include <remill/BC/DeadStoreEliminator.h>
 #include <remill/BC/Util.h>
+
+#include <algorithm>
+#include <limits>
+#include <set>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Optimize.h"
@@ -71,7 +66,8 @@ DEFINE_bool(check_for_lowmem_xrefs, false,
             "if they might be cross-reference targets. This might be "
             "reasonable to enable for PIC code, .o files, etc.");
 
-DEFINE_bool(volatile_memops, false, "Mark all lowered loads/stores as volatile");
+DEFINE_bool(volatile_memops, false,
+            "Mark all lowered loads/stores as volatile");
 
 DEFINE_bool(local_state_pointer, true,
             "Use the state pointer passed by argument to all lifted functions."
@@ -140,10 +136,10 @@ static void RemoveUndefFuncCalls(void) {
 // Get a list of all ISELs.
 static std::vector<llvm::GlobalVariable *> FindISELs(void) {
   std::vector<llvm::GlobalVariable *> isels;
-  remill::ForEachISel(
-      gModule.get(), [&](llvm::GlobalVariable *isel, llvm::Function *) {
-        isels.push_back(isel);
-      });
+  remill::ForEachISel(gModule.get(),
+                      [&](llvm::GlobalVariable *isel, llvm::Function *) {
+                        isels.push_back(isel);
+                      });
   return isels;
 }
 
@@ -177,9 +173,8 @@ static void ReplaceBarrier(const char *name) {
   }
 }
 
-static llvm::Value *FindPointer(
-    llvm::IRBuilder<> &ir, llvm::Value *addr, llvm::Type *elem_type,
-    unsigned addr_space) {
+static llvm::Value *FindPointer(llvm::IRBuilder<> &ir, llvm::Value *addr,
+                                llvm::Type *elem_type, unsigned addr_space) {
 
   if (auto as_ptr_to_int = llvm::dyn_cast<llvm::PtrToIntOperator>(addr)) {
     if (!addr_space) {
@@ -266,14 +261,14 @@ static llvm::Constant *GetAddress(const NativeModule *cfg_module, uint64_t ea) {
   return nullptr;
 }
 
-static llvm::Value *GetPointer(
-    const NativeModule *cfg_module, llvm::IRBuilder<> &ir,
-    llvm::Value *addr, llvm::Type *elem_type, unsigned addr_space);
+static llvm::Value *GetPointer(const NativeModule *cfg_module,
+                               llvm::IRBuilder<> &ir, llvm::Value *addr,
+                               llvm::Type *elem_type, unsigned addr_space);
 
-static llvm::Value *GetIndexedPointer(
-    const NativeModule *cfg_module, llvm::IRBuilder<> &ir,
-    llvm::Value *lhs, llvm::Value *rhs, llvm::Type *dest_type,
-    unsigned addr_space) {
+static llvm::Value *GetIndexedPointer(const NativeModule *cfg_module,
+                                      llvm::IRBuilder<> &ir, llvm::Value *lhs,
+                                      llvm::Value *rhs, llvm::Type *dest_type,
+                                      unsigned addr_space) {
 
   auto i32_ty = llvm::Type::getInt32Ty(*gContext);
   auto i8_ty = llvm::Type::getInt8Ty(*gContext);
@@ -297,23 +292,21 @@ static llvm::Value *GetIndexedPointer(
 
       if (cfg_module) {
         if (auto cfg_seg = cfg_module->TryGetSegment(lhs_global->getName())) {
-          const auto real_ea = static_cast<uint64_t>(
-              static_cast<int64_t>(cfg_seg->ea) + index);
+          const auto real_ea =
+              static_cast<uint64_t>(static_cast<int64_t>(cfg_seg->ea) + index);
 
           if (auto addr = GetAddress(cfg_module, real_ea)) {
             LOG_IF(WARNING, cfg_module->TryGetSegment(real_ea) != cfg_seg)
-                << "Fixing cross-reference to " << std::hex
-                << real_ea << std::dec << " that was misplaced into segment "
+                << "Fixing cross-reference to " << std::hex << real_ea
+                << std::dec << " that was misplaced into segment "
                 << cfg_seg->name;
 
-            return GetPointer(
-                nullptr, ir, addr, dest_type->getPointerElementType(),
-                addr_space);
+            return GetPointer(nullptr, ir, addr,
+                              dest_type->getPointerElementType(), addr_space);
 
           } else {
-            LOG(ERROR)
-                << "Out-of-bounds reference to " << std::hex << real_ea
-                << std::dec << " tied to segment " << cfg_seg->name;
+            LOG(ERROR) << "Out-of-bounds reference to " << std::hex << real_ea
+                       << std::dec << " tied to segment " << cfg_seg->name;
           }
         }
       }
@@ -383,9 +376,9 @@ static llvm::Value *GetIndexedPointer(
 
 // Try to get a pointer for the address operand of a remill memory access
 // intrinsic.
-static llvm::Value *GetPointerFromInt(
-    llvm::IRBuilder<> &ir, llvm::Value *addr, llvm::Type *elem_type,
-    unsigned addr_space) {
+static llvm::Value *GetPointerFromInt(llvm::IRBuilder<> &ir, llvm::Value *addr,
+                                      llvm::Type *elem_type,
+                                      unsigned addr_space) {
   auto dest_type = llvm::PointerType::get(elem_type, addr_space);
 
   if (auto phi = llvm::dyn_cast<llvm::PHINode>(addr)) {
@@ -421,9 +414,9 @@ static llvm::Value *GetPointerFromInt(
 
 // Try to get a pointer for the address operand of a remill memory access
 // intrinsic.
-llvm::Value *GetPointer(
-    const NativeModule *cfg_module, llvm::IRBuilder<> &ir,
-    llvm::Value *addr, llvm::Type *elem_type, unsigned addr_space) {
+llvm::Value *GetPointer(const NativeModule *cfg_module, llvm::IRBuilder<> &ir,
+                        llvm::Value *addr, llvm::Type *elem_type,
+                        unsigned addr_space) {
 
   addr_space = GetPointerAddressSpace(addr, addr_space);
   const auto addr_type = addr->getType();
@@ -434,14 +427,15 @@ llvm::Value *GetPointer(
   // intrinsics.
   if (auto as_itp = llvm::dyn_cast<llvm::IntToPtrInst>(addr); as_itp) {
     llvm::IRBuilder<> sub_ir(as_itp);
-    return GetPointer(
-        cfg_module, sub_ir, as_itp->getOperand(0), elem_type, addr_space);
+    return GetPointer(cfg_module, sub_ir, as_itp->getOperand(0), elem_type,
+                      addr_space);
 
   // It's a `ptrtoint`, but of the wrong type; lets go back and try to use
   // that pointer.
-  } else if (auto as_pti = llvm::dyn_cast<llvm::PtrToIntOperator>(addr); as_pti) {
-    return GetPointer(
-        cfg_module, ir, as_pti->getPointerOperand(), elem_type, addr_space);
+  } else if (auto as_pti = llvm::dyn_cast<llvm::PtrToIntOperator>(addr);
+             as_pti) {
+    return GetPointer(cfg_module, ir, as_pti->getPointerOperand(), elem_type,
+                      addr_space);
 
   // We've found a pointer of the desired type; return :-D
   } else if (addr_type == dest_type) {
@@ -454,9 +448,8 @@ llvm::Value *GetPointer(
       return GetPointer(cfg_module, ir, addr, elem_type, addr_space);
 
     } else {
-      LOG(ERROR)
-          << "Missed cross-reference target " << std::hex
-          << ea << " to pointer";
+      LOG(ERROR) << "Missed cross-reference target " << std::hex << ea
+                 << " to pointer";
       return llvm::ConstantExpr::getIntToPtr(ci, dest_type);
     }
 
@@ -464,8 +457,8 @@ llvm::Value *GetPointer(
   // as we've already handled `ptrtoint` above.
   } else if (auto ce = llvm::dyn_cast<llvm::ConstantExpr>(addr); ce) {
     if (ce->getOpcode() == llvm::Instruction::IntToPtr) {
-      return GetPointer(
-          cfg_module, ir, ce->getOperand(0), elem_type, addr_space);
+      return GetPointer(cfg_module, ir, ce->getOperand(0), elem_type,
+                        addr_space);
 
     } else if (addr_type->isIntegerTy()) {
       return llvm::ConstantExpr::getIntToPtr(ce, dest_type);
@@ -529,24 +522,22 @@ llvm::Value *GetPointer(
     if (lhs && rhs) {
       const auto bb = ir.GetInsertBlock();
 
-      LOG(ERROR)
-          << "Two pointers "
-          << remill::LLVMThingToString(lhs) << " and "
-          << remill::LLVMThingToString(rhs) << " are added together "
-          << remill::LLVMThingToString(addr) << " in block "
-          << bb->getName().str() << " in function "
-          << bb->getParent()->getName().str();
+      LOG(ERROR) << "Two pointers " << remill::LLVMThingToString(lhs) << " and "
+                 << remill::LLVMThingToString(rhs) << " are added together "
+                 << remill::LLVMThingToString(addr) << " in block "
+                 << bb->getName().str() << " in function "
+                 << bb->getParent()->getName().str();
 
       return ir.CreateIntToPtr(addr, dest_type);
     }
 
     if (rhs) {
-      return GetIndexedPointer(
-          cfg_module, ir, rhs, lhs_op, dest_type, addr_space);
+      return GetIndexedPointer(cfg_module, ir, rhs, lhs_op, dest_type,
+                               addr_space);
 
     } else {
-      return GetIndexedPointer(
-          cfg_module, ir, lhs, rhs_op, dest_type, addr_space);
+      return GetIndexedPointer(cfg_module, ir, lhs, rhs_op, dest_type,
+                               addr_space);
     }
 
   } else if (auto as_sub = llvm::dyn_cast<llvm::SubOperator>(addr); as_sub) {
@@ -559,19 +550,19 @@ llvm::Value *GetPointer(
 
     } else {
       auto i32_ty = llvm::Type::getInt32Ty(*gContext);
-      auto neg_index = static_cast<int64_t>(
-          -static_cast<int32_t>(rhs->getZExtValue()));
+      auto neg_index =
+          static_cast<int64_t>(-static_cast<int32_t>(rhs->getZExtValue()));
       auto const_index = llvm::ConstantInt::get(
           i32_ty, static_cast<uint64_t>(neg_index), true);
       addr_space = GetPointerAddressSpace(lhs, addr_space);
       dest_type = llvm::PointerType::get(elem_type, addr_space);
-      return GetIndexedPointer(
-          cfg_module, ir, lhs, const_index, dest_type, addr_space);
+      return GetIndexedPointer(cfg_module, ir, lhs, const_index, dest_type,
+                               addr_space);
     }
 
   } else if (auto as_bc = llvm::dyn_cast<llvm::BitCastOperator>(addr); as_bc) {
-    return GetPointer(cfg_module, ir, as_bc->getOperand(0),
-                      elem_type, addr_space);
+    return GetPointer(cfg_module, ir, as_bc->getOperand(0), elem_type,
+                      addr_space);
 
   // E.g. loading an address-sized integer register.
   } else if (addr_type->isIntegerTy()) {
@@ -583,14 +574,12 @@ llvm::Value *GetPointer(
     // `inttoptr` conversions instead of adding new ones.
     for (auto user : addr->users()) {
       const auto inst_user = llvm::dyn_cast<llvm::IntToPtrInst>(user);
-      if (!inst_user ||
-          inst_user == addr_inst ||
+      if (!inst_user || inst_user == addr_inst ||
           inst_user->getParent() != bb) {
         continue;
       }
 
-      for (auto next_inst = inst_user->getNextNode();
-           next_inst;
+      for (auto next_inst = inst_user->getNextNode(); next_inst;
            next_inst = next_inst->getNextNode()) {
         DCHECK_EQ(next_inst->getParent(), bb);
 
@@ -715,7 +704,7 @@ static void LowerMemOps(const NativeModule *cfg_module) {
   ReplaceMemReadOp(cfg_module, "__remill_read_memory_f80",
                    llvm::Type::getX86_FP80Ty(*gContext));
   ReplaceMemReadOp(cfg_module, "__remill_write_memory_f128",
-                    llvm::Type::getFP128Ty(*gContext));
+                   llvm::Type::getFP128Ty(*gContext));
 
   ReplaceMemWriteOp(cfg_module, "__remill_write_memory_f80",
                     llvm::Type::getX86_FP80Ty(*gContext));
@@ -740,7 +729,8 @@ static bool RemoveDeadRestores(llvm::Function *restorer) {
 
           } else if (auto invoke_inst = llvm::dyn_cast<llvm::InvokeInst>(user);
                      invoke_inst && invoke_inst->getCalledFunction() == &func) {
-            functions_with_noreturn.insert(invoke_inst->getParent()->getParent());
+            functions_with_noreturn.insert(
+                invoke_inst->getParent()->getParent());
           }
         }
       }
@@ -780,8 +770,8 @@ static bool RemoveDeadRestores(llvm::Function *restorer) {
       // NOTE(pag): If a function has an unreachable instruction, then it might
       //            miss out on some optimizations, and so we want to always
       //            force some restores.
-      if (first_arg == second_arg &&
-          (!FLAGS_restore_all_on_unreachable || !functions_with_noreturn.count(func))) {
+      if (first_arg == second_arg && (!FLAGS_restore_all_on_unreachable ||
+                                      !functions_with_noreturn.count(func))) {
         auto all_users_are_stores = true;
 
         // Go find the store of the return value to the state structure, and
@@ -813,7 +803,8 @@ static bool RemoveDeadRestores(llvm::Function *restorer) {
         // Go look for any stores of the first argument into the state structure,
         // and remove them. If we find these, then they are likely leftovers from
         // after function calls to other lifted functions.
-        if (auto reg_load = llvm::dyn_cast<llvm::LoadInst>(first_arg); reg_load) {
+        if (auto reg_load = llvm::dyn_cast<llvm::LoadInst>(first_arg);
+            reg_load) {
           for (auto reg_user : first_arg->users()) {
             if (auto reg_restore = llvm::dyn_cast<llvm::StoreInst>(reg_user);
                 reg_restore) {
@@ -971,7 +962,8 @@ static void RemoveSavingKilledStores(void) {
   }
 
   for (auto [kill_val, reg_val] : to_replace) {
-    if (auto store_inst = llvm::dyn_cast<llvm::StoreInst>(kill_val->getNextNode());
+    if (auto store_inst =
+            llvm::dyn_cast<llvm::StoreInst>(kill_val->getNextNode());
         store_inst && store_inst->getValueOperand() == kill_val) {
       to_remove.push_back(store_inst);
     }
@@ -1015,17 +1007,17 @@ static llvm::Constant *AdaptToType(llvm::Constant *src, llvm::Type *dest_type) {
       return llvm::ConstantExpr::getIntToPtr(src, dest_type);
     }
   } else {
-    LOG(FATAL)
-        << "Unsupported destination type: "
-        << remill::LLVMThingToString(dest_type);
+    LOG(FATAL) << "Unsupported destination type: "
+               << remill::LLVMThingToString(dest_type);
     return nullptr;
   }
 }
 // The add-on pass to merge the `GEP` instructions if they are operating
 // on the same instruction operand
 static void MergeGEPInstructions(llvm::Function &func) {
-  std::map<std::pair<llvm::Value*, llvm::Value*>,
-           std::vector<llvm::Instruction*>>  gep_map;
+  std::map<std::pair<llvm::Value *, llvm::Value *>,
+           std::vector<llvm::Instruction *>>
+      gep_map;
 
   for (auto &block : func) {
     for (auto &inst : block) {
@@ -1035,8 +1027,9 @@ static void MergeGEPInstructions(llvm::Function &func) {
       if ((inst.getOpcode() == llvm::Instruction::GetElementPtr) &&
           (llvm::isa<llvm::Instruction>(inst.getOperand(0))) &&
           (llvm::isa<llvm::Constant>(inst.getOperand(1)))) {
-        gep_map[std::pair<llvm::Value*, llvm::Value*>(
-            inst.getOperand(0), inst.getOperand(1))].push_back(&inst);
+        gep_map[std::pair<llvm::Value *, llvm::Value *>(inst.getOperand(0),
+                                                        inst.getOperand(1))]
+            .push_back(&inst);
       }
     }
   }
@@ -1073,10 +1066,9 @@ static void LowerXrefs(const NativeModule *cfg_module) {
 
   anvill::XrefExprFolder folder(*cfg_module, *gModule);
 
-  auto get_fixup = [=, &folder, &done_fixups] (llvm::User *user,
-                                               llvm::Constant *ce)
-                                               -> llvm::Constant * {
-
+  auto get_fixup = [=, &folder, &done_fixups](
+                       llvm::User *user,
+                       llvm::Constant *ce) -> llvm::Constant * {
     bool is_bitwise = false;
     if (auto op = llvm::dyn_cast<llvm::BinaryOperator>(user); op) {
       switch (op->getOpcode()) {
@@ -1086,10 +1078,10 @@ static void LowerXrefs(const NativeModule *cfg_module) {
         case llvm::Instruction::And:
         case llvm::Instruction::Xor:
         case llvm::Instruction::Or:
+
           //is_bitwise = true;
           break;
-        default:
-          break;
+        default: break;
       }
     }
 
@@ -1103,8 +1095,7 @@ static void LowerXrefs(const NativeModule *cfg_module) {
     const auto ea = folder.VisitConst(ce);
 
     if (remill::IsError(folder.error)) {
-      LOG(ERROR)
-          << remill::GetErrorString(folder.error);
+      LOG(ERROR) << remill::GetErrorString(folder.error);
     }
 
     // Common to have a shift left by one, two, or three for common
@@ -1126,13 +1117,13 @@ static void LowerXrefs(const NativeModule *cfg_module) {
     // It doesn't reference anything known; treat it as a constant.
     } else {
       if (auto inst = llvm::dyn_cast<llvm::Instruction>(user); inst) {
-        LOG(WARNING)
-            << "Treating " << std::hex << ea << std::dec << " as a constant"
-            << " in " << inst->getParent()->getName().str();
+        LOG(WARNING) << "Treating " << std::hex << ea << std::dec
+                     << " as a constant"
+                     << " in " << inst->getParent()->getName().str();
 
       } else {
-        LOG(WARNING)
-            << "Treating " << std::hex << ea << std::dec << " as a constant";
+        LOG(WARNING) << "Treating " << std::hex << ea << std::dec
+                     << " as a constant";
       }
 
       fixup = llvm::ConstantInt::get(ce_type, ea);
@@ -1143,10 +1134,10 @@ static void LowerXrefs(const NativeModule *cfg_module) {
         if (llvm::isa<llvm::ConstantInt>(fixup)) {
           return fixup;
         } else {
-          LOG(ERROR)
-              << "Previously lifted cross-reference to " << std::hex
-              << ea << std::dec << " is used in subsequent bitwise operations; "
-              << "assuming it is actually a constant in this instance";
+          LOG(ERROR) << "Previously lifted cross-reference to " << std::hex
+                     << ea << std::dec
+                     << " is used in subsequent bitwise operations; "
+                     << "assuming it is actually a constant in this instance";
 
           return llvm::ConstantInt::get(ce_type, ea);
         }
@@ -1161,17 +1152,15 @@ static void LowerXrefs(const NativeModule *cfg_module) {
       fixup = llvm::ConstantInt::get(ce_type, ea);
 
       if (auto inst = llvm::dyn_cast<llvm::Instruction>(user); inst) {
-        LOG(ERROR)
-            << "Cross-reference to " << std::hex << ea << std::dec
-            << " in " << inst->getParent()->getName().str()
-            << " is computed via a XOR; assuming it is a constant: "
-            << remill::LLVMThingToString(ce);
+        LOG(ERROR) << "Cross-reference to " << std::hex << ea << std::dec
+                   << " in " << inst->getParent()->getName().str()
+                   << " is computed via a XOR; assuming it is a constant: "
+                   << remill::LLVMThingToString(ce);
 
       } else {
-        LOG(ERROR)
-            << "Cross-reference to " << std::hex << ea << std::dec
-            << " is computed via a XOR; assuming it is a constant: "
-            << remill::LLVMThingToString(ce);
+        LOG(ERROR) << "Cross-reference to " << std::hex << ea << std::dec
+                   << " is computed via a XOR; assuming it is a constant: "
+                   << remill::LLVMThingToString(ce);
       }
     }
 
@@ -1221,9 +1210,8 @@ static void LowerXrefs(const NativeModule *cfg_module) {
           continue;
 
         } else {
-          LOG(ERROR)
-              << "Unexpected user of cross-reference: "
-              << remill::LLVMThingToString(user);
+          LOG(ERROR) << "Unexpected user of cross-reference: "
+                     << remill::LLVMThingToString(user);
         }
       }
     }
@@ -1233,7 +1221,7 @@ static void LowerXrefs(const NativeModule *cfg_module) {
     use->set(replacement);
   }
 
-  auto find_missed_fixup = [&] (const char *func_name, llvm::Type *val_type) {
+  auto find_missed_fixup = [&](const char *func_name, llvm::Type *val_type) {
     const auto func = gModule->getFunction(func_name);
     if (!func) {
       return;
@@ -1253,17 +1241,17 @@ static void LowerXrefs(const NativeModule *cfg_module) {
       if (auto addr_int = llvm::dyn_cast<llvm::ConstantInt>(addr_val)) {
         const auto new_addr_val = get_fixup(user, addr_int);
         if (llvm::isa<llvm::ConstantInt>(new_addr_val)) {
-          LOG(ERROR)
-              << "Missed cross-reference to absolute address " << std::hex
-              << addr_int->getZExtValue() << std::dec << " in block "
-              << ci->getParent()->getName().str() << " in function "
-              << ci->getParent()->getParent()->getName().str();
+          LOG(ERROR) << "Missed cross-reference to absolute address "
+                     << std::hex << addr_int->getZExtValue() << std::dec
+                     << " in block " << ci->getParent()->getName().str()
+                     << " in function "
+                     << ci->getParent()->getParent()->getName().str();
 
         } else {
-          LOG(WARNING)
-              << "Fixing absolute address " << std::hex
-              << addr_int->getZExtValue() << std::dec << " to be reference "
-              << remill::LLVMThingToString(new_addr_val);
+          LOG(WARNING) << "Fixing absolute address " << std::hex
+                       << addr_int->getZExtValue() << std::dec
+                       << " to be reference "
+                       << remill::LLVMThingToString(new_addr_val);
         }
 
         fixups.emplace_back(&addr_use, new_addr_val);
@@ -1272,8 +1260,8 @@ static void LowerXrefs(const NativeModule *cfg_module) {
       // instruction that computes an integer.
       } else {
         llvm::IRBuilder<> ir(ci);
-        llvm::Value *ptr = GetPointer(
-            cfg_module, ir, addr_use.get(), val_type, 0);
+        llvm::Value *ptr =
+            GetPointer(cfg_module, ir, addr_use.get(), val_type, 0);
         fixups.emplace_back(&addr_use, ir.CreatePtrToInt(ptr, gWordType));
       }
     }
@@ -1407,8 +1395,7 @@ static llvm::Value *TryGetRegAlias(llvm::Value *ptr, unsigned offset) {
 
   alias = llvm::GlobalAlias::create(
       elem_type, ptr_type->getPointerAddressSpace(),
-      llvm::GlobalValue::PrivateLinkage, alias_name, ptr_const,
-      gModule.get());
+      llvm::GlobalValue::PrivateLinkage, alias_name, ptr_const, gModule.get());
   alias->setThreadLocalMode(llvm::GlobalValue::InitialExecTLSModel);
   return alias;
 }
@@ -1428,6 +1415,7 @@ static llvm::Value *TryGetRegAlias(llvm::Value *ptr, unsigned offset) {
 static void GlobalizeStateStructures(void) {
   const auto state_ptr = ::mcsema::GetStatePointer();
   const auto state_ptr_type = state_ptr->getType();
+
   //const auto undef_state = llvm::UndefValue::get(state_ptr_type);
 
   std::vector<std::pair<llvm::Value *, unsigned>> work_list;
@@ -1446,11 +1434,13 @@ static void GlobalizeStateStructures(void) {
       continue;
     }
 
-    auto func_state_ptr = remill::NthArgument(&func, remill::kStatePointerArgNum);
+    auto func_state_ptr =
+        remill::NthArgument(&func, remill::kStatePointerArgNum);
     if (func_state_ptr->getType() != state_ptr_type) {
       continue;
     }
 #if 0
+
     // Replace all state pointer args with `undef`.
     for (auto user : func.users()) {
       if (auto call_inst = llvm::dyn_cast<llvm::CallInst>(user);
@@ -1474,11 +1464,12 @@ static void GlobalizeStateStructures(void) {
             next_work_list.emplace_back(bc, offset);
             to_remove.push_back(bc);
 
-          } else if (auto gep = llvm::dyn_cast<llvm::GetElementPtrInst>(user); gep) {
+          } else if (auto gep = llvm::dyn_cast<llvm::GetElementPtrInst>(user);
+                     gep) {
             llvm::APInt sub_offset(gArch->address_size, 0);
             if (gep->accumulateConstantOffset(dl, sub_offset)) {
-              next_work_list.emplace_back(
-                  gep, offset + sub_offset.getZExtValue());
+              next_work_list.emplace_back(gep,
+                                          offset + sub_offset.getZExtValue());
 
             } else {
               to_replace.emplace_back(&use, offset);
@@ -1490,7 +1481,8 @@ static void GlobalizeStateStructures(void) {
                      llvm::isa<llvm::StoreInst>(user)) {
             to_replace.emplace_back(&use, offset);
 
-          } else if (auto inst = llvm::dyn_cast<llvm::Instruction>(user); inst) {
+          } else if (auto inst = llvm::dyn_cast<llvm::Instruction>(user);
+                     inst) {
 
             to_replace.emplace_back(&use, offset);
             to_remove.push_back(inst);
@@ -1518,12 +1510,12 @@ static void GlobalizeStateStructures(void) {
               llvm::PointerType::get(pti->getPointerOperandType(), 0));
           ptr = TryGetRegAlias(ptr, offset);
 
-          if (auto pti_inst = llvm::dyn_cast<llvm::Instruction>(pti); pti_inst) {
+          if (auto pti_inst = llvm::dyn_cast<llvm::Instruction>(pti);
+              pti_inst) {
             to_remove.push_back(pti_inst);
           }
 
-          (void) new llvm::StoreInst(
-              pti->getPointerOperand(), ptr, store);
+          (void) new llvm::StoreInst(pti->getPointerOperand(), ptr, store);
           to_remove.push_back(store);
           continue;
         }
@@ -1544,8 +1536,8 @@ static void GlobalizeStateStructures(void) {
         }
       }
 
-      auto ptr = remill::BuildPointerToOffset(
-          ir, state_ptr, offset, use->get()->getType());
+      auto ptr = remill::BuildPointerToOffset(ir, state_ptr, offset,
+                                              use->get()->getType());
 
       ptr = TryGetRegAlias(ptr, offset);
       use->set(ptr);
@@ -1586,8 +1578,7 @@ void OptimizeModule(const NativeModule *cfg_module) {
   MuteStateEscape("__remill_async_hyper_call");
 
   auto isels = FindISELs();
-  LOG(INFO)
-      << "Optimizing module.";
+  LOG(INFO) << "Optimizing module.";
 
   PrivatizeISELs(isels);
 
@@ -1604,9 +1595,9 @@ void OptimizeModule(const NativeModule *cfg_module) {
 
   llvm::legacy::FunctionPassManager pm(gModule.get());
 
-//    pm.add(llvm::createGVNHoistPass());
-//    pm.add(llvm::createGVNSinkPass());
-//    pm.add(llvm::createMergedLoadStoreMotionPass());
+  //    pm.add(llvm::createGVNHoistPass());
+  //    pm.add(llvm::createGVNSinkPass());
+  //    pm.add(llvm::createMergedLoadStoreMotionPass());
 
   pm.add(llvm::createEarlyCSEPass(true));
   pm.add(llvm::createDeadCodeEliminationPass());
@@ -1651,7 +1642,7 @@ void OptimizeModule(const NativeModule *cfg_module) {
     RemoveSavingKilledStores();
   }
 
-//  anvill::RecoverMemoryAccesses(*cfg_module, *gModule);
+  //  anvill::RecoverMemoryAccesses(*cfg_module, *gModule);
   LowerXrefs(cfg_module);
 
   for (auto &[ea, cfg_func] : cfg_module->ea_to_func) {
@@ -1664,11 +1655,11 @@ void OptimizeModule(const NativeModule *cfg_module) {
 
     cfg_func->lifted_function = gModule->getFunction(cfg_func->lifted_name);
 
-//    if (!cfg_func->is_exported && cfg_func->function) {
-//      if (cfg_func->function->hasNUsesOrMore(1)) {
-//        continue;
-//      }
-//    }
+    //    if (!cfg_func->is_exported && cfg_func->function) {
+    //      if (cfg_func->function->hasNUsesOrMore(1)) {
+    //        continue;
+    //      }
+    //    }
   }
 
   pm.doInitialization();
@@ -1732,24 +1723,24 @@ void CleanUpModule(const NativeModule *cfg_module) {
   }
 
 
-//  // Go try to inline
-//  for (const auto &func : cfg_module->functions) {
-//    if (func->lifted_function) {
-//      func->lifted_function = gModule->getFunction(func->lifted_name);
-//    }
-//
-//    if (func->lifted_function)
-//
-//    if (func->function) {
-//      func->function = gModule->getFunction(func->name);
-//    }
-//
-//    if (func->function &&
-//        func->lifted_function &&
-//        func->lifted_function->hasNUses(1)) {
-//
-//    }
-//  }
+  //  // Go try to inline
+  //  for (const auto &func : cfg_module->functions) {
+  //    if (func->lifted_function) {
+  //      func->lifted_function = gModule->getFunction(func->lifted_name);
+  //    }
+  //
+  //    if (func->lifted_function)
+  //
+  //    if (func->function) {
+  //      func->function = gModule->getFunction(func->name);
+  //    }
+  //
+  //    if (func->function &&
+  //        func->lifted_function &&
+  //        func->lifted_function->hasNUses(1)) {
+  //
+  //    }
+  //  }
 
   std::vector<llvm::Function *> to_remove;
   do {

@@ -29,10 +29,7 @@ struct NativeFunction;
 // internal code.
 llvm::Function *GetLiftedToNativeExitPoint(const NativeFunction *cfg_func);
 
-enum ExitPointKind {
-  kExitPointJump,
-  kExitPointFunctionCall
-};
+enum ExitPointKind { kExitPointJump, kExitPointFunctionCall };
 
 // Get a function that goes from the current lifted state into native state,
 // where we don't know where the native destination actually is.

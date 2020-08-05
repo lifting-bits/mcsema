@@ -17,12 +17,12 @@
 
 #include "Util.h"
 
-mcsema::CodeReference *AddCodeXref(mcsema::Instruction * instruction,
-                 mcsema::CodeReference_OperandType opTy,
-                 Dyninst::Address addr) {
+mcsema::CodeReference *AddCodeXref(mcsema::Instruction *instruction,
+                                   mcsema::CodeReference_OperandType opTy,
+                                   Dyninst::Address addr) {
 
-    auto xref = instruction->add_xrefs();
-    xref->set_operand_type(opTy);
-    xref->set_ea(addr);
-    return xref;
+  auto xref = instruction->add_xrefs();
+  xref->set_operand_type(opTy);
+  xref->set_ea(addr);
+  return xref;
 }

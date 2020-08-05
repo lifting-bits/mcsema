@@ -18,28 +18,26 @@
 #include "Instruction.h"
 
 #include <glog/logging.h>
-
-#include <sstream>
-#include <string>
-#include <vector>
-
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
-#include <llvm/IR/InstIterator.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/InstIterator.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
-#include "remill/Arch/Arch.h"
-#include "remill/Arch/Instruction.h"
-#include "remill/BC/Util.h"
+#include <sstream>
+#include <string>
+#include <vector>
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Callback.h"
 #include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
+#include "remill/Arch/Arch.h"
+#include "remill/Arch/Instruction.h"
+#include "remill/BC/Util.h"
 
 
 namespace mcsema {
@@ -48,12 +46,13 @@ InstructionLifter::~InstructionLifter(void) {}
 
 InstructionLifter::InstructionLifter(const remill::IntrinsicTable *intrinsics_,
                                      TranslationContext &ctx_)
-      : remill::InstructionLifter(gArch.get(), intrinsics_),
-        ctx(ctx_) {}
+    : remill::InstructionLifter(gArch.get(), intrinsics_),
+      ctx(ctx_) {}
 
 // Lift a single instruction into a basic block.
-remill::LiftStatus InstructionLifter::LiftIntoBlock(
-    remill::Instruction &inst, llvm::BasicBlock *block_, bool is_delayed) {
+remill::LiftStatus InstructionLifter::LiftIntoBlock(remill::Instruction &inst,
+                                                    llvm::BasicBlock *block_,
+                                                    bool is_delayed) {
 
   inst_ptr = &inst;
   block = block_;
@@ -72,31 +71,28 @@ remill::LiftStatus InstructionLifter::LiftIntoBlock(
   disp_ref_used = false;
   imm_ref_used = false;
 
-  auto status = this->remill::InstructionLifter::LiftIntoBlock(
-      inst, block, is_delayed);
+  auto status =
+      this->remill::InstructionLifter::LiftIntoBlock(inst, block, is_delayed);
 
   // If we have semantics for the instruction, then make sure that we were
   // able to match cross-reference information to the instruction's operands.
   if (remill::kLiftedInstruction == status) {
     if (mem_ref && !mem_ref_used) {
-      LOG(ERROR)
-          << "Unused memory reference operand to " << std::hex
-          << ctx.cfg_inst->mem->target_ea << " in instruction "
-          << inst.Serialize() << std::dec;
+      LOG(ERROR) << "Unused memory reference operand to " << std::hex
+                 << ctx.cfg_inst->mem->target_ea << " in instruction "
+                 << inst.Serialize() << std::dec;
     }
 
     if (imm_ref && !imm_ref_used) {
-      LOG(ERROR)
-          << "Unused immediate operand reference to " << std::hex
-          << ctx.cfg_inst->imm->target_ea << " in instruction "
-          << inst.Serialize() << std::dec;
+      LOG(ERROR) << "Unused immediate operand reference to " << std::hex
+                 << ctx.cfg_inst->imm->target_ea << " in instruction "
+                 << inst.Serialize() << std::dec;
     }
 
     if (disp_ref && !disp_ref_used) {
-      LOG(ERROR)
-          << "Unused displacement operand reference to " << std::hex
-          << ctx.cfg_inst->disp->target_ea << " in instruction "
-          << inst.Serialize() << std::dec;
+      LOG(ERROR) << "Unused displacement operand reference to " << std::hex
+                 << ctx.cfg_inst->disp->target_ea << " in instruction "
+                 << inst.Serialize() << std::dec;
     }
   }
 
@@ -126,8 +122,8 @@ remill::LiftStatus InstructionLifter::LiftIntoBlock(
 //  return entry.xref->target_ea == entry.ea;
 //}
 
-llvm::Value *InstructionLifter::GetAddress(
-    const NativeInstructionXref *cfg_xref) {
+llvm::Value *
+InstructionLifter::GetAddress(const NativeInstructionXref *cfg_xref) {
   if (!cfg_xref) {
     return nullptr;
   }
@@ -139,9 +135,10 @@ llvm::Value *InstructionLifter::GetAddress(
   }
 }
 
-llvm::Value *InstructionLifter::LiftImmediateOperand(
-    remill::Instruction &inst, llvm::BasicBlock *block,
-    llvm::Argument *arg, remill::Operand &op) {
+llvm::Value *InstructionLifter::LiftImmediateOperand(remill::Instruction &inst,
+                                                     llvm::BasicBlock *block,
+                                                     llvm::Argument *arg,
+                                                     remill::Operand &op) {
   auto arg_type = arg->getType();
   if (imm_ref && !imm_ref_used) {
     imm_ref_used = true;
@@ -150,10 +147,10 @@ llvm::Value *InstructionLifter::LiftImmediateOperand(
     auto arg_size = data_layout.getTypeSizeInBits(arg_type);
 
     CHECK(arg_size <= arch->address_size)
-        << "Immediate operand size " << op.size << " of "
-        << op.Serialize() << " in instuction " << std::hex << inst.pc
-        << " is wider than the architecture pointer size ("
-        << std::dec << arch->address_size << ").";
+        << "Immediate operand size " << op.size << " of " << op.Serialize()
+        << " in instuction " << std::hex << inst.pc
+        << " is wider than the architecture pointer size (" << std::dec
+        << arch->address_size << ").";
 
     if (arg_type != imm_ref->getType() && arg_size < arch->address_size) {
       llvm::IRBuilder<> ir(block);
@@ -162,31 +159,30 @@ llvm::Value *InstructionLifter::LiftImmediateOperand(
 
     return imm_ref;
 
-  } else if (op.size == arch->address_size &&
-             4096 <= op.imm.val) {
+  } else if (op.size == arch->address_size && 4096 <= op.imm.val) {
     auto seg = ctx.cfg_module->TryGetSegment(op.imm.val);
     LOG_IF(WARNING, seg != nullptr)
-        << "Immediate operand '" << op.Serialize()
-        << "' of instruction " << inst.Serialize()
-        << " is a missed cross-reference candidate";
+        << "Immediate operand '" << op.Serialize() << "' of instruction "
+        << inst.Serialize() << " is a missed cross-reference candidate";
   }
 
-  return this->remill::InstructionLifter::LiftImmediateOperand(
-      inst, block, arg, op);
+  return this->remill::InstructionLifter::LiftImmediateOperand(inst, block, arg,
+                                                               op);
 }
 
 // Lift an indirect memory operand to a value.
-llvm::Value *InstructionLifter::LiftAddressOperand(
-    remill::Instruction &inst, llvm::BasicBlock *block,
-    llvm::Argument *arg, remill::Operand &op) {
+llvm::Value *InstructionLifter::LiftAddressOperand(remill::Instruction &inst,
+                                                   llvm::BasicBlock *block,
+                                                   llvm::Argument *arg,
+                                                   remill::Operand &op) {
 
   auto &mem = op.addr;
 
   // A higher layer will resolve any code refs; this is a static address and
   // we want to preserve it in the register state structure.
   if (mem.IsControlFlowTarget()) {
-    return this->remill::InstructionLifter::LiftAddressOperand(
-        inst, block, arg, op);
+    return this->remill::InstructionLifter::LiftAddressOperand(inst, block, arg,
+                                                               op);
   }
 
   if ((mem.base_reg.name.empty() && mem.index_reg.name.empty()) ||
@@ -242,8 +238,8 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
     }
   }
 
-  return this->remill::InstructionLifter::LiftAddressOperand(
-      inst, block, arg, op);
+  return this->remill::InstructionLifter::LiftAddressOperand(inst, block, arg,
+                                                             op);
 }
 
 }  // namespace mcsema

@@ -17,11 +17,11 @@
 
 #pragma once
 
+#include <llvm/IR/IRBuilder.h>
+
 #include <cstdint>
 #include <list>
 #include <vector>
-
-#include <llvm/IR/IRBuilder.h>
 
 #include "mcsema/CFG/CFG.h"
 
@@ -53,7 +53,7 @@ llvm::Constant *LiftXrefInCode(uint64_t ea);
 
 // Get a lifted representation of a reference (in data) to `ea`.
 llvm::Constant *LiftXrefInData(const NativeSegment *cfg_seg, uint64_t ea,
-                               bool cast_to_int=true);
+                               bool cast_to_int = true);
 
 // Create a global register state pointer to pass to lifted functions.
 llvm::Constant *GetStatePointer(void);

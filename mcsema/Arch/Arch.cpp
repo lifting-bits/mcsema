@@ -18,11 +18,7 @@
 #include "mcsema/Arch/Arch.h"
 
 #include <glog/logging.h>
-
-#include <unordered_set>
-
 #include <llvm/ADT/ArrayRef.h>
-
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
@@ -30,12 +26,12 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
-
-#include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
-
+#include <llvm/Support/raw_ostream.h>
 #include <remill/Arch/Arch.h>
+
+#include <unordered_set>
 
 #include "mcsema/BC/Util.h"
 
@@ -46,12 +42,11 @@ extern std::shared_ptr<llvm::LLVMContext> gContext;
 std::unique_ptr<const remill::Arch> gArch(nullptr);
 
 bool InitArch(const std::string &os, const std::string &arch) {
-  LOG(INFO)
-      << "Initializing for " << arch << " code on " << os;
+  LOG(INFO) << "Initializing for " << arch << " code on " << os;
 
   remill::Arch::GetTargetArch(*gContext).swap(gArch);
-  gWordType = llvm::Type::getIntNTy(
-      *gContext, static_cast<unsigned>(gArch->address_size));
+  gWordType = llvm::Type::getIntNTy(*gContext,
+                                    static_cast<unsigned>(gArch->address_size));
 
   gWordMask = 0;
   if (32 == gArch->address_size) {
