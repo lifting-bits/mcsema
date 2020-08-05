@@ -39,6 +39,9 @@ if(NOT DEFINED WIN32)
   )
 endif()
 
+#
+# libraries
+#
 #sqlite
 find_package(SQLite3 REQUIRED)
 list(APPEND PROJECT_LIBRARIES ${SQLite3_LIBRARIES})
