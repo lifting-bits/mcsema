@@ -17,49 +17,52 @@
  * limitations under the License.
  */
 
+#include <iostream>
 #include <memory>
 #include <string>
-#include <iostream>
 
 struct Parent {
-protected:
-    std::string name;
-public:
-    Parent( const std::string& str ) : name( str ) {
-        std::cout << "Parent is setting name!" << std::endl;
-    }
+ protected:
+  std::string name;
 
-    virtual ~Parent() = default;
+ public:
+  Parent(const std::string &str) : name(str) {
+    std::cout << "Parent is setting name!" << std::endl;
+  }
 
-    virtual void shout() = 0;
+  virtual ~Parent() = default;
+
+  virtual void shout() = 0;
 };
 
 struct Angry : Parent {
-protected:
-    int age = 42;
-public:
-    Angry( const std::string& str ) : Parent( str ) {
-        //Empty
-    }
+ protected:
+  int age = 42;
 
-    void shout() override {
-        std::cout << "I am angry! I am: " << name << std::endl;
-    }
+ public:
+  Angry(const std::string &str) : Parent(str) {
+
+    //Empty
+  }
+
+  void shout() override {
+    std::cout << "I am angry! I am: " << name << std::endl;
+  }
 };
 
 struct Calm : Parent {
-    Calm( const std::string& str ) : Parent( str ) {
-        //Empty
-    }
+  Calm(const std::string &str) : Parent(str) {
 
-    void shout() override {
-        std::cout << "Me calm. Me: " << name << std::endl;
-    }
+    //Empty
+  }
+
+  void shout() override {
+    std::cout << "Me calm. Me: " << name << std::endl;
+  }
 };
 
 int main() {
-    Parent* oldMan = new Angry( "Ivan" );
-    oldMan->shout();
-    delete oldMan;
-
+  Parent *oldMan = new Angry("Ivan");
+  oldMan->shout();
+  delete oldMan;
 }

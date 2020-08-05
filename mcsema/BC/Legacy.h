@@ -34,4 +34,3 @@ void PropagateInstAnnotations(void);
 
 }  // namespace legacy
 }  // namespace mcsema
-

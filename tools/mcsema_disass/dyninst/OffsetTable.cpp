@@ -15,18 +15,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "OffsetTable.h"
+
+#include <Symtab.h>
 #include <glog/logging.h>
 
 #include <algorithm>
 
-#include <Symtab.h>
-
-#include "OffsetTable.h"
 #include "SectionManager.h"
 
 // Sometimes there are no good candidates -> try every possibility
-Maybe<Dyninst::Address> OffsetTable::BlindMatch(
-    const std::set<Dyninst::Address> &succ) const {
+Maybe<Dyninst::Address>
+OffsetTable::BlindMatch(const std::set<Dyninst::Address> &succ) const {
 
   auto it = start_ea;
 
@@ -37,7 +37,6 @@ Maybe<Dyninst::Address> OffsetTable::BlindMatch(
     }
     // TODO: Entries are smaller (maybe move by 8?)
     it += 4;
-
   }
 
   return {};
@@ -53,9 +52,9 @@ bool OffsetTable::contains(Dyninst::Address addr) const {
   return true;
 }
 
-Maybe<Dyninst::Address> OffsetTable::Match(
-    const std::set<Dyninst::Address> &succs,
-    const std::set<Dyninst::Address> &xrefs) const {
+Maybe<Dyninst::Address>
+OffsetTable::Match(const std::set<Dyninst::Address> &succs,
+                   const std::set<Dyninst::Address> &xrefs) const {
 
   if (xrefs.empty()) {
     return BlindMatch(succs);
@@ -125,12 +124,10 @@ bool OffsetTable::Match(const std::set<Dyninst::Address> &succs) const {
 }
 
 // This is just a bunch of 64-bit ELF specific heuristics
-Maybe<OffsetTable> OffsetTable::Parse(
-    const SectionManager &section_m,
-    Dyninst::Address start_ea,
-    int32_t *reader,
-    Dyninst::SymtabAPI::Region *region,
-    size_t size) {
+Maybe<OffsetTable>
+OffsetTable::Parse(const SectionManager &section_m, Dyninst::Address start_ea,
+                   int32_t *reader, Dyninst::SymtabAPI::Region *region,
+                   size_t size) {
 
   // It has to be alligned
   if (start_ea % 4) {
@@ -142,7 +139,7 @@ Maybe<OffsetTable> OffsetTable::Parse(
   OffsetTable table{start_ea, region, size};
 
   for (Dyninst::Address it_ea = start_ea; it_ea < start_ea + size;
-      it_ea += 4, ++reader) {
+       it_ea += 4, ++reader) {
 
     // Get what is that entry truly pointing to
     auto target_ea = table.start_ea - ~(*reader) - 1;
@@ -155,6 +152,7 @@ Maybe<OffsetTable> OffsetTable::Parse(
       table.start_ea += 4;
 
     } else {
+
       // It doesn't point into text, it is not a jump table
       return {};
     }

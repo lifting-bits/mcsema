@@ -15,9 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "CFGWriter.h"
-#include "ExternalFunctionManager.h"
-
+#include <CFG.h>
 #include <CodeObject.h>
 #include <Dereference.h>
 #include <Function.h>
@@ -25,15 +23,16 @@
 #include <InstructionDecoder.h>
 #include <Symtab.h>
 #include <Variable.h>
-#include <fstream>
-#include <memory>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 
-#include <CFG.h>
+#include <fstream>
 #include <map>
+#include <memory>
 #include <sstream>
 
-#include <glog/logging.h>
-#include <gflags/gflags.h>
+#include "CFGWriter.h"
+#include "ExternalFunctionManager.h"
 
 DEFINE_string(std_defs, "", "Path to file containing external definitions");
 DEFINE_bool(dump_cfg, false, "Dump produced cfg on stdout");
@@ -54,14 +53,14 @@ static std::vector<std::string> Split(const std::string &s, const char delim) {
   std::string rem;
   std::istringstream instream(s);
 
-  while(std::getline(instream, rem, delim)) {
+  while (std::getline(instream, rem, delim)) {
     res.push_back(rem);
   }
 
   return res;
 }
 
-}
+}  // namespace
 
 /* There is a global context right now consisting of two groups
  * - gflags
@@ -83,8 +82,8 @@ int main(int argc, char **argv) {
   ss << "  " << argv[0] << "\\" << std::endl
      << "    --binary INPUT_FILE \\" << std::endl
      << "    --output OUTPUT CFG FILE \\" << std::endl
-     << "    --std_defs FILE_NAME[" << kPathDelim <<
-        "FILE_NAME,...] \\" << std::endl
+     << "    --std_defs FILE_NAME[" << kPathDelim << "FILE_NAME,...] \\"
+     << std::endl
 
      << "    [--pretty_print] \\" << std::endl
      << "    [--dump_cfg] \\" << std::endl;
@@ -93,6 +92,7 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   google::SetUsageMessage(ss.str());
   google::ParseCommandLineFlags(&argc, &argv, true);
+
   //FLAGS_logtostderr = 1;
 
   CHECK(!FLAGS_binary.empty()) << "Input file need to be specified";
@@ -100,6 +100,7 @@ int main(int argc, char **argv) {
   auto input_file = const_cast<char *>(input_string.data());
 
   ExternalFunctionManager extFuncManager;
+
   // Load external symbol definitions
   if (!FLAGS_std_defs.empty()) {
     auto std_defs = Split(FLAGS_std_defs, kPathDelim);
@@ -111,8 +112,7 @@ int main(int argc, char **argv) {
   }
 
   // Set up Dyninst stuff
-  auto symtab_cs =
-      std::make_shared<ParseAPI::SymtabCodeSource>(input_file);
+  auto symtab_cs = std::make_shared<ParseAPI::SymtabCodeSource>(input_file);
   CHECK(symtab_cs) << "Error during creation of ParseAPI::SymtabCodeSource!";
 
   auto code_object = std::make_shared<ParseAPI::CodeObject>(symtab_cs.get());

@@ -17,6 +17,11 @@
 
 #pragma once
 
+#include <anvill/Program.h>
+#include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/StringRef.h>
+#include <llvm/IR/CallingConv.h>
+
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -24,12 +29,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-#include <llvm/ADT/SmallVector.h>
-#include <llvm/ADT/StringRef.h>
-#include <llvm/IR/CallingConv.h>
-
-#include <anvill/Program.h>
 
 namespace llvm {
 class Constant;
@@ -90,7 +89,7 @@ struct NativeObject {
   virtual ~NativeObject(void) = default;
 
   // Module containing this object.
-  NativeModule * const module;
+  NativeModule *const module;
 
   // Forwarding pointer to resolve duplicates and such.
   mutable NativeObject *forward;
@@ -206,7 +205,8 @@ struct NativeExternalFunction : public NativeFunction {
   }
 
   NativeExternalFunction *Get(void) {
-    return reinterpret_cast<NativeExternalFunction *>(this->NativeObject::Get());
+    return reinterpret_cast<NativeExternalFunction *>(
+        this->NativeObject::Get());
   }
 
   // Defined in `External.cpp`.
@@ -231,7 +231,8 @@ struct NativeExternalVariable : public NativeVariable {
   }
 
   NativeExternalVariable *Get(void) {
-    return reinterpret_cast<NativeExternalVariable *>(this->NativeObject::Get());
+    return reinterpret_cast<NativeExternalVariable *>(
+        this->NativeObject::Get());
   }
 
   // Defined in `External.cpp`.
@@ -244,10 +245,7 @@ struct NativeExternalVariable : public NativeVariable {
 
 // A cross-reference (xref) from data to something.
 struct NativeXref {
-  enum FixupKind : uint32_t {
-    kAbsoluteFixup,
-    kThreadLocalOffsetFixup
-  };
+  enum FixupKind : uint32_t { kAbsoluteFixup, kThreadLocalOffsetFixup };
 
   // Width (in bytes) of this cross-reference. This only makes sense for xrefs
   // embedded in the data section.
@@ -364,8 +362,8 @@ struct NativeModule : anvill::Program {
   const NativeVariable *TryGetVariable(uint64_t ea) const;
 
   // Try to get the block containing `inst_ea`.
-  const NativeBlock *TryGetBlock(
-      uint64_t inst_ea, const NativeBlock *curr) const;
+  const NativeBlock *TryGetBlock(uint64_t inst_ea,
+                                 const NativeBlock *curr) const;
 
   // Try to get the instruction at `ea`.
   const NativeInstruction *TryGetInstruction(uint64_t ea) const;
@@ -394,7 +392,8 @@ struct NativeModule : anvill::Program {
   // Maps effective addresses to sets of registers that are preserved around
   // the instruction at this address. This corresponds to registers preserved
   // around a function call.
-  std::unordered_multimap<uint64_t, std::pair<uint64_t, const NativePreservedRegisters *>>
+  std::unordered_multimap<uint64_t,
+                          std::pair<uint64_t, const NativePreservedRegisters *>>
       ea_to_range_preserved_regs;
 
   template <typename T>
@@ -428,7 +427,6 @@ struct NativeModule : anvill::Program {
   }
 };
 
-NativeModule *ReadProtoBuf(const std::string &file_name,
-                           uint64_t pointer_size);
+NativeModule *ReadProtoBuf(const std::string &file_name, uint64_t pointer_size);
 
 }  // namespace mcsema

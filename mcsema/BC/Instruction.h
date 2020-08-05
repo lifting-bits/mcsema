@@ -52,19 +52,17 @@ class InstructionLifter : public remill::InstructionLifter {
                                    bool is_delayed) override;
 
  protected:
-
   // Lift an immediate operand.
-  llvm::Value *LiftImmediateOperand(
-      remill::Instruction &inst, llvm::BasicBlock *block,
-      llvm::Argument *arg, remill::Operand &op) override;
+  llvm::Value *
+  LiftImmediateOperand(remill::Instruction &inst, llvm::BasicBlock *block,
+                       llvm::Argument *arg, remill::Operand &op) override;
 
   // Lift an indirect memory operand to a value.
-  llvm::Value *LiftAddressOperand(
-      remill::Instruction &inst, llvm::BasicBlock *block,
-      llvm::Argument *arg, remill::Operand &mem) override;
+  llvm::Value *LiftAddressOperand(remill::Instruction &inst,
+                                  llvm::BasicBlock *block, llvm::Argument *arg,
+                                  remill::Operand &mem) override;
 
  private:
-
   llvm::Value *GetAddress(const NativeInstructionXref *cfg_xref);
 
   TranslationContext &ctx;

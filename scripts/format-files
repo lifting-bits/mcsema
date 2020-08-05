@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+# Copyright 2020, Trail of Bits, Inc. All rights reserved.
+
+
+import argparse
+import itertools
+import os
+import pathlib
+import subprocess
+import sys
+import traceback
+import shutil
+
+
+REFLOW_COMMENT = "// !!! REFLOW-COMMENT"
+
+
+def find_comment_lines(path):
+  new_lines = []
+  old_comments = []
+  needs_fixes = False
+  with open(path, "r") as lines:
+    num_leading_comment_lines = 0
+    for line_ in lines:
+      line = line_.rstrip("\n\r\t ")
+      unindented_line = line.lstrip("\t ")
+
+      new_lines.append(line)
+
+      if unindented_line.startswith("//"):
+
+        # Make sure that every line that begins a comment block
+        # is preceded by a new line or a closing brace.
+        if not num_leading_comment_lines and 1 < len(new_lines):
+          prev_line = new_lines[-2].strip()
+          if prev_line != "" and prev_line != "}":
+            new_lines[-1] = ""
+            new_lines.append(line)
+            needs_fixes = True
+
+        num_leading_comment_lines += 1
+
+      # The code style has it so that the comment on an `else` or `else if` statement
+      # appears on the line before the `else` or `else if`.
+      elif num_leading_comment_lines:
+        if unindented_line.startswith("} else"):
+          comment_lines = list(new_lines[-(num_leading_comment_lines + 1):-1])
+          del new_lines[-(num_leading_comment_lines+1):]
+          new_lines.append(REFLOW_COMMENT)
+          new_lines.append(line)
+          old_comments.append(comment_lines)
+          needs_fixes = True
+
+        num_leading_comment_lines = 0
+      else:
+        num_leading_comment_lines = 0
+
+  # Force an empty newline at the end of the file.
+  if len(new_lines) and new_lines[-1]:
+    new_lines.append("")
+    needs_fixes = True
+
+  return new_lines, old_comments, needs_fixes
+
+
+def run_clang_format_on_files(format_exe, format_file, paths):
+  args = [format_exe, '-i']
+  args.extend(paths)
+  try:
+    subprocess.check_call(args)
+  except:
+    return
+
+
+def run_clang_format_on_lines(format_exe, format_file, path, lines):
+  p = subprocess.Popen(
+      [format_exe,
+       '--assume-filename={}'.format(path),
+       '--style=file'],
+      stdin=subprocess.PIPE,
+      stdout=subprocess.PIPE,
+      stderr=subprocess.PIPE,
+      universal_newlines=True)
+  try:
+    stdout_data, stderr_data = p.communicate("\n".join(lines))
+    return stdout_data.split("\n"), False
+  except:
+    p.kill()
+    stdout_data, stderr_data = p.communicate()
+    return stdout_data.split("\n"), True
+
+
+def fixup_file(path, lines, old_comments):
+  new_lines = []
+  i = 0
+  for line in lines:
+    if line.strip() == REFLOW_COMMENT:
+      num_spaces = max(0, (len(line) - len(line.lstrip())) - 2)
+      new_indent = " " * num_spaces
+      for old_comment_line in old_comments[i]:
+        old_comment_line = old_comment_line.strip("\r\n\t ")
+        new_lines.append("{}{}".format(new_indent, old_comment_line))
+      i += 1
+    else:
+      new_lines.append(line)
+
+  with open(path, "w") as file:
+    file.write("\n".join(new_lines))
+
+
+def main():
+  clang_format_exe = shutil.which('clang-format')
+
+  arg_parser = argparse.ArgumentParser()
+
+  if clang_format_exe:
+    arg_parser.add_argument(
+        '--format_exe',
+        help='Path to clang-format executable.',
+        required=False,
+        default=str(clang_format_exe))
+  else:
+    arg_parser.add_argument(
+        '--format_exe',
+        help='Path to clang-format executable.',
+        required=True)
+
+  arg_parser.add_argument(
+      '--source_dir',
+      help='Path to root of source directory.',
+      required=False,
+      default=str(os.path.dirname(os.path.dirname(__file__))))
+
+  arg_parser.add_argument(
+      '--files',
+      help='Specific files to format',
+      nargs='*')
+
+  args, _ = arg_parser.parse_known_args()
+
+  try:
+    source_dir = os.path.abspath(args.source_dir)
+    os.chdir(source_dir)
+  except:
+    print("'{}' passed to --source_dir is not a directory".format(args.source_dir))
+    return 1
+
+  format_file = os.path.abspath(os.path.join(source_dir, ".clang-format"))
+  if not os.path.isfile(format_file):
+    print("Could not find clang-format file at '{}'".format(format_file))
+    return 1
+
+  if not os.path.isfile(args.format_exe):
+    print("'{}' passed to --format_exe does not exist".format(args.format_exe))
+    return 1
+
+  # NOTE(pag): Go get the abs paths of the files here before we change the current
+  #            working directory.
+  cxx_files = args.files
+  if cxx_files:
+    cxx_files = list(os.path.abspath(cxx_file) for cxx_file in cxx_files)
+
+  if not cxx_files:
+    cxx_header_files = pathlib.Path(source_dir).rglob("*.h")
+    cxx_source_files = pathlib.Path(source_dir).rglob("*.cpp")
+    cxx_files = itertools.chain(cxx_header_files, cxx_source_files)
+
+  in_place_files = []
+  for cxx_file_ in cxx_files:
+    cxx_file = os.path.abspath(cxx_file_)
+    if not (cxx_file.endswith(".h") or cxx_file.endswith(".cpp")):
+      continue
+
+    try:
+      new_lines, old_comments, needs_fixes = find_comment_lines(cxx_file)
+    except:
+      continue
+
+    if not needs_fixes:
+      in_place_files.append(cxx_file)
+    else:
+      new_lines, has_error = run_clang_format_on_lines(
+          args.format_exe, format_file, cxx_file, new_lines)
+      if not has_error:
+        fixup_file(cxx_file, new_lines, old_comments)
+
+  if in_place_files:
+    run_clang_format_on_files(args.format_exe, format_file, in_place_files)
+
+  return 0
+
+if __name__ == "__main__":
+  exit(main())
