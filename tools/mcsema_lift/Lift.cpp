@@ -24,6 +24,7 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Support/CommandLine.h>
+#include <mcsema/Version/Version.h>
 #include <remill/Arch/Arch.h>
 #include <remill/BC/Annotate.h>
 #include <remill/BC/Util.h>
@@ -41,14 +42,6 @@
 #ifndef LLVM_VERSION_STRING
 #  define LLVM_VERSION_STRING LLVM_VERSION_MAJOR << "." << LLVM_VERSION_MINOR
 #endif
-
-#ifndef MCSEMA_VERSION_STRING
-#  define MCSEMA_VERSION_STRING "unknown"
-#endif  // MCSEMA_VERSION_STRING
-
-#ifndef MCSEMA_BRANCH_NAME
-#  define MCSEMA_BRANCH_NAME "unknown"
-#endif  // MCSEMA_BRANCH_NAME
 
 DECLARE_string(arch);
 DECLARE_string(os);
@@ -82,11 +75,29 @@ DEFINE_bool(legacy_mode, false,
 
 namespace {
 
-static void PrintVersion(void) {
-  std::cout << "This is mcsema-lift version: " << MCSEMA_VERSION_STRING
-            << std::endl
-            << "Built from branch: " << MCSEMA_BRANCH_NAME << std::endl
-            << "Using LLVM " << LLVM_VERSION_STRING << std::endl;
+static void SetVersion(void) {
+  std::stringstream ss;
+  auto vs = mcsema::Version::GetVersionString();
+  if (0 == vs.size()) {
+    vs = "unknown";
+  }
+  ss << vs << "\n";
+  if (!mcsema::Version::HasVersionData()) {
+    ss << "No extended version information found!\n";
+  } else {
+    ss << "Commit Hash: " << mcsema::Version::GetCommitHash() << "\n";
+    ss << "Commit Date: " << mcsema::Version::GetCommitDate() << "\n";
+    ss << "Last commit by: " << mcsema::Version::GetAuthorName() << " ["
+       << mcsema::Version::GetAuthorEmail() << "]\n";
+    ss << "Commit Subject: [" << mcsema::Version::GetCommitSubject() << "]\n";
+    ss << "\n";
+    if (mcsema::Version::HasUncommittedChanges()) {
+      ss << "Uncommitted changes were present during build.\n";
+    } else {
+      ss << "All changes were committed prior to building.\n";
+    }
+  }
+  google::SetVersionString(ss.str());
 }
 
 // Print a list of instructions that Remill can lift.
@@ -643,6 +654,8 @@ int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(1, llvm_argv);
 
   google::SetUsageMessage(ss.str());
+
+  SetVersion();
   google::ParseCommandLineFlags(&argc, &argv, true);
 
   if (FLAGS_log.empty()) {
@@ -652,11 +665,6 @@ int main(int argc, char *argv[]) {
   }
 
   FLAGS_minloglevel = FLAGS_loglevel;
-
-  if (FLAGS_version) {
-    PrintVersion();
-    return EXIT_SUCCESS;
-  }
 
   if (FLAGS_os.empty() || FLAGS_arch.empty() || FLAGS_cfg.empty()) {
     std::cout << google::ProgramUsage() << std::endl;

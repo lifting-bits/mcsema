@@ -69,3 +69,9 @@ package
 
 # Ignore local binary ninja installations
 binaryninja
+
+#ignore vscode dir
+.vscode
+
+#ignore generated version files
+VERSION

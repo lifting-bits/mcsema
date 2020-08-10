@@ -1,6 +1,6 @@
 build
 Dockerfile*
 .travis.yml
-.git*
+.github*
 LICENSE
 README.md
