@@ -1,40 +1,39 @@
 /*
- * Copyright (c) 2018 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
 
-#include <string>
-#include <vector>
-#include <unordered_map>
-
-#include <CodeObject.h>
-
 #include <CFG.pb.h>
-
+#include <CodeObject.h>
 #include <glog/logging.h>
+
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 struct ExternalFunction;
 
 struct MagicSection {
   mcsema::ExternalVariable *WriteExternalVariable(mcsema::Module &module,
-                                                  const std::string &name="");
+                                                  const std::string &name = "");
   mcsema::ExternalFunction *WriteExternalFunction(mcsema::Module &module,
-                             ExternalFunction &function);
+                                                  ExternalFunction &function);
 
-  Dyninst::Address AllocSpace(uint64_t byte_width=8);
+  Dyninst::Address AllocSpace(uint64_t byte_width = 8);
 
   Dyninst::Address GetAllocated(Dyninst::Address ea);
 
@@ -61,7 +60,7 @@ struct MagicSection {
   }
 
   //TODO(lukas): Rework as ctor
-  void init(Dyninst::Address start_ea, int ptr_byte_size=8) {
+  void init(Dyninst::Address start_ea, int ptr_byte_size = 8) {
     this->start_ea = start_ea;
     this->ptr_byte_size = ptr_byte_size;
   }
@@ -78,5 +77,4 @@ struct MagicSection {
   // This will serve when searching for function xrefs, IDA uses everywhere
   // imaginary address while Dyninst catches the .plt stub one
   std::unordered_map<Dyninst::Address, Dyninst::Address> real_to_imag;
-
 };

@@ -1,23 +1,24 @@
 /*
- * Copyright (c) 2019 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
 
 // Replace with std::optional once C++17 is supported
-template<typename T>
+template <typename T>
 struct Maybe {
   T val;
   bool contains;
@@ -27,11 +28,12 @@ struct Maybe {
   Maybe(const Maybe<T> &other) : val(other.val), contains(other.contains) {}
 
   Maybe(Maybe<T> &&other) noexcept(std::is_nothrow_move_constructible<T>::value)
-    : val(std::move(other.val)), contains(other.contains) {
+      : val(std::move(other.val)),
+        contains(other.contains) {
     other.contains = false;
   }
 
-  Maybe& operator=(Maybe<T> other) {
+  Maybe &operator=(Maybe<T> other) {
     using std::swap;
     swap(val, other.val);
     swap(contains, other.contains);
@@ -50,27 +52,27 @@ struct Maybe {
     return contains;
   }
 
-  const T* operator->() const {
+  const T *operator->() const {
     return &val;
   }
 
-  T* operator->() {
+  T *operator->() {
     return &val;
   }
 
-  const T& operator*() const {
+  const T &operator*() const {
     return val;
   }
 
-  T& operator*() {
+  T &operator*() {
     return val;
   }
 
-  constexpr T& value() {
+  constexpr T &value() {
     return val;
   }
 
-  constexpr const T& value() const {
+  constexpr const T &value() const {
     return val;
   }
 };

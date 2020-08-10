@@ -2,7 +2,7 @@ project(xz_amd64)
 cmake_minimum_required(VERSION 3.2)
 
 set(PROJECT_CXXFLAGS -Wall -Werror)
-set(PROJECT_LINKERFLAGS -lm -ldl -llzma)
+set(PROJECT_LINKERFLAGS -lm -ldl -llzma -lpthread)
 
 AddBinaryTest(${PROJECT_NAME}
   BINARY ${PROJECT_NAME}

@@ -36,6 +36,7 @@ DATA: _end PTR
 
 
 __assert_fail 4 C Y
+__assert_c99 3 C Y
 __cxa_atexit 5 C N
 __cxa_guard_acquire 5 C N
 __cxa_guard_release 5 C N
@@ -1569,7 +1570,7 @@ ass_add_font 4 C N
 ass_alloc_event 1 C N
 ass_alloc_style 1 C N
 ass_clear_fonts 1 C N
-__assert 3 C N
+__assert 3 C Y
 __assert_perror_fail 4 C Y
 ass_flush_events 1 C N
 ass_fonts_update 1 C N
@@ -2382,7 +2383,6 @@ bfd_set_section_size 3 C N
 bfd_set_start_address 2 C N
 bfd_set_symtab 3 C N
 bfd_simple_get_relocated_section_contents 4 C N
-bfd_sparclinux_size_dynamic_sections 2 C N
 bfd_sprintf_vma 3 C N
 bfd_stat 2 C N
 bfd_sunos_get_needed_list 2 C N
@@ -20190,7 +20190,6 @@ print_insn_s390 2 C N
 print_insn_sh 2 C N
 print_insn_sh64 2 C N
 print_insn_sh64x_media 2 C N
-print_insn_sparc 2 C N
 print_insn_spu 2 C N
 print_insn_tic30 2 C N
 print_insn_tic4x 2 C N

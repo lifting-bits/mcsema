@@ -1,31 +1,32 @@
 /*
- * Copyright (c) 2018 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "OffsetTable.h"
+
+#include <Symtab.h>
 #include <glog/logging.h>
 
 #include <algorithm>
 
-#include <Symtab.h>
-
-#include "OffsetTable.h"
 #include "SectionManager.h"
 
 // Sometimes there are no good candidates -> try every possibility
-Maybe<Dyninst::Address> OffsetTable::BlindMatch(
-    const std::set<Dyninst::Address> &succ) const {
+Maybe<Dyninst::Address>
+OffsetTable::BlindMatch(const std::set<Dyninst::Address> &succ) const {
 
   auto it = start_ea;
 
@@ -36,7 +37,6 @@ Maybe<Dyninst::Address> OffsetTable::BlindMatch(
     }
     // TODO: Entries are smaller (maybe move by 8?)
     it += 4;
-
   }
 
   return {};
@@ -52,9 +52,9 @@ bool OffsetTable::contains(Dyninst::Address addr) const {
   return true;
 }
 
-Maybe<Dyninst::Address> OffsetTable::Match(
-    const std::set<Dyninst::Address> &succs,
-    const std::set<Dyninst::Address> &xrefs) const {
+Maybe<Dyninst::Address>
+OffsetTable::Match(const std::set<Dyninst::Address> &succs,
+                   const std::set<Dyninst::Address> &xrefs) const {
 
   if (xrefs.empty()) {
     return BlindMatch(succs);
@@ -124,12 +124,10 @@ bool OffsetTable::Match(const std::set<Dyninst::Address> &succs) const {
 }
 
 // This is just a bunch of 64-bit ELF specific heuristics
-Maybe<OffsetTable> OffsetTable::Parse(
-    const SectionManager &section_m,
-    Dyninst::Address start_ea,
-    int32_t *reader,
-    Dyninst::SymtabAPI::Region *region,
-    size_t size) {
+Maybe<OffsetTable>
+OffsetTable::Parse(const SectionManager &section_m, Dyninst::Address start_ea,
+                   int32_t *reader, Dyninst::SymtabAPI::Region *region,
+                   size_t size) {
 
   // It has to be alligned
   if (start_ea % 4) {
@@ -141,7 +139,7 @@ Maybe<OffsetTable> OffsetTable::Parse(
   OffsetTable table{start_ea, region, size};
 
   for (Dyninst::Address it_ea = start_ea; it_ea < start_ea + size;
-      it_ea += 4, ++reader) {
+       it_ea += 4, ++reader) {
 
     // Get what is that entry truly pointing to
     auto target_ea = table.start_ea - ~(*reader) - 1;
@@ -154,6 +152,7 @@ Maybe<OffsetTable> OffsetTable::Parse(
       table.start_ea += 4;
 
     } else {
+
       // It doesn't point into text, it is not a jump table
       return {};
     }

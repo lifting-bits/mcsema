@@ -45,7 +45,7 @@ Why would anyone translate binaries *back* to bitcode?
 * **Write one set of analysis tools**. Lifting to LLVM IR means that one set of analysis tools can work on both the source and the binary. Maintaining a single set of tools saves development time and effort, and allows for a single set of better tools.
 
 ## Comparison with other machine code to LLVM bitcode lifters
-|   | McSema | [dagger](https://github.com/repzret/dagger) | [llvm-mctoll](https://github.com/Microsoft/llvm-mctoll) | [retdec](https://github.com/avast-tl/retdec) | [reopt](https://github.com/GaloisInc/reopt) | [rev.ng](https://github.com/revng/revamb) | [bin2llvm](https://github.com/cojocar/bin2llvm) | [fcd](https://github.com/zneak/fcd) | [RevGen](https://github.com/S2E/tools/tree/master/tools) | [Fracture](https://github.com/draperlaboratory/fracture) | [libbeauty](https://github.com/jcdutton/libbeauty) |
+|   | McSema | [dagger](https://github.com/repzret/dagger) | [llvm-mctoll](https://github.com/Microsoft/llvm-mctoll) | [retdec](https://github.com/avast-tl/retdec) | [reopt](https://github.com/GaloisInc/reopt) | [rev.ng](https://github.com/revng/revamb) | [bin2llvm](https://github.com/cojocar/bin2llvm) | [fcd](https://github.com/zneak/fcd) | [RevGen](https://github.com/S2E/tools/tree/master/tools) | [Fracture](https://github.com/draperlaboratory/fracture) | [libbeauty](https://github.com/pgoodman/libbeauty) |
 |  ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
 |  Actively maintained? | Yes | No | Yes | Yes | Yes | No | Maybe | Maybe | Maybe | No | Yes |
 |  Commercial support available? | Yes | No | No | No | Maybe | No | No | No | No | Maybe | No |
@@ -79,6 +79,8 @@ Why would anyone translate binaries *back* to bitcode?
 | [Python](https://www.python.org/) | 2.7 | 
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
+| [python-clang](https://pypi.org/project/clang/) | 3.5.0 |
+| [ccsyspath](https://pypi.org/project/ccsyspath/) | 1.1.0 |
 | [IDA Pro](https://www.hex-rays.com/products/ida) | 7.1+ |
 | [Binary Ninja](https://binary.ninja/) | Latest |
 | [Dyninst](https://www.dyninst.org/) | 9.3.2 |
@@ -87,16 +89,13 @@ Why would anyone translate binaries *back* to bitcode?
 
 ### Docker
 
-#### Step 1: Clone McSema
+#### Step 1: Download Dockerfile
 
-```sh
-git clone --depth 1 https://github.com/lifting-bits/mcsema.git
-cd mcsema
-```
+`wget https://raw.githubusercontent.com/lifting-bits/mcsema/master/tools/Dockerfile`
 
-#### Step 2: Add your disassembler (optional)
+#### Step 2: Add your disassembler
 
-Currently IDA, Binary Ninja, and Dyninst are supported for control-flow recovery, it's left as an exercise to the reader to install your disassembler of choice in a Dockerfile, but an example of installing Binary Ninja is provided (remember for Docker that paths need to be relative to where you built from):
+Currently IDA, Binary Ninja, and Dyninst are supported for control-flow recovery, it's left as an exercise to the reader to install your disassembler of choice, but an example of installing Binary Ninja is provided (remember for Docker that paths need to be relative to where you built from):
 ```
 ADD local-relative/path/to/binaryninja/ /root/binaryninja/
 ADD local-relative/path/to/.binaryninja/ /root/.binaryninja/ # <- Make sure there's no `lastrun` file

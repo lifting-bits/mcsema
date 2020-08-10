@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
 
-class Buffer
-{
+class Buffer {
  public:
   Buffer(void);
   ~Buffer();
@@ -99,13 +98,14 @@ void *consumer(void *arg) {
   return arg;
 }
 
-int main(int argc, char * argv[]) {
+int main(int argc, char *argv[]) {
   (void)argc;
   int iter_counter = atoi(argv[1]);
 
   pthread_t pro_th;
   pthread_t cons_th;
-  pthread_create(&pro_th, NULL, producer, reinterpret_cast<void*>(iter_counter));
+  pthread_create(&pro_th, NULL, producer,
+                 reinterpret_cast<void *>(iter_counter));
   pthread_create(&cons_th, NULL, consumer, NULL);
   pthread_join(pro_th, NULL);
   pthread_join(cons_th, NULL);

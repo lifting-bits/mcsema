@@ -1,51 +1,50 @@
 /*
- * Copyright (c) 2018 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
 
-#include "Util.h"
 #include "OffsetTable.h"
+#include "Util.h"
 
 struct SectionManager;
 
 namespace Dyninst {
-  namespace SymtabAPI {
-    class Region;
-  }
+namespace SymtabAPI {
+class Region;
 }
+}  // namespace Dyninst
 
 namespace mcsema {
-  class Segment;
+class Segment;
 }
-
 
 
 struct SectionParser {
   using CrossXrefMap = std::map<Dyninst::Address, CrossXref<mcsema::Segment>>;
 
-  SectionParser(DisassContext *disass_context,
-                SectionManager &section_manager) :
-    disass_context(disass_context),
-    section_manager(section_manager) {
+  SectionParser(DisassContext *disass_context, SectionManager &section_manager)
+      : disass_context(disass_context),
+        section_manager(section_manager){
 
-    };
+        };
 
   // More detailed parse for .data, .rodata
   void ParseVariables(Dyninst::SymtabAPI::Region *region,
-                         mcsema::Segment *segment);
+                      mcsema::Segment *segment);
 
   // Simple parse looking only for alligned xrefs
   void XrefsInSegment(Dyninst::SymtabAPI::Region *region,
@@ -59,16 +58,14 @@ struct SectionParser {
   }
 
 
-private:
+ private:
   DisassContext *disass_context;
   SectionManager &section_manager;
 
   bool TryXref(uint64_t offset, Dyninst::SymtabAPI::Region *region,
                mcsema::Segment *cfg_segment);
-  bool TryOffsetTable(uint64_t &offset,
-                      Dyninst::SymtabAPI::Region *region);
-  bool TryVar(uint64_t &offset,
-              Dyninst::SymtabAPI::Region *region,
+  bool TryOffsetTable(uint64_t &offset, Dyninst::SymtabAPI::Region *region);
+  bool TryVar(uint64_t &offset, Dyninst::SymtabAPI::Region *region,
               mcsema::Segment *cfg_segment);
 
   // For variable names

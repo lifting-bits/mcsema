@@ -1,22 +1,21 @@
 /*
- * Copyright (c) 2018 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "CFGWriter.h"
-#include "ExternalFunctionManager.h"
-
+#include <CFG.h>
 #include <CodeObject.h>
 #include <Dereference.h>
 #include <Function.h>
@@ -24,15 +23,16 @@
 #include <InstructionDecoder.h>
 #include <Symtab.h>
 #include <Variable.h>
-#include <fstream>
-#include <memory>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 
-#include <CFG.h>
+#include <fstream>
 #include <map>
+#include <memory>
 #include <sstream>
 
-#include <glog/logging.h>
-#include <gflags/gflags.h>
+#include "CFGWriter.h"
+#include "ExternalFunctionManager.h"
 
 DEFINE_string(std_defs, "", "Path to file containing external definitions");
 DEFINE_bool(dump_cfg, false, "Dump produced cfg on stdout");
@@ -41,8 +41,6 @@ DEFINE_string(output, "", "Path to output file");
 DEFINE_string(binary, "", "Path to binary to be disassembled");
 DEFINE_string(entrypoint, "main", "Name of entrypoint function");
 DEFINE_bool(pie_mode, false, "Need to be true for pie binaries");
-DEFINE_string(arch, "", "NOT IMPLEMENTED YET");
-DEFINE_string(os, "", "NOT IMPLEMENTED YET");
 
 using namespace Dyninst;
 
@@ -55,14 +53,14 @@ static std::vector<std::string> Split(const std::string &s, const char delim) {
   std::string rem;
   std::istringstream instream(s);
 
-  while(std::getline(instream, rem, delim)) {
+  while (std::getline(instream, rem, delim)) {
     res.push_back(rem);
   }
 
   return res;
 }
 
-}
+}  // namespace
 
 /* There is a global context right now consisting of two groups
  * - gflags
@@ -84,8 +82,8 @@ int main(int argc, char **argv) {
   ss << "  " << argv[0] << "\\" << std::endl
      << "    --binary INPUT_FILE \\" << std::endl
      << "    --output OUTPUT CFG FILE \\" << std::endl
-     << "    --std_defs FILE_NAME[" << kPathDelim <<
-        "FILE_NAME,...] \\" << std::endl
+     << "    --std_defs FILE_NAME[" << kPathDelim << "FILE_NAME,...] \\"
+     << std::endl
 
      << "    [--pretty_print] \\" << std::endl
      << "    [--dump_cfg] \\" << std::endl;
@@ -94,6 +92,7 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   google::SetUsageMessage(ss.str());
   google::ParseCommandLineFlags(&argc, &argv, true);
+
   //FLAGS_logtostderr = 1;
 
   CHECK(!FLAGS_binary.empty()) << "Input file need to be specified";
@@ -101,6 +100,7 @@ int main(int argc, char **argv) {
   auto input_file = const_cast<char *>(input_string.data());
 
   ExternalFunctionManager extFuncManager;
+
   // Load external symbol definitions
   if (!FLAGS_std_defs.empty()) {
     auto std_defs = Split(FLAGS_std_defs, kPathDelim);
@@ -112,8 +112,7 @@ int main(int argc, char **argv) {
   }
 
   // Set up Dyninst stuff
-  auto symtab_cs =
-      std::make_shared<ParseAPI::SymtabCodeSource>(input_file);
+  auto symtab_cs = std::make_shared<ParseAPI::SymtabCodeSource>(input_file);
   CHECK(symtab_cs) << "Error during creation of ParseAPI::SymtabCodeSource!";
 
   auto code_object = std::make_shared<ParseAPI::CodeObject>(symtab_cs.get());

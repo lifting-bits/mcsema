@@ -1,16 +1,17 @@
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from flow import *
 from table import *
@@ -55,8 +56,16 @@ def is_sane_reference_target(ea):
 
   #item_size = idc.get_item_size(ea)
 
+  # If the byte has value but no other flag is set
+  # This is possibly not a true reference target
+  if not IS_ARM:
+    if (flags == idc.FF_IVL) \
+      or (flags == idc.FF_UNK) \
+      or (flags == 0xfff00300):
+      return False
+
   #DEBUG("!!! target_ea = {:x} item_size = {}".format(ea, item_size))
-  #return 1 != item_size 
+  #return 1 != item_size
   #NOTE(artem): Above lines commented out since they caused problems
   # and we cannot determine what they fixed. If this code has problems
   # again, consider a solution that handles both cases properly
@@ -94,7 +103,7 @@ def next_reasonable_head(ea, max_ea):
   matched ones. If the next logical head is a string, but the actual head is
   an alignment, then we really want to find the head of the string.
 
-  TODO(pag): Investigate using `idc.NextNotTail(ea)`."""
+  TODO(pag): Investigate using `ida_bytes.next_not_tail(ea)`."""
   while ea < max_ea:
     ea = idc.next_head(ea, max_ea)
     flags = idc.get_full_flags(ea)
@@ -195,13 +204,28 @@ def remaining_item_size(ea):
   assert (head_ea + size) >= ea
   return (head_ea + size) - ea
 
+
+_POPCOUNT_TABLE8 = [0] * 2**8
+for index in xrange(len(_POPCOUNT_TABLE8)):
+  _POPCOUNT_TABLE8[index] = (index & 1) + _POPCOUNT_TABLE8[index >> 1]
+
+def _popcount(v):
+  v = struct.unpack("=Q", struct.pack("=Q", v))[0]
+  count = 0
+  while v:
+    count += _POPCOUNT_TABLE8[v & 0xff]
+    v = v >> 8
+  return count
+
 def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
   """Look for cross-refernces that were missed by IDA. This function assumes
   a natural alignments for pointers (i.e. 4- or 8-byte alignment)."""
 
+  addr_size_bits = get_address_size_in_bits()
+
   seg_ea = (seg_ea + 3) & ~3  # Align to a 4-byte boundary.
 
-  try_qwords = get_address_size_in_bits() == 64
+  try_qwords = addr_size_bits == 64
   try_dwords = True
   if try_qwords and binary_is_pie:
     try_dwords = False
@@ -210,6 +234,8 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
   ea, next_ea = idc.BADADDR, seg_ea
 
   missing_refs = []
+
+  maybe_jump_table_entries = []
 
   while next_ea < seg_end_ea:
     ea, next_ea = next_ea, idc.BADADDR
@@ -239,11 +265,20 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
 
     qword_data, dword_data = 0, 0
 
+    # Minimum number of set bits for something to be considered an address.
+    MIN_NUM_SET_BITS = 1
+
     # Try to read it as an 8-byte pointer.
     if try_qwords and (ea + 8) <= seg_end_ea:
       target_ea = qword_data = read_qword(ea)
       if is_sane_reference_target(target_ea):
-        if make_xref(ea, target_ea, idc.FF_QWORD, 8):
+        if MIN_NUM_SET_BITS >= _popcount(target_ea):
+          DEBUG("Ignoring possible qword reference from {:x} to {:x}: not enough set bits".format(
+              ea, target_ea))
+
+        elif make_dref(ea, target_ea, ida_bytes.FF_QWORD, 8):
+          if is_block_or_instruction_head(target_ea):
+            maybe_jump_table_entries.append((ea, 8))
           DEBUG("Adding qword reference from {:x} to {:x}".format(ea, target_ea))
           next_ea = ea + 8
           continue
@@ -252,7 +287,7 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
     if try_dwords and (ea + 4) <= seg_end_ea:
       target_ea = dword_data = read_dword(ea)
       if is_sane_reference_target(target_ea):
-        if make_xref(ea, target_ea, idc.FF_DWORD, 4):
+        if make_dref(ea, target_ea, idc.FF_DWORD, 4):
           DEBUG("Adding dword reference from {:x} to {:x}".format(ea, target_ea))
           next_ea = ea + 4
           continue
@@ -269,6 +304,23 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
     next_ea = ea + 4
 
   DEBUG("Stopping scan at {:x}".format(ea))
+
+  # Look for missed jump tables.
+  for (entry_ea, entry_size) in maybe_jump_table_entries:
+    if is_jump_table_entry(entry_ea):
+      continue
+    inst_ea = None
+    for maybe_inst_ea in xrefs_to(entry_ea):
+      if is_block_or_instruction_head(maybe_inst_ea):
+        inst_ea = maybe_inst_ea
+        break
+    if not inst_ea:
+      continue
+
+    DEBUG("Investigating possibly missed jump table at {:x} referenced by {:x}".format(
+        entry_ea, inst_ea))
+    try_create_jump_table(inst_ea, entry_ea, entry_size, binary_is_pie)
+
 
 def _next_code_or_jt_ea(ea):
   """Scan forward looking for the next non-data effective address."""

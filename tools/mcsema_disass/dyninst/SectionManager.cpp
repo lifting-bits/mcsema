@@ -1,25 +1,26 @@
 /*
- * Copyright (c) 2018 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "SectionManager.h"
-#include "Util.h"
 
 #include <CFG.h>
-
 #include <glog/logging.h>
+
+#include "Util.h"
 
 using namespace Dyninst;
 using namespace SymtabAPI;
@@ -37,12 +38,13 @@ bool SectionManager::IsInRegion(const SymtabAPI::Region *r, Address a) const {
   return true;
 }
 
-bool SectionManager::IsInRegion(const std::string &region_name, Address addr) const {
+bool SectionManager::IsInRegion(const std::string &region_name,
+                                Address addr) const {
   return IsInRegion(GetRegion(region_name), addr);
 }
 
 bool SectionManager::IsInRegions(std::vector<std::string> sections,
-                                  Dyninst::Address addr) const {
+                                 Dyninst::Address addr) const {
   for (auto &s : regions) {
     for (auto &name : sections) {
       if (name == s.name) {
@@ -82,8 +84,7 @@ SectionManager::GetRegion(const std::string &name) const {
   return GetRegion_impl<const Dyninst::SymtabAPI::Region *>(*this, name);
 }
 
-Dyninst::SymtabAPI::Region *
-SectionManager::GetRegion(const std::string &name) {
+Dyninst::SymtabAPI::Region *SectionManager::GetRegion(const std::string &name) {
   return GetRegion_impl<Dyninst::SymtabAPI::Region *>(*this, name);
 }
 
@@ -96,7 +97,7 @@ void SectionManager::AddRegion(Dyninst::SymtabAPI::Region *r) {
     }
   }
   static std::array<std::string, 1> no_write = {
-    ".fini_array",
+      ".fini_array",
   };
 
   bool should_write = true;

@@ -1,20 +1,19 @@
 /*
- * Copyright (c) 2017 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-#include "pin.H"
 
 #include <cstdint>
 #include <cstdio>
@@ -22,13 +21,14 @@
 #include <iostream>
 #include <sstream>
 
-KNOB<uintptr_t> gEntrypoint(
-    KNOB_MODE_WRITEONCE, "pintool", "entrypoint", "0",
-    "Entrypoint of lifted program. Usually address of `main`.");
+#include "pin.H"
 
-KNOB<uintptr_t> gStopAt(
-    KNOB_MODE_WRITEONCE, "pintool", "stop_at", "0",
-    "Address of code for when tracing should stop.");
+KNOB<uintptr_t>
+    gEntrypoint(KNOB_MODE_WRITEONCE, "pintool", "entrypoint", "0",
+                "Entrypoint of lifted program. Usually address of `main`.");
+
+KNOB<uintptr_t> gStopAt(KNOB_MODE_WRITEONCE, "pintool", "stop_at", "0",
+                        "Address of code for when tracing should stop.");
 
 struct RegInfo final {
   const char *name;
@@ -43,37 +43,25 @@ static uintptr_t gHighExcludeAddr = 0;
 #ifdef __x86_64__
 
 static const struct RegInfo gGprs[] = {
-  {"RIP", LEVEL_BASE::REG_RIP},
-  {"RAX", LEVEL_BASE::REG_RAX},
-  {"RBX", LEVEL_BASE::REG_RBX},
-  {"RCX", LEVEL_BASE::REG_RCX},
-  {"RDX", LEVEL_BASE::REG_RDX},
-  {"RSI", LEVEL_BASE::REG_RSI},
-  {"RDI", LEVEL_BASE::REG_RDI},
-  {"RBP", LEVEL_BASE::REG_RBP},
-  {"RSP", LEVEL_BASE::REG_RSP},
-  {"R8", LEVEL_BASE::REG_R8},
-  {"R9", LEVEL_BASE::REG_R9},
-  {"R10", LEVEL_BASE::REG_R10},
-  {"R11", LEVEL_BASE::REG_R11},
-  {"R12", LEVEL_BASE::REG_R12},
-  {"R13", LEVEL_BASE::REG_R13},
-  {"R14", LEVEL_BASE::REG_R14},
-  {"R15", LEVEL_BASE::REG_R15},
+    {"RIP", LEVEL_BASE::REG_RIP}, {"RAX", LEVEL_BASE::REG_RAX},
+    {"RBX", LEVEL_BASE::REG_RBX}, {"RCX", LEVEL_BASE::REG_RCX},
+    {"RDX", LEVEL_BASE::REG_RDX}, {"RSI", LEVEL_BASE::REG_RSI},
+    {"RDI", LEVEL_BASE::REG_RDI}, {"RBP", LEVEL_BASE::REG_RBP},
+    {"RSP", LEVEL_BASE::REG_RSP}, {"R8", LEVEL_BASE::REG_R8},
+    {"R9", LEVEL_BASE::REG_R9},   {"R10", LEVEL_BASE::REG_R10},
+    {"R11", LEVEL_BASE::REG_R11}, {"R12", LEVEL_BASE::REG_R12},
+    {"R13", LEVEL_BASE::REG_R13}, {"R14", LEVEL_BASE::REG_R14},
+    {"R15", LEVEL_BASE::REG_R15},
 };
 
 #else
 
 static const struct RegInfo gGprs[] = {
-  {"EIP", LEVEL_BASE::REG_EIP},
-  {"EAX", LEVEL_BASE::REG_EAX},
-  {"EBX", LEVEL_BASE::REG_EBX},
-  {"ECX", LEVEL_BASE::REG_ECX},
-  {"EDX", LEVEL_BASE::REG_EDX},
-  {"ESI", LEVEL_BASE::REG_ESI},
-  {"EDI", LEVEL_BASE::REG_EDI},
-  {"EBP", LEVEL_BASE::REG_EBP},
-  {"ESP", LEVEL_BASE::REG_ESP},
+    {"EIP", LEVEL_BASE::REG_EIP}, {"EAX", LEVEL_BASE::REG_EAX},
+    {"EBX", LEVEL_BASE::REG_EBX}, {"ECX", LEVEL_BASE::REG_ECX},
+    {"EDX", LEVEL_BASE::REG_EDX}, {"ESI", LEVEL_BASE::REG_ESI},
+    {"EDI", LEVEL_BASE::REG_EDI}, {"EBP", LEVEL_BASE::REG_EBP},
+    {"ESP", LEVEL_BASE::REG_ESP},
 };
 
 #endif  // __x86_64__
@@ -109,9 +97,8 @@ VOID PrintRegState(CONTEXT *ctx) {
   std::stringstream ss;
   const char *sep = "";
   for (auto &gpr : gGprs) {
-    ss
-        << sep << gpr.name << "=" << std::hex << std::setw(0)
-        << PIN_GetContextReg(ctx, gpr.reg);
+    ss << sep << gpr.name << "=" << std::hex << std::setw(0)
+       << PIN_GetContextReg(ctx, gpr.reg);
     sep = ",";
   }
 
@@ -122,27 +109,24 @@ VOID PrintRegState(CONTEXT *ctx) {
 
 VOID InstrumentInstruction(INS ins, VOID *) {
   auto addr = INS_Address(ins);
-  
+
   if (addr >= gLowAddr && addr < gHighAddr) {
-    
+
     // A thunk; only include the address of the first instruction.
     if (addr >= gLowExcludeAddr && addr < gHighExcludeAddr) {
-      INS_InsertCall(
-          ins, IPOINT_BEFORE, (AFUNPTR)CountReps, IARG_END);
-    
+      INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR) CountReps, IARG_END);
+
     // Normal code.
     } else {
       if (INS_HasRealRep(ins)) {
-        INS_InsertCall(
-            ins, IPOINT_BEFORE, (AFUNPTR)CountReps, IARG_END);
+        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR) CountReps, IARG_END);
       } else {
-        INS_InsertCall(
-            ins, IPOINT_BEFORE, (AFUNPTR)ClearReps, IARG_END);
+        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR) ClearReps, IARG_END);
       }
     }
 
-    INS_InsertCall(
-        ins, IPOINT_BEFORE, (AFUNPTR)PrintRegState, IARG_CONTEXT, IARG_END);
+    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR) PrintRegState, IARG_CONTEXT,
+                   IARG_END);
   }
 }
 
@@ -152,8 +136,8 @@ VOID FindEntrypoint(IMG img, void *) {
   if (low <= gEntrypoint.Value() && gEntrypoint.Value() <= high) {
     gLowAddr = low;
     gHighAddr = high;
-  
-    // Find 
+
+    // Find
     for (SEC sec = IMG_SecHead(img); SEC_Valid(sec); sec = SEC_Next(sec)) {
       if (SEC_Name(sec) == ".plt" || SEC_Name(sec) == ".PLT") {
         gLowExcludeAddr = SEC_Address(sec);
