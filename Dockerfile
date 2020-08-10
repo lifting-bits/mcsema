@@ -1,4 +1,4 @@
-ARG LLVM_VERSION=800
+ARG LLVM_VERSION=900
 ARG ARCH=amd64
 ARG UBUNTU_VERSION=18.04
 ARG DISTRO_BASE=ubuntu${UBUNTU_VERSION}
@@ -20,6 +20,10 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 
+# Will copy anvill installation from here
+FROM trailofbits/anvill:llvm${LLVM_VERSION}-${DISTRO_BASE}-${ARCH} as anvill
+
+
 # Build-time dependencies go here
 FROM trailofbits/cxx-common:llvm${LLVM_VERSION}-${DISTRO_BASE}-${ARCH} as deps
 ARG LIBRARIES
@@ -31,28 +35,16 @@ RUN apt-get update && \
 
 # needed for 20.04 support until we migrate to py3
 RUN curl https://bootstrap.pypa.io/get-pip.py --output get-pip.py && python2.7 get-pip.py
-
 RUN update-alternatives --install /usr/bin/python2 python2 /usr/bin/python2.7 1
 
-WORKDIR /
-COPY .remill_commit_id ./
-RUN git clone https://github.com/lifting-bits/remill.git && \
-    git clone https://github.com/lifting-bits/anvill.git remill/tools/anvill && \
-    cd remill && \
-    echo "Using remill commit $(cat ../.remill_commit_id)" && \
-    git checkout $(cat ../.remill_commit_id)
+COPY --from=anvill /opt/trailofbits/remill /opt/trailofbits/remill
 
 ENV PATH="${LIBRARIES}/llvm/bin:${LIBRARIES}/cmake/bin:${LIBRARIES}/protobuf/bin:${PATH}" \
     CC="${LIBRARIES}/llvm/bin/clang" \
     CXX="${LIBRARIES}/llvm/bin/clang++" \
     TRAILOFBITS_LIBRARIES="${LIBRARIES}"
 
-WORKDIR /remill
-RUN mkdir -p build && cd build && \
-    cmake -G Ninja -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/remill .. && \
-    cmake --build . --target install
-
-WORKDIR tools/mcsema
+WORKDIR /mcsema
 
 # Source code build
 FROM deps as build
@@ -67,7 +59,7 @@ FROM deps as build
 COPY . ./
 
 RUN mkdir -p ./build && cd ./build && \
-    cmake -G Ninja -DCMAKE_PREFIX_PATH=/opt/trailofbits/remill -DMCSEMA_DISABLED_ABI_LIBRARIES:STRING="" -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/mcsema .. && \
+    cmake -G Ninja -DCMAKE_PREFIX_PATH="/opt/trailofbits/remill" -DMCSEMA_DISABLED_ABI_LIBRARIES:STRING="" -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/mcsema .. && \
     cmake --build . --target install
 
 WORKDIR tests/test_suite_generator
