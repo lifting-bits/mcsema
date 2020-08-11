@@ -96,6 +96,9 @@ set(REMILL_LLVM_VERSION "${LLVM_MAJOR_VERSION}.${LLVM_MINOR_VERSION}")
 
 set(MCSEMA_LIFT mcsema-lift-${REMILL_LLVM_VERSION})
 
+# for version information
+add_subdirectory(mcsema/Version)
+
 add_executable(${MCSEMA_LIFT}
   ${PROJECT_PROTOBUFSOURCEFILES}
 
@@ -200,7 +203,7 @@ list(APPEND PROJECT_LIBRARIES gflags)
 # target settings
 #
 
-target_link_libraries(${MCSEMA_LIFT} PRIVATE ${PROJECT_LIBRARIES})
+target_link_libraries(${MCSEMA_LIFT} PRIVATE ${PROJECT_LIBRARIES} McSemaVersion)
 target_include_directories(${MCSEMA_LIFT} SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTORIES})
 target_compile_definitions(${MCSEMA_LIFT} PUBLIC ${PROJECT_DEFINITIONS})
 target_compile_options(${MCSEMA_LIFT} PRIVATE ${PROJECT_CXXFLAGS})
