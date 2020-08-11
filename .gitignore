@@ -69,3 +69,6 @@ package
 
 # Ignore local binary ninja installations
 binaryninja
+
+#vscode things
+.vscode
