@@ -38,6 +38,7 @@ RUN curl https://bootstrap.pypa.io/get-pip.py --output get-pip.py && python2.7 g
 RUN update-alternatives --install /usr/bin/python2 python2 /usr/bin/python2.7 1
 
 COPY --from=anvill /opt/trailofbits/remill /opt/trailofbits/remill
+COPY --from=anvill /opt/trailofbits/anvill /opt/trailofbits/anvill
 
 ENV PATH="${LIBRARIES}/llvm/bin:${LIBRARIES}/cmake/bin:${LIBRARIES}/protobuf/bin:${PATH}" \
     CC="${LIBRARIES}/llvm/bin/clang" \
@@ -59,7 +60,7 @@ FROM deps as build
 COPY . ./
 
 RUN mkdir -p ./build && cd ./build && \
-    cmake -G Ninja -DCMAKE_PREFIX_PATH="/opt/trailofbits/remill" -DMCSEMA_DISABLED_ABI_LIBRARIES:STRING="" -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/mcsema .. && \
+    cmake -G Ninja -DCMAKE_PREFIX_PATH="/opt/trailofbits/remill;/opt/trailofbits/anvill" -DMCSEMA_DISABLED_ABI_LIBRARIES:STRING="" -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/mcsema .. && \
     cmake --build . --target install
 
 WORKDIR tests/test_suite_generator
@@ -93,6 +94,7 @@ ARG LLVM_VERSION
 RUN mkdir -p /mcsema/local
 
 COPY --from=build /opt/trailofbits/remill /opt/trailofbits/remill
+COPY --from=build /opt/trailofbits/anvill /opt/trailofbits/anvill
 COPY --from=build /opt/trailofbits/mcsema /opt/trailofbits/mcsema
 COPY scripts/docker-lifter-entrypoint.sh /opt/trailofbits/mcsema
 ENV LLVM_VERSION=llvm${LLVM_VERSION} \
