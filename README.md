@@ -89,11 +89,14 @@ Why would anyone translate binaries *back* to bitcode?
 
 ### Docker
 
-#### Step 1: Download Dockerfile
+#### Step 1: Clone the repo
 
-`wget https://raw.githubusercontent.com/lifting-bits/mcsema/master/tools/Dockerfile`
+```bash
+git clone https://github.com/lifting-bits/mcsema
+cd mcsema
+```
 
-#### Step 2: Add your disassembler
+#### Step 2: Add your disassembler to the Dockerfile
 
 Currently IDA, Binary Ninja, and Dyninst are supported for control-flow recovery, it's left as an exercise to the reader to install your disassembler of choice, but an example of installing Binary Ninja is provided (remember for Docker that paths need to be relative to where you built from):
 ```
