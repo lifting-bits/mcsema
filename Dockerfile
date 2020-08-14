@@ -11,7 +11,9 @@ FROM ${BUILD_BASE} as base
 ARG UBUNTU_VERSION
 ARG LIBRARIES
 RUN apt-get update && \
-    apt-get install -qqy --no-install-recommends zlib1g && \
+    apt-get install -qqy --no-install-recommends python2.7 zlib1g curl ca-certificates && \
+    curl https://bootstrap.pypa.io/get-pip.py --output get-pip.py && python2.7 get-pip.py && \
+    update-alternatives --install /usr/bin/python2 python2 /usr/bin/python2.7 1 && \
     if [ "${UBUNTU_VERSION}" = "18.04" ] ; then \
       apt-get install -qqy --no-install-recommends libtinfo5 ; \
     else \
@@ -98,5 +100,6 @@ COPY --from=build /opt/trailofbits/anvill /opt/trailofbits/anvill
 COPY --from=build /opt/trailofbits/mcsema /opt/trailofbits/mcsema
 COPY scripts/docker-lifter-entrypoint.sh /opt/trailofbits/mcsema
 ENV LLVM_VERSION=llvm${LLVM_VERSION} \
-    PATH="/opt/trailofbits/mcsema/bin:${PATH}"
+    PATH="/opt/trailofbits/mcsema/bin:${PATH}" \
+    PYTHONPATH="/opt/trailofbits/mcsema/lib/python2.7/site-packages"
 ENTRYPOINT ["/opt/trailofbits/mcsema/docker-lifter-entrypoint.sh"]
