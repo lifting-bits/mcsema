@@ -34,7 +34,9 @@ jobs:
         echo ${{needs.VersionFile.outputs.version}} > VERSION
         docker build . -t docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest -f Dockerfile --build-arg UBUNTU_VERSION=${{ matrix.ubuntu }} --build-arg ARCH=amd64 --build-arg LLVM_VERSION=${{ matrix.llvm }}
     - name: Test final Docker image
-      run: docker run --rm docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest --version
+      run: |
+        docker run --rm docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest --version
+        docker run --rm --entrypoint=mcsema-disass docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest --help
     - name: Push Image for LLVM ${{ matrix.llvm }} on ${{ matrix.ubuntu }}
       if: github.event_name == 'push' && github.ref == 'refs/heads/master'
       run: |

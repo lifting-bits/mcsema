@@ -5,13 +5,22 @@ ARG DISTRO_BASE=ubuntu${UBUNTU_VERSION}
 ARG BUILD_BASE=ubuntu:${UBUNTU_VERSION}
 ARG LIBRARIES=/opt/trailofbits/libraries
 
+# Using this file:
+# 1. Clone the mcsema repo https://github.com/lifting-bits/mcsema
+# 2. docker build -t=mcsema .
+# To run the lifter
+# 3. docker run --rm -it --ipc=host -v "${PWD}":/home/user/local mcsema
+# To run the disassembler
+# 4. docker run --rm --entrypoint=mcsema-disass -it --ipc=host -v "${PWD}":/home/user/local mcsema
 
 # Run-time dependencies go here
 FROM ${BUILD_BASE} as base
 ARG UBUNTU_VERSION
 ARG LIBRARIES
 RUN apt-get update && \
-    apt-get install -qqy --no-install-recommends zlib1g && \
+    apt-get install -qqy --no-install-recommends python2.7 zlib1g curl ca-certificates && \
+    curl https://bootstrap.pypa.io/get-pip.py --output get-pip.py && python2.7 get-pip.py && \
+    update-alternatives --install /usr/bin/python2 python2 /usr/bin/python2.7 1 && \
     if [ "${UBUNTU_VERSION}" = "18.04" ] ; then \
       apt-get install -qqy --no-install-recommends libtinfo5 ; \
     else \
@@ -49,13 +58,6 @@ WORKDIR /mcsema
 
 # Source code build
 FROM deps as build
-# Using this file:
-# 1. wget https://raw.githubusercontent.com/trailofbits/mcsema/master/tools/Dockerfile
-# 2. docker build -t=mcsema .
-# 3. docker run --rm -it --ipc=host -v "${PWD}":/home/user/local mcsema
-
-# If using IDA for CFG recovery, uncomment the following line:
-# RUN sudo dpkg --add-architecture i386 && sudo apt-get install zip zlib1g-dev:i386 -y
 
 COPY . ./
 
@@ -75,18 +77,6 @@ RUN mkdir -p build && \
 RUN cd test_suite && \
     PATH="/opt/trailofbits/mcsema/bin:${PATH}" python2.7 start.py
 
-
-
-################################
-# Left to reader to install    #
-#  their disassembler (IDA/BN) #
-################################
-# But, as an example:
-# ADD local-relative/path/to/binaryninja/ /root/binaryninja/
-# ADD local-relative/path/to/.binaryninja/ /root/.binaryninja/ # <- Make sure there's no `lastrun` file
-# RUN /root/binaryninja/scripts/linux-setup.sh
-
-
 FROM base as dist
 ARG LLVM_VERSION
 
@@ -98,5 +88,15 @@ COPY --from=build /opt/trailofbits/anvill /opt/trailofbits/anvill
 COPY --from=build /opt/trailofbits/mcsema /opt/trailofbits/mcsema
 COPY scripts/docker-lifter-entrypoint.sh /opt/trailofbits/mcsema
 ENV LLVM_VERSION=llvm${LLVM_VERSION} \
-    PATH="/opt/trailofbits/mcsema/bin:${PATH}"
+    PATH="/opt/trailofbits/mcsema/bin:${PATH}" \
+    PYTHONPATH="/opt/trailofbits/mcsema/lib/python2.7/site-packages"
 ENTRYPOINT ["/opt/trailofbits/mcsema/docker-lifter-entrypoint.sh"]
+
+################################
+# Left to reader to install    #
+#  their disassembler (IDA/BN) #
+################################
+# But, as an example:
+# ADD local-relative/path/to/binaryninja/ /root/binaryninja/
+# ADD local-relative/path/to/.binaryninja/ /root/.binaryninja/ # <- Make sure there's no `lastrun` file
+# RUN /root/binaryninja/scripts/linux-setup.sh
