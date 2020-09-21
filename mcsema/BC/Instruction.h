@@ -49,6 +49,7 @@ class InstructionLifter : public remill::InstructionLifter {
   // Lift a single instruction into a basic block.
   remill::LiftStatus LiftIntoBlock(remill::Instruction &inst,
                                    llvm::BasicBlock *block,
+                                   llvm::Value *state_ptr,
                                    bool is_delayed) override;
 
  protected:
@@ -59,7 +60,9 @@ class InstructionLifter : public remill::InstructionLifter {
 
   // Lift an indirect memory operand to a value.
   llvm::Value *LiftAddressOperand(remill::Instruction &inst,
-                                  llvm::BasicBlock *block, llvm::Argument *arg,
+                                  llvm::BasicBlock *block,
+                                  llvm::Value *state_ptr,
+                                  llvm::Argument *arg,
                                   remill::Operand &mem) override;
 
  private:

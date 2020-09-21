@@ -106,12 +106,12 @@ namespace {
 
 static llvm::Value *LoadMemoryPointer(const TranslationContext &ctx,
                                       llvm::BasicBlock *block) {
-  return ctx.lifter->LoadRegValue(block, "MEMORY");
+  return ctx.lifter->LoadRegValue(block, ctx.state_ptr, "MEMORY");
 }
 
 static llvm::Value *LoadMemoryPointerRef(const TranslationContext &ctx,
                                          llvm::BasicBlock *block) {
-  return ctx.lifter->LoadRegAddress(block, "MEMORY");
+  return ctx.lifter->LoadRegAddress(block, ctx.state_ptr, "MEMORY");
 }
 
 static llvm::Value *LoadStatePointer(const TranslationContext &,
@@ -121,22 +121,22 @@ static llvm::Value *LoadStatePointer(const TranslationContext &,
 
 static llvm::Value *LoadProgramCounter(const TranslationContext &ctx,
                                        llvm::BasicBlock *block) {
-  return ctx.lifter->LoadRegValue(block, "PC");
+  return ctx.lifter->LoadRegValue(block, ctx.state_ptr, "PC");
 }
 
 static llvm::Value *LoadProgramCounterRef(const TranslationContext &ctx,
                                           llvm::BasicBlock *block) {
-  return ctx.lifter->LoadRegAddress(block, "PC");
+  return ctx.lifter->LoadRegAddress(block, ctx.state_ptr, "PC");
 }
 
 static llvm::Value *LoadNextProgramCounter(const TranslationContext &ctx,
                                            llvm::BasicBlock *block) {
-  return ctx.lifter->LoadRegValue(block, "NEXT_PC");
+  return ctx.lifter->LoadRegValue(block, ctx.state_ptr, "NEXT_PC");
 }
 
 static llvm::Value *LoadNextProgramCounterRef(const TranslationContext &ctx,
                                               llvm::BasicBlock *block) {
-  return ctx.lifter->LoadRegAddress(block, "NEXT_PC");
+  return ctx.lifter->LoadRegAddress(block, ctx.state_ptr, "NEXT_PC");
 }
 
 // Get the register tracer. This is useful when debugging, where the runtime
@@ -1088,7 +1088,8 @@ void SaveAndRestoreFunctionPreservedRegs(TranslationContext &ctx,
     // However, if after optimization the two parameters don't match, then
     // we need to preserve the restore, and we'll replace all uses of
     // `%restore_val` with `%reg`.
-    const auto reg_ptr = ctx.lifter->LoadRegAddress(entry_block, reg_name);
+    const auto reg_ptr = ctx.lifter->LoadRegAddress(
+        entry_block, ctx.state_ptr, reg_name);
     const auto reg = ir.CreateLoad(reg_ptr);
     const auto reg_latest = restore_ir.CreateLoad(reg_ptr);
     llvm::Value *restorer_args[] = {reg, reg_latest};
@@ -1121,7 +1122,8 @@ static void LiftSavedRegs(TranslationContext &ctx, llvm::BasicBlock *block) {
   ctx.cfg_module->ForEachInstructionPreservedRegister(
       ctx.inst.pc, [=, &ir, &ctx](const std::string &reg_name) {
         if (const auto reg = gArch->RegisterByName(reg_name); reg) {
-          const auto reg_ptr = ctx.lifter->LoadRegAddress(block, reg_name);
+          const auto reg_ptr = ctx.lifter->LoadRegAddress(
+              block, ctx.state_ptr, reg_name);
           const auto reg_val = ir.CreateLoad(reg_ptr);
           ctx.preserved_regs.emplace_back(reg_ptr, reg_val);
         }
@@ -1171,7 +1173,8 @@ static void LiftKilledRegs(TranslationContext &ctx, llvm::BasicBlock *block) {
   llvm::IRBuilder<> ir(block);
   ctx.cfg_module->ForEachInstructionKilledRegister(
       ctx.inst.pc, [=, &ir, &ctx](const std::string &reg_name) {
-        const auto reg_ptr = ctx.lifter->LoadRegAddress(block, reg_name);
+        const auto reg_ptr = ctx.lifter->LoadRegAddress(
+            block, ctx.state_ptr, reg_name);
         if (!reg_ptr) {
           return;
         }
@@ -1462,6 +1465,7 @@ static llvm::Function *LiftFunction(const NativeModule *cfg_module,
   ctx.cfg_block = nullptr;
   ctx.cfg_inst = nullptr;
   ctx.lifted_func = lifted_func;
+  ctx.state_ptr = remill::NthArgument(lifted_func, remill::kStatePointerArgNum);
 
   std::unordered_set<uint64_t> referenced_blocks;
   referenced_blocks.insert(cfg_func->ea);
