@@ -102,7 +102,7 @@ OS_NAME = ""
 # e.g. `@@QEAU_..`, `@@AEAV..`, though these are likely for name mangling.
 EXTERNAL_NAMES = ("@@GLIBC_", "@@GLIBCXX_", "@@CXXABI_", "@@GCC_")
 
-_NOT_ELF_BEGIN_EAS = (0xffffffffL, 0xffffffffffffffffL)
+_NOT_ELF_BEGIN_EAS = (0xffffffff, 0xffffffffffffffff)
 
 # Returns `True` if this is an ELF binary (as opposed to an ELF object file).
 def is_linked_ELF_program():

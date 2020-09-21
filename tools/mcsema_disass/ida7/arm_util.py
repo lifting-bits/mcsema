@@ -76,7 +76,9 @@ def fixup_function_return_address(inst, next_ea):
   return next_ea
 
 
+_BAD_ARM_REF_OFF = (idc.BADADDR, 0, 0)
 _INVALID_THUNK_ADDR = (False, idc.BADADDR)
+
 
 def is_ELF_thunk_by_structure(ea):
   """Try to manually identify an ELF thunk by its structure."""

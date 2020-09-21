@@ -175,7 +175,6 @@ _REFS = {}
 _HAS_NO_REFS = set()
 _NO_REFS = tuple()
 _ENABLE_CACHING = False
-_BAD_ARM_REF_OFF = (idc.BADADDR, 0)
 _NOT_A_REF = set()
 
 # Remove a reference from `from_ea` to `to_ea`.
