@@ -29,5 +29,6 @@ llvm::Function *GetOrCreateMcSemaInitializer(void);
 //void DeclareDataSegments(const NativeModule *cfg_module);
 void DefineDataSegments(const NativeModule *cfg_module);
 void CallInitFiniCode(const NativeModule *cfg_module);
+void MergeSegments(const NativeModule *cfg_module);
 
 }  // namespace mcsema

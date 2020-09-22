@@ -1630,7 +1630,7 @@ static void InlineCalls(llvm::Function &func) {
 // those references.
 void DeclareLiftedFunctions(const NativeModule *cfg_module) {
 
-  for (const auto [ea, cfg_func] : cfg_module->ea_to_func) {
+  for (auto [ea, cfg_func] : cfg_module->ea_to_func) {
     (void) ea;
 
     if (cfg_func->is_external) {
