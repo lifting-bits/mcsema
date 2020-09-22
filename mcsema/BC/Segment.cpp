@@ -63,6 +63,13 @@ DEFINE_bool(force_embed_data_refs, false,
             "when using McSema-produced bitcode in KLEE, as it avoids doing "
             "lazy cross-reference initialization.");
 
+DEFINE_bool(dont_align_sections, false,
+            "If set, McSema won't specify alignments for sections.");
+
+DEFINE_bool(name_lifted_sections, false,
+            "Put lifted sections into sections in the target in a way that is "
+            "reflective of their original addresses.");
+
 DECLARE_bool(disable_aliases);
 
 namespace mcsema {
@@ -580,13 +587,20 @@ llvm::Constant *NativeSegment::Pointer(void) const {
         var_name, nullptr, ThreadLocalMode(this));
   }
 
-  if (ea) {
-    const auto alignment = 1u << __builtin_ctzl(ea - padding);
+  if (ea && !FLAGS_dont_align_sections) {
+    if (const auto alignment = 1u << __builtin_ctzl(ea - padding); alignment) {
 #if LLVM_VERSION_NUMBER >= LLVM_VERSION(10, 0)
-    lifted_var->setAlignment(llvm::MaybeAlign(alignment));
+      lifted_var->setAlignment(llvm::MaybeAlign(alignment));
 #else
-    lifted_var->setAlignment(alignment);
+      lifted_var->setAlignment(alignment);
 #endif
+    }
+  }
+
+  if (!is_external && FLAGS_name_lifted_sections) {
+    std::stringstream ss;
+    ss << ".section_" << std::hex << ea;
+    lifted_var->setSection(ss.str());
   }
 
   return lifted_var;

@@ -47,6 +47,7 @@
 #include "mcsema/CFG/CFG.h"
 
 DECLARE_bool(explicit_args);
+DECLARE_bool(dont_align_sections);
 
 DEFINE_bool(
     disable_adjacent_segment_merging, false,
@@ -1386,7 +1387,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
   }
 
   for (auto &seg : module->segments) {
-    if (!seg->is_external) {
+    if (!seg->is_external && !FLAGS_dont_align_sections) {
       seg->padding = seg->ea & 4095u;
     }
 
