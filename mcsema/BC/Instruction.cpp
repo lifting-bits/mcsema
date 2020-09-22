@@ -157,12 +157,12 @@ llvm::Value *InstructionLifter::LiftAddressOperand(remill::Instruction &inst,
 
   auto &mem = op.addr;
 
-  // A higher layer will resolve any code refs; this is a static address and
-  // we want to preserve it in the register state structure.
-  if (mem.IsControlFlowTarget()) {
-    return this->remill::InstructionLifter::LiftAddressOperand(
-        inst, block, state_ptr, arg, op);
-  }
+//  // A higher layer will resolve any code refs; this is a static address and
+//  // we want to preserve it in the register state structure.
+//  if (mem.IsControlFlowTarget()) {
+//    return this->remill::InstructionLifter::LiftAddressOperand(
+//        inst, block, state_ptr, arg, op);
+//  }
 
   if ((mem.base_reg.name.empty() && mem.index_reg.name.empty()) ||
       (mem.base_reg.name == "PC" && mem.index_reg.name.empty())) {
