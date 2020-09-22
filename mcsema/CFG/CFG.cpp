@@ -1163,14 +1163,14 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
 
         const auto inst_ea = static_cast<uint64_t>(cfg_inst.ea());
 
+        // Don't add it if we've already got it.
+        block->last_inst_ea = std::max(block->last_inst_ea, inst_ea);
+
         // If there is no possibility of interesting metadata, then we don't
         // actually need a `NativeInstruction`.
         if (!cfg_inst.lp_ea() && !cfg_inst.xrefs_size()) {
           continue;
         }
-
-        // Don't add it if we've already got it.
-        block->last_inst_ea = std::max(block->last_inst_ea, inst_ea);
 
         auto &inst = module->ea_to_inst[inst_ea];
         if (!inst) {

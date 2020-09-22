@@ -731,6 +731,7 @@ static void LiftIndirectJump(TranslationContext &ctx, llvm::BasicBlock *block,
   auto fallback = DevirtualizeIndirectFlow(ctx, exit_point);
 
   std::unordered_map<uint64_t, llvm::BasicBlock *> block_map;
+
   if (ctx.cfg_block) {
     for (auto target_ea : ctx.cfg_block->successor_eas) {
       block_map.emplace(target_ea, GetOrCreateBlock(ctx, target_ea, true));
