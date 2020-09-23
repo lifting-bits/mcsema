@@ -65,17 +65,17 @@ RUN mkdir -p ./build && cd ./build && \
     cmake -G Ninja -DCMAKE_PREFIX_PATH="/opt/trailofbits/remill;/opt/trailofbits/anvill" -DMCSEMA_DISABLED_ABI_LIBRARIES:STRING="" -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/mcsema .. && \
     cmake --build . --target install
 
-WORKDIR tests/test_suite_generator
-RUN mkdir -p build && \
-    cd build && \
-    cmake -DMCSEMALIFT_PATH=/opt/trailofbits/mcsema/bin \
-          -DMCSEMA_PREBUILT_CFG_PATH="$(pwd)/../generated/prebuilt_cfg/" \
-	  -DMCSEMADISASS_PATH=/opt/trailofbits/mcsema/bin \
-	  .. && \
-    cmake --build . --target install
-
-RUN cd test_suite && \
-    PATH="/opt/trailofbits/mcsema/bin:${PATH}" python2.7 start.py
+# WORKDIR tests/test_suite_generator
+# RUN mkdir -p build && \
+#     cd build && \
+#     cmake -DMCSEMALIFT_PATH=/opt/trailofbits/mcsema/bin \
+#           -DMCSEMA_PREBUILT_CFG_PATH="$(pwd)/../generated/prebuilt_cfg/" \
+#       -DMCSEMADISASS_PATH=/opt/trailofbits/mcsema/bin \
+#       .. && \
+#     cmake --build . --target install
+# 
+# RUN cd test_suite && \
+#     PATH="/opt/trailofbits/mcsema/bin:${PATH}" python2.7 start.py
 
 FROM base as dist
 ARG LLVM_VERSION
