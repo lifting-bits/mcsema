@@ -377,6 +377,8 @@ def lift_test_cfg(test_directory, toolset, test):
                   "--arch", test.architecture(),
                   "--os", test.platform(), "--cfg", test.cfg_path(),
                   "--output", output_file_path,
+                  "--explicit_args",
+                  "--local_state_pointer",
                   "--libc_constructor", "init",
                   "--libc_destructor", "fini", 
                   "--abi_libraries", abi_libs,
