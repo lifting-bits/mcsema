@@ -69,7 +69,7 @@ DEFINE_bool(check_for_lowmem_xrefs, false,
 DEFINE_bool(volatile_memops, false,
             "Mark all lowered loads/stores as volatile");
 
-DEFINE_bool(local_state_pointer, true,
+DEFINE_bool(local_state_pointer, false,
             "Use the state pointer passed by argument to all lifted functions."
             "Set local_state_pointer to false to disable it.");
 

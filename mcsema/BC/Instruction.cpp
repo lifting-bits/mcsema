@@ -52,6 +52,7 @@ InstructionLifter::InstructionLifter(const remill::IntrinsicTable *intrinsics_,
 // Lift a single instruction into a basic block.
 remill::LiftStatus InstructionLifter::LiftIntoBlock(remill::Instruction &inst,
                                                     llvm::BasicBlock *block_,
+                                                    llvm::Value *state_ptr,
                                                     bool is_delayed) {
 
   inst_ptr = &inst;
@@ -71,8 +72,8 @@ remill::LiftStatus InstructionLifter::LiftIntoBlock(remill::Instruction &inst,
   disp_ref_used = false;
   imm_ref_used = false;
 
-  auto status =
-      this->remill::InstructionLifter::LiftIntoBlock(inst, block, is_delayed);
+  auto status = this->remill::InstructionLifter::LiftIntoBlock(
+      inst, block, state_ptr, is_delayed);
 
   // If we have semantics for the instruction, then make sure that we were
   // able to match cross-reference information to the instruction's operands.
@@ -98,29 +99,6 @@ remill::LiftStatus InstructionLifter::LiftIntoBlock(remill::Instruction &inst,
 
   return status;
 }
-
-//// Returns `true` if a given cross-reference is self-referential. That is,
-//// we'll have something like `jmp cs:EnterCriticalSection`, which references
-//// `EnterCriticalSection` in the `.idata` section of a PE file. But this
-//// location is our only "place" for the external `EnterCriticalSection`, so
-//// we point it back at itself.
-//static bool IsSelfReferential(const NativeXref *cfg_xref) {
-//  if (!cfg_xref->target_segment) {
-//    return false;
-//  }
-//
-//  auto it = cfg_xref->target_segment->entries.find(cfg_xref->target_ea);
-//  if (it == cfg_xref->target_segment->entries.end()) {
-//    return false;
-//  }
-//
-//  const auto &entry = it->second;
-//  if (!entry.xref) {
-//    return false;
-//  }
-//
-//  return entry.xref->target_ea == entry.ea;
-//}
 
 llvm::Value *
 InstructionLifter::GetAddress(const NativeInstructionXref *cfg_xref) {
@@ -173,17 +151,18 @@ llvm::Value *InstructionLifter::LiftImmediateOperand(remill::Instruction &inst,
 // Lift an indirect memory operand to a value.
 llvm::Value *InstructionLifter::LiftAddressOperand(remill::Instruction &inst,
                                                    llvm::BasicBlock *block,
+                                                   llvm::Value *state_ptr,
                                                    llvm::Argument *arg,
                                                    remill::Operand &op) {
 
   auto &mem = op.addr;
 
-  // A higher layer will resolve any code refs; this is a static address and
-  // we want to preserve it in the register state structure.
-  if (mem.IsControlFlowTarget()) {
-    return this->remill::InstructionLifter::LiftAddressOperand(inst, block, arg,
-                                                               op);
-  }
+//  // A higher layer will resolve any code refs; this is a static address and
+//  // we want to preserve it in the register state structure.
+//  if (mem.IsControlFlowTarget()) {
+//    return this->remill::InstructionLifter::LiftAddressOperand(
+//        inst, block, state_ptr, arg, op);
+//  }
 
   if ((mem.base_reg.name.empty() && mem.index_reg.name.empty()) ||
       (mem.base_reg.name == "PC" && mem.index_reg.name.empty())) {
@@ -218,7 +197,7 @@ llvm::Value *InstructionLifter::LiftAddressOperand(remill::Instruction &inst,
       disp_ref_used = true;
       mem.displacement = 0;
       auto dynamic_addr = this->remill::InstructionLifter::LiftAddressOperand(
-          inst, block, arg, op);
+          inst, block, state_ptr, arg, op);
       llvm::IRBuilder<> ir(block);
       return ir.CreateAdd(dynamic_addr, disp_ref);
 
@@ -232,14 +211,14 @@ llvm::Value *InstructionLifter::LiftAddressOperand(remill::Instruction &inst,
       mem_ref_used = true;
       mem.displacement = 0;
       auto dynamic_addr = this->remill::InstructionLifter::LiftAddressOperand(
-          inst, block, arg, op);
+          inst, block, state_ptr, arg, op);
       llvm::IRBuilder<> ir(block);
       return ir.CreateAdd(dynamic_addr, mem_ref);
     }
   }
 
-  return this->remill::InstructionLifter::LiftAddressOperand(inst, block, arg,
-                                                             op);
+  return this->remill::InstructionLifter::LiftAddressOperand(
+      inst, block, state_ptr, arg, op);
 }
 
 }  // namespace mcsema

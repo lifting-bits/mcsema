@@ -244,6 +244,8 @@ bool LiftCodeIntoModule(const NativeModule *cfg_module) {
     legacy::PropagateInstAnnotations();
   }
 
+  MergeSegments(cfg_module);
+
   return true;
 }
 

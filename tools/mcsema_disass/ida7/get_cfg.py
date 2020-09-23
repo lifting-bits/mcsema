@@ -102,7 +102,7 @@ OS_NAME = ""
 # e.g. `@@QEAU_..`, `@@AEAV..`, though these are likely for name mangling.
 EXTERNAL_NAMES = ("@@GLIBC_", "@@GLIBCXX_", "@@CXXABI_", "@@GCC_")
 
-_NOT_ELF_BEGIN_EAS = (0xffffffffL, 0xffffffffffffffffL)
+_NOT_ELF_BEGIN_EAS = (0xffffffff, 0xffffffffffffffff)
 
 # Returns `True` if this is an ELF binary (as opposed to an ELF object file).
 def is_linked_ELF_program():
@@ -1716,6 +1716,13 @@ if __name__ == "__main__":
       default=None,
       required=False)
 
+  parser.add_argument(
+      "--rebase",
+      help="Amount by which to rebase a binary",
+      default=0,
+      type=int,
+      required=False)
+
   args = parser.parse_args(args=idc.ARGV[1:])
 
   if args.log_file != os.devnull:
@@ -1765,10 +1772,18 @@ if __name__ == "__main__":
   # other sane defaults.
   idc.set_inf_attr(idc.INF_AF, 0xdfff)
   idc.set_inf_attr(idc.INF_AF2, 0xfffd)
-
+  
   # Ensure that IDA is done processing
   DEBUG("Using Batch mode.")
   idaapi.auto_wait()
+
+  # Shift the program image in memory.
+  if args.rebase:
+    rebase_flags = idc.MSF_FIXONCE
+    if idc.MOVE_SEGM_OK != idc.rebase_program(args.rebase, rebase_flags):
+      DEBUG("ERROR: Failed to rebase program with delta {:08x}".format(args.rebase))
+
+    idaapi.auto_wait()
 
   ANVILL_PROGRAM = anvill.get_program()
 

@@ -74,6 +74,7 @@ main() {
     return 1
   else
     printf " i Successfully installed\n"
+    rm "${temp_file}"
   fi
 
   return 0

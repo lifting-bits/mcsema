@@ -63,7 +63,13 @@ DEFINE_bool(force_embed_data_refs, false,
             "when using McSema-produced bitcode in KLEE, as it avoids doing "
             "lazy cross-reference initialization.");
 
+DEFINE_bool(name_lifted_sections, false,
+            "Put lifted sections into sections in the target in a way that is "
+            "reflective of their original addresses.");
+
 DECLARE_bool(disable_aliases);
+
+DEFINE_bool(merge_segments, false, "Should all lifted segments be merged?");
 
 namespace mcsema {
 namespace {
@@ -558,7 +564,7 @@ llvm::Constant *NativeSegment::Pointer(void) const {
             llvm::Type::getIntNTy(*gContext, static_cast<unsigned>(size * 8u));
         break;
 
-        // An array of bytes
+      // An array of bytes
       default: {
         auto byte_type = llvm::Type::getInt8Ty(*gContext);
         var_type = llvm::ArrayType::get(byte_type, static_cast<unsigned>(size));
@@ -581,12 +587,19 @@ llvm::Constant *NativeSegment::Pointer(void) const {
   }
 
   if (ea) {
-    const auto alignment = 1u << __builtin_ctzl(ea - padding);
+    if (const auto alignment = 1u << __builtin_ctzl(ea - padding); alignment) {
 #if LLVM_VERSION_NUMBER >= LLVM_VERSION(10, 0)
-    lifted_var->setAlignment(llvm::MaybeAlign(alignment));
+      lifted_var->setAlignment(llvm::MaybeAlign(alignment));
 #else
-    lifted_var->setAlignment(alignment);
+      lifted_var->setAlignment(alignment);
 #endif
+    }
+  }
+
+  if (!is_external && FLAGS_name_lifted_sections && !FLAGS_merge_segments) {
+    std::stringstream ss;
+    ss << ".section_" << std::hex << ea;
+    lifted_var->setSection(ss.str());
   }
 
   return lifted_var;
@@ -703,6 +716,104 @@ void CallInitFiniCode(const NativeModule *cfg_module) {
       llvm::IRBuilder<> ir(insert_point);
       ir.CreateCall(callback);
     }
+  }
+}
+
+// Merge all segments into one contiguous mega segment.
+void MergeSegments(const NativeModule *cfg_module) {
+  if (!FLAGS_merge_segments) {
+    return;
+  }
+
+  using SegPair = std::pair<const NativeSegment *, llvm::GlobalVariable *>;
+  std::vector<SegPair> segs;
+
+  for (auto [ea, seg] : cfg_module->ea_to_seg) {
+    seg = seg->Get();
+    if (auto var = llvm::dyn_cast<llvm::GlobalVariable>(seg->Pointer());
+        var && var->hasInitializer() && !seg->is_thread_local) {
+      segs.emplace_back(seg, var);
+      (void) ea;
+    }
+  }
+
+
+  std::sort(segs.begin(), segs.end(), [](SegPair a, SegPair b) {
+    return a.first->ea < b.first->ea;
+  });
+
+  if (segs.empty()) {
+    return;
+  }
+
+  const auto &dl = gModule->getDataLayout();
+  llvm::Type * const u8 = llvm::Type::getInt8Ty(*gContext);
+  llvm::Type * const u32 = llvm::Type::getInt32Ty(*gContext);
+
+  auto start_ea = segs.front().first->ea & ~4095ull;
+  const auto min_ea = start_ea;
+
+  std::vector<llvm::Type *> new_types;
+  std::vector<llvm::Constant *> new_vals;
+  std::unordered_map<llvm::GlobalVariable *, unsigned> indices;
+
+  const NativeSegment *prev_cfg_seg = nullptr;
+  for (auto [cfg_seg, seg_var] : segs) {
+    if (cfg_seg == prev_cfg_seg) {
+      continue;
+    }
+
+    LOG(INFO)
+        << "Merging segment " << cfg_seg->name << " at " << std::hex
+        << cfg_seg->ea << " of size " << std::dec << cfg_seg->size;
+
+    const auto ea = cfg_seg->ea;
+    if (start_ea < ea) {
+      const auto pad_type = llvm::ArrayType::get(u8, ea - start_ea);
+      new_types.push_back(pad_type);
+      new_vals.push_back(llvm::ConstantAggregateZero::get(pad_type));
+      start_ea = ea;
+
+    } else if (start_ea > ea) {
+      LOG(FATAL)
+          << "Segment " << cfg_seg->name << " starting at " << std::hex << ea
+          << " overlaps with previous segment " << prev_cfg_seg->name
+          << " starting at " << prev_cfg_seg->ea << " and ending at "
+          << start_ea << std::dec;
+    }
+
+    const auto init = seg_var->getInitializer();
+    const auto type = init->getType();
+    indices.emplace(seg_var, static_cast<unsigned>(new_types.size()));
+    new_vals.push_back(init);
+    new_types.push_back(type);
+    start_ea += dl.getTypeStoreSize(type);
+    prev_cfg_seg = cfg_seg;
+  }
+
+  llvm::StructType * const new_type = llvm::StructType::get(
+      *gContext, new_types, true);
+
+  llvm::Constant * const new_val = llvm::ConstantStruct::get(new_type, new_vals);
+
+  auto new_var = new llvm::GlobalVariable(
+      *gModule, new_type, false, llvm::GlobalValue::InternalLinkage, new_val,
+      "__mcsema_all_segments");
+
+  if (FLAGS_name_lifted_sections) {
+    std::stringstream ss;
+    ss << ".section_" << std::hex << min_ea;
+    new_var->setSection(ss.str());
+  }
+
+  const auto const_zero = llvm::Constant::getNullValue(u32);
+  for (auto [var, index] : indices) {
+    auto const_index = llvm::ConstantInt::get(u32, index, false);
+    llvm::Constant *const_indices[] = {const_zero, const_index};
+    const auto ptr = llvm::ConstantExpr::getInBoundsGetElementPtr(
+        new_type, new_var, const_indices);
+    var->replaceAllUsesWith(ptr);
+    var->eraseFromParent();
   }
 }
 

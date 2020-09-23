@@ -43,6 +43,13 @@ endif()
 # libraries
 #
 
+# remill
+if("${PLATFORM_NAME}" STREQUAL "windows")
+  set(REMILL_FINDPACKAGE_HINTS HINTS "${CMAKE_INSTALL_PREFIX}/remill/lib")
+endif()
+
+find_package(remill REQUIRED ${REMILL_FINDPACKAGE_HINTS})
+
 # protobuf
 find_package(Protobuf REQUIRED)
 list(APPEND PROJECT_LIBRARIES ${Protobuf_LIBRARIES})
@@ -69,10 +76,6 @@ add_custom_target(protobuf_python_module_ida
   DEPENDS ${PROJECT_PROTOBUFPYTHONMODULE}
 )
 
-add_custom_target(protobuf_python_module_binja
-  DEPENDS ${PROJECT_PROTOBUFPYTHONMODULE}
-)
-
 # disable -Werror on these file since they have been generated
 set_source_files_properties(${PROJECT_PROTOBUFSOURCEFILES} PROPERTIES
   COMPILE_FLAGS "-Wno-sign-conversion -Wno-shorten-64-to-32 -Wno-conversion"
@@ -81,14 +84,6 @@ set_source_files_properties(${PROJECT_PROTOBUFSOURCEFILES} PROPERTIES
 set_source_files_properties(${PROJECT_PROTOBUFHEADERFILES} PROPERTIES
   COMPILE_FLAGS "-Wno-sign-conversion -Wno-shorten-64-to-32 -Wno-conversion"
 )
-
-# llvm
-find_package(LLVM REQUIRED CONFIG HINTS ${FINDPACKAGE_LLVM_HINTS})
-
-string(REPLACE "." ";" LLVM_VERSION_LIST ${LLVM_PACKAGE_VERSION})
-list(GET LLVM_VERSION_LIST 0 LLVM_MAJOR_VERSION)
-list(GET LLVM_VERSION_LIST 1 LLVM_MINOR_VERSION)
-set(REMILL_LLVM_VERSION "${LLVM_MAJOR_VERSION}.${LLVM_MINOR_VERSION}")
 
 #
 # target settings
@@ -132,8 +127,7 @@ list(APPEND PROJECT_INCLUDEDIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_dependencies(${MCSEMA_LIFT}
   semantics
-  protobuf_python_module_ida
-  protobuf_python_module_binja)
+  protobuf_python_module_ida)
 
 #
 # libraries
@@ -154,50 +148,10 @@ list(APPEND PROJECT_LIBRARIES remill)
 if(NOT TARGET anvill-${REMILL_LLVM_VERSION})
   find_package(anvill REQUIRED)
   if(NOT anvill_FOUND)
-    message(FATAL_ERROR "McSema depends upon Anvill being cloned into Remill's tools directory")
+    message(FATAL_ERROR "McSema depends upon Anvill being installed")
   endif()
 endif()
 list(APPEND PROJECT_LIBRARIES anvill-${REMILL_LLVM_VERSION})
-
-if (LLVM_Z3_INSTALL_DIR)
-  set(need_z3 TRUE)
-elseif(DEFINED ENV{TRAILOFBITS_LIBRARIES})
-  set(LLVM_Z3_INSTALL_DIR "$ENV{TRAILOFBITS_LIBRARIES}/z3")
-  set(need_z3 TRUE)
-else()
-  set(need_z3 FALSE)
-endif()
-
-if(need_z3)
-  find_package(Z3 4.7.1)
-  if (NOT Z3_FOUND)
-    message(WARNING "Z3 >= 4.7.1 has not been found in LLVM_Z3_INSTALL_DIR: ${LLVM_Z3_INSTALL_DIR}.")
-  endif()
-endif()
-
-
-set(LLVM_LIBRARIES
-  LLVMCore LLVMSupport LLVMAnalysis LLVMipo LLVMIRReader
-  LLVMBitReader LLVMBitWriter LLVMTransformUtils LLVMScalarOpts
-  LLVMLTO
-)
-
-list(APPEND PROJECT_LIBRARIES ${LLVM_LIBRARIES})
-list(APPEND PROJECT_DEFINITIONS ${LLVM_DEFINITIONS})
-list(APPEND PROJECT_INCLUDEDIRECTORIES ${LLVM_INCLUDE_DIRS})
-
-# xed
-find_package(XED REQUIRED)
-list(APPEND PROJECT_LIBRARIES ${XED_LIBRARIES})
-list(APPEND PROJECT_INCLUDEDIRECTORIES ${XED_INCLUDE_DIRS})
-
-# google log module
-find_package(glog REQUIRED)
-list(APPEND PROJECT_LIBRARIES glog::glog)
-
-# gflags
-find_package(gflags REQUIRED)
-list(APPEND PROJECT_LIBRARIES gflags)
 
 #
 # target settings

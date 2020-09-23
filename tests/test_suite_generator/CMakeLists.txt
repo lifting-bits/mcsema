@@ -358,7 +358,7 @@ find_program(MCSEMALIFT_PATH "mcsema-lift${LLVM_VERSION_SUFFIX}")
 if ("${MCSEMALIFT_PATH}" STREQUAL "MCSEMALIFT_PATH-NOTFOUND")
   message(FATAL_ERROR "Failed to locate the mcsema-lift${LLVM_VERSION_SUFFIX} executable!")
 endif ()
-set(MCSEMALIFT_EXE "${MCSEMALIFT_PATH}/mcsema-lift${LLVM_VERSION_SUFFIX}")
+set(MCSEMALIFT_EXE "${MCSEMALIFT_PATH}")
 
 find_program(IDAT64_PATH "idat64")
 if ("${IDAT64_PATH}" STREQUAL "IDAT64_PATH-NOTFOUND")
@@ -372,11 +372,11 @@ if ("${IDAT64_PATH}" STREQUAL "IDAT64_PATH-NOTFOUND")
   endif()
 endif ()
 
-find_program(MCSEMADISASS_PATH "mcsema-disass")
+find_program(MCSEMADISASS_PATH "mcsema-disass$")
 if ("${MCSEMADISASS_PATH}" STREQUAL "MCSEMADISASS_PATH-NOTFOUND")
   message(FATAL_ERROR "Failed to locate the mcsema-disass executable!")
 endif ()
-set(MCSEMADISASS_EXE "${MCSEMADISASS_PATH}/mcsema-disass")
+set(MCSEMADISASS_EXE "${MCSEMADISASS_PATH}")
 
 message("Toolset")
 message(" > mcsema-lift: ${MCSEMALIFT_EXE}")
@@ -391,8 +391,12 @@ message(" > mcsema-disass: ${MCSEMADISASS_EXE}")
 set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/test_suite")
 
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)|(x86_64)")
-  set(ARCHITECTURE_LIST x86 amd64)
-  
+  if(APPLE)
+    set(ARCHITECTURE_LIST amd64)
+  else()
+    set(ARCHITECTURE_LIST x86 amd64)
+  endif()
+
 elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "ARM")
   set(ARCHITECTURE_LIST aarch64)
 

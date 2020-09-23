@@ -88,12 +88,8 @@ llvm::Constant *LiftXrefInData(const NativeSegment *cfg_seg, uint64_t ea,
     auto [offset, type] =
         remill::BuildIndexes(dl, seg_type, 0, goal_offset, gep_index_list);
 
-    ptr = seg_var;
-    if (offset) {
-      (void) type;
-      ptr = llvm::ConstantExpr::getInBoundsGetElementPtr(seg_type, seg_var,
-                                                         gep_index_list);
-    }
+    ptr = llvm::ConstantExpr::getInBoundsGetElementPtr(seg_type, seg_var,
+                                                       gep_index_list);
 
     if (offset < goal_offset) {
       auto i8_type = llvm::Type::getInt8Ty(*gContext);

@@ -175,7 +175,6 @@ _REFS = {}
 _HAS_NO_REFS = set()
 _NO_REFS = tuple()
 _ENABLE_CACHING = False
-_BAD_ARM_REF_OFF = (idc.BADADDR, 0)
 _NOT_A_REF = set()
 
 # Remove a reference from `from_ea` to `to_ea`.
@@ -274,7 +273,7 @@ def _get_ref_candidate(inst, op, all_refs, binary_is_pie):
 
   if is_invalid_ea(addr_val) \
     or idc.get_segm_name(idc.get_segm_start(addr_val)) in ["LOAD"]:
-    
+
     # The `addr_val` that we get might actually be a value that is relative to
     # a base address. For example, in IDA we might see:
     #
@@ -349,7 +348,7 @@ def _get_ref_candidate(inst, op, all_refs, binary_is_pie):
 
   # WTF(pag): This silently kills IDA.
   # idc.add_dref(inst.ea, addr_val, idc.XREF_USER)
-
+    
   return ref
 
 def memop_is_actually_displacement(inst):
@@ -375,9 +374,11 @@ def enable_reference_caching():
 
 _FIXUPS = []
 
+_IMM_AS_DISPLACEMENT_OPS = ("ADRP", "ADR", "SETHI")
+
 # Get a list of references from an instruction.
 def get_instruction_references(arg, binary_is_pie=False):
-  global _ENABLE_CACHING, _NOT_A_REF, _FIXUPS
+  global _ENABLE_CACHING, _NOT_A_REF, _FIXUPS, _IMM_AS_DISPLACEMENT_OPS
 
   inst = arg
   if isinstance(arg, (int, long)):
@@ -433,20 +434,20 @@ def get_instruction_references(arg, binary_is_pie=False):
         idaapi.del_cref(op_ea, op.value, False)
         continue
 
-      # If this is a PIE-mode, 64-bit binary, then most likely the immediate
-      # operand is not a data ref. 
-      if seg_begin.use64() and binary_is_pie:
-        idaapi.del_dref(op_ea, op.value)
-        idaapi.del_cref(op_ea, op.value, False)
-        continue
-
       # In the special case of "ADR" and "ADRP" instructions for aarch64
       # IDA infers the absolute immediate value to assign as op_type, rather
       # than characterizing it as a displacement from PC
-      if idc.print_insn_mnem(inst.ea) in ["ADRP", "ADR"]:
-         ref.type = Reference.DISPLACEMENT
+      if idc.print_insn_mnem(inst.ea) in _IMM_AS_DISPLACEMENT_OPS:
+        ref.type = Reference.DISPLACEMENT
       else:
-         ref.type = Reference.IMMEDIATE
+        ref.type = Reference.IMMEDIATE
+
+        # If this is a PIE-mode, 64-bit binary, then most likely the immediate
+        # operand is not a data ref. 
+        if seg_begin.use64() and binary_is_pie:
+          idaapi.del_dref(op_ea, op.value)
+          idaapi.del_cref(op_ea, op.value, False)
+          continue
 
       ref.symbol = get_symbol_name(op_ea, ref.ea)
 

@@ -76,7 +76,9 @@ def fixup_function_return_address(inst, next_ea):
   return next_ea
 
 
+_BAD_ARM_REF_OFF = (idc.BADADDR, 0, 0)
 _INVALID_THUNK_ADDR = (False, idc.BADADDR)
+
 
 def is_ELF_thunk_by_structure(ea):
   """Try to manually identify an ELF thunk by its structure."""
@@ -109,13 +111,18 @@ def is_ELF_thunk_by_structure(ea):
 _ARM_REF_CANDIDATES = set()
 
 def _get_arm_ref_candidate(mask, op_val, op_str, all_refs):
+  from util import *
   global _BAD_ARM_REF_OFF, _ARM_REF_CANDIDATES
 
   try:
     op_name = op_str.split("@")[0][1:]  # `#asc_400E5C@PAGE` -> `asc_400E5C`.
+    op_name = op_name.split("#")[-1]
+    op_name = op_name.split("+")[0]
+    op_name = op_name.split("(")[-1]
     ref_ea = idc.get_name_ea_simple(op_name)
-    if (ref_ea & mask) == op_val:
-      return ref_ea, mask, 0
+
+    #if (ref_ea & mask) == op_val:
+    return ref_ea, mask, 0
   except:
     pass
 
@@ -149,10 +156,10 @@ def try_get_ref_addr(inst, op, op_val, all_refs, _NOT_A_REF):
 
   from util import *
 
-  if op.type not in (idc.o_imm, idc.o_displ):
+  #if op.type not in (idc.o_imm, idc.o_displ):
     # This is a reference type that the other ref tracking code
     # can handle, return defaults
-    return op_val, 0, 0
+  #  return op_val, 0, 0
 
   op_str = idc.print_operand(inst.ea, op.n)
 
