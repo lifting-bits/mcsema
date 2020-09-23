@@ -22,11 +22,11 @@ from setuptools import setup, find_packages
 
 setup(name="mcsema-disass",
       description="Binary program disassembler for McSema.",
-      version="2.0",
+      version="3.0",
       url="https://github.com/lifting-bits/mcsema",
       author="Trail of Bits",
       author_email="mcsema@trailofbits.com",
-      license='Apache 2.0',
+      license='AGPLv3',
       packages=['mcsema_disass', 'mcsema_disass.ida7', 'mcsema_disass.defs'],
       install_requires=['protobuf==3.2.0', 'python-magic'],
       package_data={
