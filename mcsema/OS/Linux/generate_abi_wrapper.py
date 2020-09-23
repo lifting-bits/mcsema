@@ -186,9 +186,9 @@ def write_library_file(hfile, outfile):
     libc_type = 'c++' if ABI_LIBRARY_TYPE == "cpp" else 'c'
     pass
 
-  if libc_type is 'c':
+  if libc_type == 'c':
     write_cc_file(hfile, outfile)
-  elif libc_type is 'c++':
+  elif libc_type == 'c++':
     write_cxx_file(hfile, outfile)
 
 def write_header_file(file, headers):

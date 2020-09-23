@@ -319,7 +319,7 @@ Make sure to always execute the `vcvars64.bat` script from the "x64 Native Tools
 mkdir remill_build
 cd remill_build
 
-cmake -G "Visual Studio 16 2019" -T llvm -A x64 -DCMAKE_BUILD_TYPE=Release -DLIBRARY_REPOSITORY_ROOT=C:\Projects\tob_libraries -DCMAKE_INSTALL_PREFIX=C:\ ..\remill
+cmake -G "Visual Studio 16 2019" -T llvm -A x64 -DCMAKE_BUILD_TYPE=Release -DCXX_COMMON_REPOSITORY_ROOT=C:\Projects\tob_libraries -DCMAKE_INSTALL_PREFIX=C:\ ..\remill
 cmake --build . --config Release -- /maxcpucount:%NUMBER_OF_PROCESSORS%
 ```
 
