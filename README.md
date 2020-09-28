@@ -11,7 +11,7 @@ McSema enables analysts to find and retroactively harden binary programs against
 
 McSema supports lifting both Linux (ELF) and Windows (PE) executables, and understands most x86 and amd64 instructions, including integer, X87, MMX, SSE and AVX operations. AARCH64 (ARMv8) instruction support is in active development.
 
-Using McSema is a two-step process: control flow recovery, and instruction translation. Control flow recovery is performed using the `mcsema-disass` tool, which relies on IDA Pro, Binary Ninja, or DynInst to disassemble a binary file and produce a control flow graph. Instruction translation is then performed using the `mcsema-lift` tool, which converts the control flow graph into LLVM bitcode. Under the hood, the instruction translation capability of `mcsema-lift` is implemented in the [`remill` library](https://github.com/lifting-bits/remill). The development of `remill` was a result of refactoring and improvements to McSema, and was first introduced with McSema version 2.0.0. Read more about `remill` [here](https://github.com/lifting-bits/remill).
+Using McSema is a two-step process: control flow recovery, and instruction translation. Control flow recovery is performed using the `mcsema-disass` tool, which relies on IDA Pro to disassemble a binary file and produce a control flow graph. Instruction translation is then performed using the `mcsema-lift` tool, which converts the control flow graph into LLVM bitcode. Under the hood, the instruction translation capability of `mcsema-lift` is implemented in the [`remill` library](https://github.com/lifting-bits/remill). The development of `remill` was a result of refactoring and improvements to McSema, and was first introduced with McSema version 2.0.0. Read more about `remill` [here](https://github.com/lifting-bits/remill).
 
 McSema and `remill` were developed and are maintained by Trail of Bits, funded by and used in research for DARPA and the US Department of Defense.
 
@@ -53,7 +53,7 @@ Why would anyone translate binaries *back* to bitcode?
 |  Builds with CI? | Yes | No | No | Yes | No | No | Yes | Maybe | Maybe | No | No |
 |  32-bit architectures | x86 | x86 | ARM | x86, ARM, MIPS, PIC32, PowerPC |  | ARM, MIPS | S2E | S2E | S2E | ARM, x86 |  |
 |  64-bit architectures | x86-64, AArch64 | x86-64, [AArch64](https://github.com/IAIK/ios-analysis-dagger/)) | x86-64 | x86-64, arm64 & more | x86-64 | x86-64 |  | S2E | S2E | PowerPC | x86-64 |
-|  Control-flow recovery | IDA Pro, Binary Ninja, DynInst | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | McSema | Ad-hoc | Ad-hoc |
+|  Control-flow recovery | IDA Pro | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | McSema | Ad-hoc | Ad-hoc |
 |  File formats | ELF, PE | ELF, Mach-O |  | ELF, PE, Mach-O, COFF, AR, Intel HEX, Raw | ELF | ELF | ELF |  | ELF, PE | ELF, Mach-O (maybe) | ELF |
 |  Bitcode is executable? | Yes | Yes | Yes | Yes | Yes | Yes | No | No | CGC | No | No |
 |  C++ exceptions suport? | Yes | No | No | No | No | Indirectly | No | No | No | No | Maybe |
@@ -82,8 +82,9 @@ Why would anyone translate binaries *back* to bitcode?
 | [python-clang](https://pypi.org/project/clang/) | 3.5.0 |
 | [ccsyspath](https://pypi.org/project/ccsyspath/) | 1.1.0 |
 | [IDA Pro](https://www.hex-rays.com/products/ida) | 7.1+ |
-| [Binary Ninja](https://binary.ninja/) | Latest |
-| [Dyninst](https://www.dyninst.org/) | 9.3.2 |
+| [Dyninst](https://www.dyninst.org/) | 9.3.2 * |
+
+* DynInst support is optional if you use the experimental DynInst disassembler. Note: We do not provide support for the DynInst disassembler.
 
 ## Getting and building the code
 
@@ -98,12 +99,7 @@ cd mcsema
 
 #### Step 2: Add your disassembler to the Dockerfile
 
-Currently IDA, Binary Ninja, and Dyninst are supported for control-flow recovery, it's left as an exercise to the reader to install your disassembler of choice, but an example of installing Binary Ninja is provided (remember for Docker that paths need to be relative to where you built from):
-```
-ADD local-relative/path/to/binaryninja/ /root/binaryninja/
-ADD local-relative/path/to/.binaryninja/ /root/.binaryninja/ # <- Make sure there's no `lastrun` file
-RUN /root/binaryninja/scripts/linux-setup.sh
-```
+Currently IDA is the only supported frontend for control-flow recovery, it's left as an exercise to the reader to install your disassembler of choice. Experimental support for DynInst is available but may be buggy and sometimes get out of date, as we do not officially support it. DynInst support is provided as an exemplar of how to make a third-party disassembler.
 
 #### Step 3: Build & Run Dockerfile
 
@@ -387,7 +383,7 @@ This is a hotly contested issue. We must explore the etymology of the name to fi
 
 ### Why do I need IDA Pro to use McSema
 
-You don't! You can also use Binary Ninja or [Dyninst](tools/mcsema_disass/dyninst/README.md) to fill the role of IDA Pro; however, in our experiments, IDA Pro tends to be most reliable and both the product itself, and our scripts using it, have more person-years of development behind them.
+IDA Pro is an excellent disassembler, and in our experience, it has been the most reliable disassembler to use in McSema. The way in which IDA Pro exposes information about cross-references closely matches how McSema stores that information in its CFG file, which is convenient. We also feature an experimental, not officially supported [DynInst disassembler frontend](tools/mcsema_disass/dyninst/README.md). This frontent exists mostly to support open-source uses cases, but is not actively maintained, and may be out of date. The Dyninst frontend is a good example of how to make a new frontend.
 
 ### What is Remill, and why does McSema need it
 
