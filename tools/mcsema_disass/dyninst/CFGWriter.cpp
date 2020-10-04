@@ -1227,9 +1227,12 @@ bool CFGWriter::IsExternal(Address addr) const {
 // TODO(lukas): We may need mark offset tables entries as well.
 void CFGWriter::ComputeBBAttributes() {
   std::unordered_map<uint64_t, mcsema::Block *> bbs;
-  for (auto &cfg_fn : *module.mutable_funcs())
-    for (auto &cfg_bb : *cfg_fn.mutable_blocks())
+  for (auto &cfg_fn : *module.mutable_funcs()) {
+    for (auto &cfg_bb : *cfg_fn.mutable_blocks()) {
       bbs.emplace(cfg_bb.ea(), &cfg_bb);
+      cfg_bb.set_is_referenced_by_data(false);
+    }
+  }
 
   for (auto &[ea, cfg_dref] : ctx.data_xrefs) {
     auto it = bbs.find(cfg_dref->target_ea());
