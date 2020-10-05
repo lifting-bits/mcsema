@@ -29,7 +29,10 @@ set(MCSEMA_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
 
 option(MCSEMA_ENABLE_RUNTIME "Should runtimes for re-compilation of bitcode be produced?" ON)
 option(MCSEMA_INSTALL_PYTHON2_LIBS "Install Python 2 libraries" ON)
-option(MCSEMA_INSTALL_PYTHON3_LIBS "Install Python 3 libraries" ON)
+find_package(Python3 QUIET)
+if(Python3_FOUND)
+  option(MCSEMA_INSTALL_PYTHON3_LIBS "Install Python 3 libraries" ON)
+endif()
 
 # warnings and compiler settings
 if(NOT DEFINED WIN32)
