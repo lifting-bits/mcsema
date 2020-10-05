@@ -28,6 +28,8 @@ FindAndSelectClangCompiler()
 set(MCSEMA_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
 
 option(MCSEMA_ENABLE_RUNTIME "Should runtimes for re-compilation of bitcode be produced?" ON)
+option(MCSEMA_INSTALL_PYTHON2_LIBS "Install Python 2 libraries" ON)
+option(MCSEMA_INSTALL_PYTHON3_LIBS "Install Python 3 libraries" ON)
 
 # warnings and compiler settings
 if(NOT DEFINED WIN32)
@@ -114,6 +116,7 @@ add_executable(${MCSEMA_LIFT}
   tools/mcsema_lift/Lift.cpp
 )
 
+
 # Copy mcsema-disass in
 add_custom_command(
   TARGET protobuf_python_module_ida POST_BUILD
@@ -152,6 +155,61 @@ if(NOT TARGET anvill-${REMILL_LLVM_VERSION})
   endif()
 endif()
 list(APPEND PROJECT_LIBRARIES anvill-${REMILL_LLVM_VERSION})
+
+# mcsema-disass
+
+set(MCSEMA_PYTHON_SOURCES
+    tools/setup.py
+    tools/mcsema_disass/__init__.py
+    tools/mcsema_disass/__main__.py
+    tools/mcsema_disass/ida7/__init__.py
+    tools/mcsema_disass/ida7/anvill_compat.py
+    tools/mcsema_disass/ida7/arm_util.py
+    tools/mcsema_disass/ida7/CFG_pb2.py
+    tools/mcsema_disass/ida7/disass.py
+    tools/mcsema_disass/ida7/exception.py
+    tools/mcsema_disass/ida7/flow.py
+    tools/mcsema_disass/ida7/get_cfg.py
+    tools/mcsema_disass/ida7/refs.py
+    tools/mcsema_disass/ida7/segment.py
+    tools/mcsema_disass/ida7/table.py
+    tools/mcsema_disass/ida7/util.py
+    tools/mcsema_disass/ida7/x86_util.py
+)
+
+if(MCSEMA_INSTALL_PYTHON2_LIBS)
+  add_custom_target(build_mcsema_disass_python2
+    DEPENDS ${MCSEMA_PYTHON_SOURCES})
+    
+  add_custom_command(
+      TARGET build_mcsema_disass_python2 POST_BUILD
+      COMMAND which python2 && python2 setup.py build --force
+      COMMENT "Building McSema Python 2 mcsema-disass"
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tools")
+
+  add_dependencies(${MCSEMA_LIFT}
+    build_mcsema_disass_python2)
+
+  add_dependencies(build_mcsema_disass_python2
+    protobuf_python_module_ida)
+endif()
+
+if(MCSEMA_INSTALL_PYTHON3_LIBS)
+  add_custom_target(build_mcsema_disass_python3
+    DEPENDS ${MCSEMA_PYTHON_SOURCES})
+    
+  add_custom_command(
+      TARGET build_mcsema_disass_python3 POST_BUILD
+      COMMAND which python3 && python3 setup.py build --force
+      COMMENT "Building McSema Python 3 mcsema-disass"
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tools")
+
+  add_dependencies(${MCSEMA_LIFT}
+    build_mcsema_disass_python3)
+
+  add_dependencies(build_mcsema_disass_python3
+    protobuf_python_module_ida)
+endif()
 
 #
 # target settings
@@ -213,17 +271,6 @@ install(
   LIBRARY DESTINATION "${install_folder}/lib"
 )
 
-set(python_package_installer "${CMAKE_CURRENT_SOURCE_DIR}/tools/setup_launcher")
-
-if(DEFINED WIN32)
-  string(REPLACE "/" "\\" python_package_install_path "${install_folder}")
-  set(python_package_installer "${python_package_installer}.bat")
-  set(optional_interpreter "cmd.exe /C")
-else()
-  set(python_package_install_path "${install_folder}")
-  set(python_package_installer "${python_package_installer}.sh")
-endif()
-
 # target for dyninst frontend
 if (DEFINED BUILD_MCSEMA_DYNINST_DISASS)
     if(${BUILD_MCSEMA_DYNINST_DISASS} EQUAL 1)
@@ -231,12 +278,27 @@ if (DEFINED BUILD_MCSEMA_DYNINST_DISASS)
     endif()
 endif()
 
-install(CODE
-  "execute_process(COMMAND ${optional_interpreter} \"${python_package_installer}\" \"${python_package_install_path}\" WORKING_DIRECTORY \"${PROJECT_SOURCE_DIR}/tools\" RESULT_VARIABLE exit_code)
-   if(NOT exit_code EQUAL 0)
-     message(FATAL_ERROR \"Failed to install the Python package\")
-   endif()"
-)
+set(python_package_installer "${CMAKE_CURRENT_SOURCE_DIR}/tools/setup_launcher")
+if(DEFINED WIN32)
+  string(REPLACE "/" "\\" python_package_install_path "${install_folder}")
+  set(python_package_installer2 "${python_package_installer}.bat")
+  set(python_package_installer3 "${python_package_installer}.bat")
+  set(optional_interpreter "cmd.exe /C")
+else()
+  set(python_package_install_path "${install_folder}")
+  set(python_package_installer2 "${python_package_installer}_py2.sh")
+  set(python_package_installer3 "${python_package_installer}_py3.sh")
+endif()
+
+if(MCSEMA_INSTALL_PYTHON2_LIBS)
+  install(CODE
+    "execute_process(COMMAND ${optional_interpreter} \"${python_package_installer2}\" \"${python_package_install_path}\"\nWORKING_DIRECTORY \"${PROJECT_SOURCE_DIR}/tools\"\nRESULT_VARIABLE exit_code2)\n   if(NOT exit_code2 EQUAL 0)\n       message(FATAL_ERROR \"Failed to install the Python 2 package\")\n     endif()")
+endif()
+
+if(MCSEMA_INSTALL_PYTHON3_LIBS)
+  install(CODE
+    "execute_process(COMMAND ${optional_interpreter} \"${python_package_installer3}\" \"${python_package_install_path}\"\nWORKING_DIRECTORY \"${PROJECT_SOURCE_DIR}/tools\"\nRESULT_VARIABLE exit_code3)\n   if(NOT exit_code3 EQUAL 0)\n       message(FATAL_ERROR \"Failed to install the Python 3 package\")\n     endif()")
+endif()
 
 add_subdirectory(examples)
 

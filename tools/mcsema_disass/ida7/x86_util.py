@@ -139,7 +139,9 @@ _INVALID_THUNK_ADDR = (False, idc.BADADDR)
 
 def is_ELF_thunk_by_structure(ea):
   """Try to manually identify an ELF thunk by its structure."""
-  from util import *
+  from util import decode_instruction, is_direct_jump, is_indirect_jump
+  from util import is_invalid_ea, get_reference_target
+  
   global _INVALID_THUNK_ADDR
   
   seg_name = idc.get_segm_name(ea).lower()  

@@ -82,7 +82,8 @@ _INVALID_THUNK_ADDR = (False, idc.BADADDR)
 
 def is_ELF_thunk_by_structure(ea):
   """Try to manually identify an ELF thunk by its structure."""
-  from util import *
+  from util import decode_instruction, is_direct_jump, is_indirect_jump
+  from util import is_invalid_ea, get_reference_target
   global _INVALID_THUNK_ADDR
   inst = None
   
@@ -111,7 +112,6 @@ def is_ELF_thunk_by_structure(ea):
 _ARM_REF_CANDIDATES = set()
 
 def _get_arm_ref_candidate(mask, op_val, op_str, all_refs):
-  from util import *
   global _BAD_ARM_REF_OFF, _ARM_REF_CANDIDATES
 
   try:
@@ -154,7 +154,7 @@ def _get_arm_ref_candidate(mask, op_val, op_str, all_refs):
 def try_get_ref_addr(inst, op, op_val, all_refs, _NOT_A_REF):
   global _BAD_ARM_REF_OFF
 
-  from util import *
+  from util import is_invalid_ea
 
   #if op.type not in (idc.o_imm, idc.o_displ):
     # This is a reference type that the other ref tracking code
@@ -167,7 +167,7 @@ def try_get_ref_addr(inst, op, op_val, all_refs, _NOT_A_REF):
     return _get_arm_ref_candidate(4095, op_val, op_str, all_refs)
 
   elif '@PAGE' in op_str:
-    return _get_arm_ref_candidate(-4096L, op_val, op_str, all_refs)
+    return _get_arm_ref_candidate(-4096, op_val, op_str, all_refs)
 
   elif not is_invalid_ea(op_val) and inst.get_canon_mnem().lower() == "adr":
     return op_val, 0, 0

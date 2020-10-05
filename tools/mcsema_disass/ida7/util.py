@@ -22,6 +22,7 @@ import struct
 import inspect
 import ida_ua
 import ida_bytes
+import sys
 
 _DEBUG_FILE = None
 _DEBUG_PREFIX = ""
@@ -47,6 +48,12 @@ if IS_ARM:
 else:
   from x86_util import *
 
+
+if sys.version_info[0] < 3:
+  INT_TYPES = (int, long)
+else:
+  INT_TYPES = int
+
 def INIT_DEBUG_FILE(file):
   global _DEBUG_FILE
   _DEBUG_FILE = file
@@ -65,11 +72,15 @@ def DEBUG(s):
     _DEBUG_FILE.write("{}{}\n".format(_DEBUG_PREFIX, str(s)))
 
 # Python 2.7's xrange doesn't work with `long`s.
-def xrange(begin, end=None, step=1):
-  if end:
-    return iter(itertools.count(begin, step).next, end)
-  else:
-    return iter(itertools.count().next, begin)
+if sys.version_info[0] < 3:
+  def xrange(begin, end=None, step=1):
+    begin, step = long(begin), long(step)
+    if end:
+      return iter(itertools.count(begin, step).next, long(end))
+    else:
+      return iter(itertools.count().next, begin)
+else:
+  xrange = range
 
 _NOT_INST_EAS = set()
 
@@ -152,14 +163,14 @@ def mark_as_not_code(ea):
   _NOT_INST_EAS.add(ea)
 
 def read_bytes_slowly(start, end):
-  bytestr = []
+  bytestr = bytearray()
   for i in xrange(start, end):
     if idc.has_value(idc.get_full_flags(i)):
       bt = idc.get_wide_byte(i)
-      bytestr.append(chr(bt))
+      bytestr.append(bt)
     else:
-      bytestr.append("\x00")
-  return "".join(bytestr)
+      bytestr.append(0)
+  return bytes(bytestr)
 
 def read_byte(ea):
   byte = read_bytes_slowly(ea, ea + 1)
@@ -216,7 +227,8 @@ def read_pointer(ea):
 
 def instruction_personality(arg):
   global PERSONALITIES, PERSONALITY_NORMAL
-  if isinstance(arg, (int, long)):
+  global INT_TYPES
+  if isinstance(arg, INT_TYPES):
     arg, _ = decode_instruction(arg)
   if arg:
     p = PERSONALITIES.get(arg.itype, PERSONALITY_NORMAL)
@@ -422,7 +434,7 @@ def get_address_size_in_bits():
     return 32
 
 def get_address_size_in_bytes():
-  return get_address_size_in_bits() / 8
+  return get_address_size_in_bits() // 8
 
 _FORCED_NAMES = {}
 
@@ -739,7 +751,7 @@ def remove_all_refs(ea):
 def is_thunk(ea):
   """Returns true if some address is a known to IDA to be a thunk."""
   flags = idc.get_func_attr(ea, idc.FUNCATTR_FLAGS)
-  return (idc.BADADDR != flags) and 0 < flags and 0 != (flags & 0x00000080L)
+  return (idc.BADADDR != flags) and 0 < flags and 0 != (flags & 0x00000080)
 
 def is_referenced(ea):
   """Returns `True` if the data at `ea` is referenced by something else."""

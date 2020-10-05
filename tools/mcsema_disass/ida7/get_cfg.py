@@ -33,7 +33,6 @@ from table import *
 from flow import *
 from refs import *
 from segment import *
-from collect_variable import *
 from exception import *
 
 # Bring in Anvill
