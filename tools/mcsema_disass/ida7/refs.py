@@ -90,7 +90,7 @@ def _is_address_of_struct_field(ea):
   # Figure out the offset of `ea` within its structure, which may belong to
   # an array of structures, and then check if that offset is associated with
   # a named field.
-  arr_index = int((ea - prev_head_ea) / struct_size)
+  arr_index = int((ea - prev_head_ea) // struct_size)
   struct_begin_ea = (arr_index & struct_size) + prev_head_ea
   off_in_struct = ea - struct_begin_ea
   if not idc.get_member_name(oi.tid, off_in_struct):
@@ -141,7 +141,7 @@ def _try_create_array(ea, max_num_entries=8):
   
   if item_size not in (4, 8) \
   or 0 != (diff % item_size) \
-  or max_num_entries < (diff / item_size):
+  or max_num_entries < (diff // item_size):
     return False
 
   next_next_head_ea = idc.next_head(next_head_ea, seg_end_ea)
@@ -379,9 +379,10 @@ _IMM_AS_DISPLACEMENT_OPS = ("ADRP", "ADR", "SETHI")
 # Get a list of references from an instruction.
 def get_instruction_references(arg, binary_is_pie=False):
   global _ENABLE_CACHING, _NOT_A_REF, _FIXUPS, _IMM_AS_DISPLACEMENT_OPS
+  global INT_TYPES
 
   inst = arg
-  if isinstance(arg, (int, long)):
+  if isinstance(arg, INT_TYPES):
     inst, _ = decode_instruction(arg)
   
   if not inst:

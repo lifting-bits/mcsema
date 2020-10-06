@@ -36,7 +36,7 @@ jobs:
     - name: Test final Docker image
       run: |
         docker run --rm docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest --version
-        docker run --rm --entrypoint=mcsema-disass docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest --help
+        docker run --rm --entrypoint=mcsema-disass-2 docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest --help
     - name: Push Image for LLVM ${{ matrix.llvm }} on ${{ matrix.ubuntu }}
       if: github.event_name == 'push' && github.ref == 'refs/heads/master'
       run: |

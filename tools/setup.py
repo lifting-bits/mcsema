@@ -16,13 +16,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import sys
+
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 from setuptools import setup, find_packages
 
 setup(name="mcsema-disass",
       description="Binary program disassembler for McSema.",
-      version="3.0",
+      version="3.0.{}.{}".format(sys.version_info.major, sys.version_info.minor),
       url="https://github.com/lifting-bits/mcsema",
       author="Trail of Bits",
       author_email="mcsema@trailofbits.com",
@@ -33,5 +35,8 @@ setup(name="mcsema-disass",
         "mcsema_disass.defs": ["linux.txt", "windows.txt"]},
       entry_points={
         "console_scripts": [
-          "mcsema-disass = mcsema_disass.__main__:main"
+          "mcsema-disass = mcsema_disass.__main__:main",
+          "mcsema-disass-{} = mcsema_disass.__main__:main".format(sys.version_info.major),
+          "mcsema-disass-{}.{} = mcsema_disass.__main__:main".format(sys.version_info.major,
+                                                                     sys.version_info.minor),
         ]})
