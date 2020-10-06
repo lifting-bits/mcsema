@@ -16,7 +16,6 @@
 from table import *
 from exception import *
 from refs import *
-import sys
 
 # Addresses of the first instruction in a function.
 _FUNC_HEAD_EAS = set()
