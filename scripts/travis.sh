@@ -269,14 +269,6 @@ linux_build_helper() {
   local log_file=`mktemp`
 
   printf " > Cloning remill...\n"
-  local remill_commit_id=`cat .remill_commit_id`
-  if [ $? -ne 0 ] ; then
-    printf " x Failed to read the Remill commit id from file. Error output follows:\n"
-    printf "===\n"
-    cat "${log_file}"
-    return 1
-  fi
-
   git clone "https://github.com/lifting-bits/remill.git" > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to clone the remill repository. Error output follows:\n"
@@ -284,17 +276,11 @@ linux_build_helper() {
     cat "${log_file}"
     return 1
   fi
-
-  ( cd remill && git checkout -b temp $remill_commit_id ) > "${log_file}" 2>&1
-  if [ $? -ne 0 ] ; then
-    printf " x Failed to switch to the correct remill commit. Error output follows:\n"
-    printf "===\n"
-    cat "${log_file}"
-    return 1
-  fi
+  
+  cd remill
 
   # we are supposed to put mcsema inside the remill folder
-  mkdir "remill/tools/mcsema" > "${log_file}" 2>&1
+  mkdir -p "remill/tools/mcsema" > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to create the remill/tools/mcsema folder. Error output follows:\n"
     printf "===\n"
@@ -303,7 +289,7 @@ linux_build_helper() {
   fi
 
   printf " > Copying the mcsema folder...\n"
-  local file_list=( "cmake" "tools" "examples" "scripts" "tests" "docs" "mcsema" "generated" ".remill_commit_id" "CMakeLists.txt" "README.md" "CONTRIBUTING.md" ".gdbinit" "LICENSE" "ACKNOWLEDGEMENTS.md" ".gitignore" ".travis.yml" )
+  local file_list=( "cmake" "tools" "examples" "scripts" "tests" "docs" "mcsema" "generated" "CMakeLists.txt" "README.md" "CONTRIBUTING.md" ".gdbinit" "LICENSE" "ACKNOWLEDGEMENTS.md" ".gitignore" ".travis.yml" )
   for file_name in "${file_list[@]}" ; do
     cp -r "${file_name}" "remill/tools/mcsema" > "${log_file}" 2>&1
     if [ $? -ne 0 ] ; then

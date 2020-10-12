@@ -47,6 +47,7 @@ tools/regtrace/obj-intel64/*
 third_party/*
 generated/*
 cxxcommon
+cxx-common
 
 tools/build/*
 tools/dist/*
@@ -57,6 +58,12 @@ tools/mcsema_disass/binja/CFG_pb2.py
 #ignore test binaries, only keep CFGs in git
 tests/linux/x86/*.elf
 tests/linux/amd64/*.elf
+
+.DS_Store
+.project
+.cproject
+.settings
+.idea
 
 #==============================================================================#
 # Directories to ignore (do not add trailing '/'s, they skip symlinks).
@@ -69,3 +76,10 @@ package
 
 # Ignore local binary ninja installations
 binaryninja
+
+#ignore vscode dir
+.vscode
+
+#ignore generated version files
+VERSION
+

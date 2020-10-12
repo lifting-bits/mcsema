@@ -56,28 +56,28 @@ endfunction()
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.c ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.h
   DEPENDS ${source_file}
-  COMMAND env TRAILOFBITS_LIBRARIES=${LIBRARY_REPOSITORY_ROOT} python3 ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py
+  COMMAND env TRAILOFBITS_LIBRARIES=${CXX_COMMON_REPOSITORY_ROOT} python3 ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py
   		--arch "amd64" --type "c" --input ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.pph --output ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.c 
 )
 
 #add_custom_command(
 #  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc_x86.c ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.h
 #  DEPENDS ${source_file}
-#  COMMAND env TRAILOFBITS_LIBRARIES=${LIBRARY_REPOSITORY_ROOT} python3 ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py 
+#  COMMAND env TRAILOFBITS_LIBRARIES=${CXX_COMMON_REPOSITORY_ROOT} python3 ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py 
 #        --arch "x86" --type "c" --input ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.pph --output ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc_x86.c
 #)
 
 #add_custom_command(
 #  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libcpp_amd64.c
 #  DEPENDS ${source_file}
-#  COMMAND env TRAILOFBITS_LIBRARIES=${LIBRARY_REPOSITORY_ROOT} python ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py 
+#  COMMAND env TRAILOFBITS_LIBRARIES=${CXX_COMMON_REPOSITORY_ROOT} python ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py 
 #  		--arch "amd64" --type "cpp" --input ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.pph --output ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libcpp_amd64.c 
 #)
 
 #add_custom_command(
 #  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libcpp_x86.c
 #  DEPENDS ${source_file}
-#  COMMAND env TRAILOFBITS_LIBRARIES=${LIBRARY_REPOSITORY_ROOT} python ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py 
+#  COMMAND env TRAILOFBITS_LIBRARIES=${CXX_COMMON_REPOSITORY_ROOT} python ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py 
 #        --arch "x86" --type "cpp" --input ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.pph --output ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libcpp_x86.c
 #)
 

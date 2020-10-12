@@ -86,11 +86,14 @@ def find_linear_terminator(ea, max_num=256):
 
   return term_inst, inst_bytes
 
+
 def get_direct_branch_target(arg):
   """Tries to 'force' get the target of a direct or conditional branch.
   IDA can't always get code refs for flows from an instruction that appears
   inside another instruction (and so even seen by IDA in the first place)."""
-  if not isinstance(arg, (int, long)):
+  global INT_TYPES
+
+  if not isinstance(arg, INT_TYPES):
     branch_inst_ea = arg.ea
   else:
     branch_inst_ea = arg
@@ -109,8 +112,9 @@ def get_direct_branch_target(arg):
 def is_noreturn_inst(arg):
   """Returns `True` if the instruction `arg`, or at `arg`, will terminate
   control flow."""
+  global INT_TYPES
   inst = arg
-  if isinstance(arg, (int, long)):
+  if isinstance(arg, INT_TYPES):
     inst, _ = decode_instruction(arg)
 
   if is_direct_function_call(inst) or is_direct_jump(inst):

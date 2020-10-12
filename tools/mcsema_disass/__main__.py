@@ -102,6 +102,12 @@ def main():
       help="The entrypoint where disassembly should begin",
       required=False)
 
+  arg_parser.add_argument(
+      '--rebase',
+      help="Amount by which to rebase a binary",
+      required=False,
+      default=0)
+
   args, command_args = arg_parser.parse_known_args()
 
   if not os.path.isfile(args.binary):
@@ -174,7 +180,8 @@ def main():
         "--entrypoint", args.entrypoint,
         "--os", args.os,
         "--output", args.output,
-        "--binary", args.binary
+        "--binary", args.binary,
+        "--rebase", args.rebase
       ]
       subprocess.run(pass_args)
     else:

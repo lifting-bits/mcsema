@@ -19,25 +19,23 @@
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-
-#include <vector>
-
 #include <llvm/IR/Constants.h>
-#include <llvm/IR/Instructions.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
-#include "remill/Arch/Arch.h"
-#include "remill/BC/ABI.h"
-#include "remill/BC/Util.h"
-#include "remill/BC/Version.h"
+#include <vector>
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Callback.h"
 #include "mcsema/BC/Legacy.h"
 #include "mcsema/BC/Util.h"
+#include "remill/Arch/Arch.h"
+#include "remill/BC/ABI.h"
+#include "remill/BC/Util.h"
+#include "remill/BC/Version.h"
 
 DEFINE_string(pc_annotation, "",
               "Name of the metadata to apply to every LLVM instruction. The "

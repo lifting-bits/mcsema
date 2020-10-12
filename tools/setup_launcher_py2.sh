@@ -42,6 +42,7 @@ main() {
     fi
   fi
 
+
   local python_version=`"${python_interpreter}" --version 2>&1 | awk '{ print $2 }' | cut -d '.' -f 1-2`
   if [ "${python_version}" != "2.7" ]; then
     printf " x Python 2.7 was not found\n"
@@ -74,6 +75,7 @@ main() {
     return 1
   else
     printf " i Successfully installed\n"
+    rm "${temp_file}"
   fi
 
   return 0

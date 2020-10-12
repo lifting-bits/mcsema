@@ -88,7 +88,7 @@ class JumpTableBuilder(object):
 
   def read_entry(self, entry_ea):
     data = (self._READERS[self.entry_size])(entry_ea)
-    data &= ((1 << (self.entry_size * 8)) - 1)
+    data &= ((1 << int(self.entry_size * 8)) - 1)
     data += self.offset * self.offset_mult
     data &= 0xFFFFFFFFFFFFFFFF
     if 4 == self.entry_size and (self.offset & 0xFFFFFFFF) == self.offset:
@@ -290,7 +290,7 @@ def try_get_simple_jump_table_reader(builder):
           # Read the second entry from the table as a way of verifying our
           # guesses on things like the offset multiplier and entry multiplier.
           next_entry_addr = builder.table_ea + \
-                            (builder.entry_size * builder.entry_mult)
+                            int(builder.entry_size * builder.entry_mult)
 
           if _check_entry_target_ea(target_ea, min_ea, max_ea):
             target_ea = builder.read_entry(next_entry_addr)
@@ -339,7 +339,7 @@ def get_ida_jump_table_reader(builder, si):
   DEBUG("IDA inferred jump table entry size: {}".format(builder.entry_size))
   
   if builder.entry_size not in (4, 8):
-    builder.entry_size = get_address_size_in_bits() / 8
+    builder.entry_size = get_address_size_in_bits() // 8
     DEBUG("Using jump table entry size {} instead".format(builder.entry_size))
     
   # Check if this is an offset based jump table, and if so, create an

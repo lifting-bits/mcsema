@@ -17,19 +17,15 @@
 
 #include "mcsema/BC/Util.h"
 
-#include <glog/logging.h>
 #include <gflags/gflags.h>
-
-#include <string>
-
+#include <glog/logging.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Metadata.h>
 #include <llvm/IR/MDBuilder.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
-
 #include <remill/Arch/Arch.h>
 #include <remill/Arch/Name.h>
 #include <remill/BC/Compat/GlobalValue.h>
@@ -37,9 +33,13 @@
 #include <remill/BC/Version.h>
 #include <remill/OS/OS.h>
 
+#include <string>
+
 #include "mcsema/Arch/Arch.h"
 
-DEFINE_bool(disable_aliases, false, "Disable using global aliases for accessing data/registers in the bitcode");
+DEFINE_bool(
+    disable_aliases, false,
+    "Disable using global aliases for accessing data/registers in the bitcode");
 
 namespace mcsema {
 
@@ -50,15 +50,13 @@ std::unique_ptr<llvm::Module> gModule = nullptr;
 llvm::Constant *gZero = nullptr;
 
 llvm::Value *GetConstantInt(unsigned size, uint64_t value) {
-  return llvm::ConstantInt::get(
-      llvm::Type::getIntNTy(*gContext, size), value);
+  return llvm::ConstantInt::get(llvm::Type::getIntNTy(*gContext, size), value);
 }
 
 // Get a lifted representation of a reference (in code) to `ea`.
 llvm::Constant *LiftXrefInCode(uint64_t ea) {
   return llvm::ConstantExpr::getAdd(
-      gZero,
-      llvm::ConstantInt::get(gWordType, ea & gWordMask, false));
+      gZero, llvm::ConstantInt::get(gWordType, ea & gWordMask, false));
 }
 
 // Get a lifted representation of a reference (in data) to `ea`.
@@ -77,8 +75,8 @@ llvm::Constant *LiftXrefInData(const NativeSegment *cfg_seg, uint64_t ea,
     ptr = alias;
 
   } else {
-    auto seg_var = llvm::dyn_cast<llvm::GlobalVariable>(
-        cfg_seg->Get()->Pointer());
+    auto seg_var =
+        llvm::dyn_cast<llvm::GlobalVariable>(cfg_seg->Get()->Pointer());
 
     auto seg_type = remill::GetValueType(seg_var);
     llvm::DataLayout dl(gModule.get());
@@ -87,20 +85,16 @@ llvm::Constant *LiftXrefInData(const NativeSegment *cfg_seg, uint64_t ea,
     auto i32_type = llvm::Type::getInt32Ty(*gContext);
     gep_index_list.push_back(llvm::ConstantInt::get(i32_type, 0));
     const auto goal_offset = (ea - cfg_seg->ea) + cfg_seg->padding;
-    auto [offset, type] = remill::BuildIndexes(
-        dl, seg_type, 0, goal_offset, gep_index_list);
+    auto [offset, type] =
+        remill::BuildIndexes(dl, seg_type, 0, goal_offset, gep_index_list);
 
-    ptr = seg_var;
-    if (offset) {
-      (void) type;
-      ptr = llvm::ConstantExpr::getInBoundsGetElementPtr(
-          seg_type, seg_var, gep_index_list);
-    }
+    ptr = llvm::ConstantExpr::getInBoundsGetElementPtr(seg_type, seg_var,
+                                                       gep_index_list);
 
     if (offset < goal_offset) {
       auto i8_type = llvm::Type::getInt8Ty(*gContext);
-      ptr = llvm::ConstantExpr::getBitCast(
-          ptr, llvm::PointerType::get(i8_type, 0));
+      ptr = llvm::ConstantExpr::getBitCast(ptr,
+                                           llvm::PointerType::get(i8_type, 0));
       ptr = llvm::ConstantExpr::getInBoundsGetElementPtr(
           i8_type, ptr,
           llvm::ConstantInt::get(i32_type, goal_offset - offset, false));
@@ -162,12 +156,11 @@ llvm::Value *GetTLSBaseAddress(llvm::IRBuilder<> &ir) {
   if (gArch->IsAArch64()) {
 
 #if LLVM_VERSION(3, 7) >= LLVM_VERSION_NUMBER
-    LOG(ERROR)
-        << "LLVM 3.7 and below have no thread pointer-related "
-        << "intrinsics; using NULL as the base of TLS.";
+    LOG(ERROR) << "LLVM 3.7 and below have no thread pointer-related "
+               << "intrinsics; using NULL as the base of TLS.";
     return llvm::ConstantInt::get(gWordType, 0);
 #else
-# if LLVM_VERSION(3, 8) >= LLVM_VERSION_NUMBER
+#  if LLVM_VERSION(3, 8) >= LLVM_VERSION_NUMBER
     if (gArch->IsAArch64()) {
       LOG(ERROR)
           << "Assuming the `llvm.arm.thread.pointer` intrinsic gets us the base "
@@ -178,10 +171,9 @@ llvm::Value *GetTLSBaseAddress(llvm::IRBuilder<> &ir) {
         return ir.CreatePtrToInt(ir.CreateCall(func), gWordType);
       }
     }
-# endif
-    LOG(ERROR)
-        << "Assuming the `thread.pointer` intrinsic gets us the base "
-        << "of thread-local storage.";
+#  endif
+    LOG(ERROR) << "Assuming the `thread.pointer` intrinsic gets us the base "
+               << "of thread-local storage.";
     auto func = llvm::Intrinsic::getDeclaration(
         gModule.get(), llvm::Intrinsic::thread_pointer);
     return ir.CreatePtrToInt(ir.CreateCall(func), gWordType);
@@ -224,10 +216,9 @@ llvm::Value *GetTLSBaseAddress(llvm::IRBuilder<> &ir) {
     }
   }
 
-  LOG(FATAL)
-      << "Cannot generate code to find the thread base pointer for arch "
-      << remill::GetArchName(gArch->arch_name) << " and OS "
-      << remill::GetOSName(gArch->os_name);
+  LOG(FATAL) << "Cannot generate code to find the thread base pointer for arch "
+             << remill::GetArchName(gArch->arch_name) << " and OS "
+             << remill::GetOSName(gArch->os_name);
   return nullptr;
 }
 

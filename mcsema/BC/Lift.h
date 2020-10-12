@@ -30,6 +30,7 @@ class InstructionLifter;
 
 namespace llvm {
 class AllocaInst;
+class Argument;
 class BasicBlock;
 class Function;
 class Value;
@@ -65,6 +66,7 @@ struct TranslationContext {
   llvm::BasicBlock *entry_block{nullptr};
   llvm::Value *stack_ptr_var{nullptr};
   llvm::Value *frame_ptr_var{nullptr};
+  llvm::Argument *state_ptr{nullptr};
 };
 
 bool LiftCodeIntoModule(const NativeModule *cfg_module);
