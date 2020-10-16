@@ -16,9 +16,8 @@
 if (NOT UNIX)
   message (ERROR "The Dyninst frontend currently does not support this OS")
 else ()
-  add_compile_options(-frtti -std=c++14)
   set (CMAKE_CXX_FLAGS "-frtti")
-  set (CMAKE_CXX_FLAGS "-std=c++14")
+  set (CMAKE_CXX_STANDARD 17)
 endif ()
 
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
