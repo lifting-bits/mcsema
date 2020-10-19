@@ -1,16 +1,17 @@
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from table import *
 from exception import *
@@ -75,7 +76,9 @@ def find_linear_terminator(ea, max_num=256):
     ea += len(inst_bytes)
 
     # The next instruction was already processed as part of some other scan.
-    if ea in _BLOCK_HEAD_EAS:
+    if ea in _BLOCK_HEAD_EAS or \
+       has_our_dref_to(ea) or \
+       is_jump_table_target(ea):
       break
 
   if term_inst:
@@ -83,11 +86,14 @@ def find_linear_terminator(ea, max_num=256):
 
   return term_inst, inst_bytes
 
+
 def get_direct_branch_target(arg):
   """Tries to 'force' get the target of a direct or conditional branch.
   IDA can't always get code refs for flows from an instruction that appears
   inside another instruction (and so even seen by IDA in the first place)."""
-  if not isinstance(arg, (int, long)):
+  global INT_TYPES
+
+  if not isinstance(arg, INT_TYPES):
     branch_inst_ea = arg.ea
   else:
     branch_inst_ea = arg
@@ -97,51 +103,70 @@ def get_direct_branch_target(arg):
   except:
     decoded_inst, _ = decode_instruction(branch_inst_ea)
     target_ea = decoded_inst.Op1.addr
-    #log.warning("Determined target of {:08x} to be {:08x}".format(
-    #    branch_inst_ea, target_ea))
+    if not target_ea:
+      for i, op in enumerate(decoded_inst.ops):
+        if op.addr != 0:
+          target_ea = op.addr
     return target_ea
 
 def is_noreturn_inst(arg):
   """Returns `True` if the instruction `arg`, or at `arg`, will terminate
   control flow."""
+  global INT_TYPES
   inst = arg
-  if isinstance(arg, (int, long)):
+  if isinstance(arg, INT_TYPES):
     inst, _ = decode_instruction(arg)
 
   if is_direct_function_call(inst) or is_direct_jump(inst):
     called_ea = get_direct_branch_target(inst.ea)
     return is_noreturn_function(called_ea)
 
-  return inst.itype in (idaapi.NN_int3, idaapi.NN_icebp, idaapi.NN_hlt)
+  return is_terminator(inst)
 
-def get_static_successors(sub_ea, inst, binary_is_pie):
+def get_static_successors(sub_ea, term_inst, delayed_inst, binary_is_pie):
   """Returns the statically known successors of an instruction."""
 
-  branch_flows = tuple(idautils.CodeRefsFrom(inst.ea, False))
-  next_ea = inst.ea + inst.size
+  # delayed_inst will be term_inst if there is no delay slot
+  #
+  # NOTE(pag): It is possible that there is an apparently single instruction
+  #            block containing a synthetic instruction that is actually two underlying
+  #            instructions, and so we want to use `term_inst.size` (8 in this case) to find `next_ea`
+  #            if `term_inst` and `delayed_inst` match.
+  global _FUNC_HEAD_EAS
+
+  next_ea = term_inst.ea + term_inst.size
+  if term_inst.ea != delayed_inst.ea:
+    next_ea = delayed_inst.ea + fixup_delayed_instr_size(delayed_inst)
+
   # Direct function call. The successor will be the fall-through instruction
   # unless the target of the function call looks like a `noreturn` function.
-  if is_direct_function_call(inst):
-    if not is_noreturn_function(get_direct_branch_target(inst.ea)):
-      yield next_ea  # Not recognised as a `noreturn` function.
+  if is_direct_function_call(term_inst):
+    if not is_noreturn_function(get_direct_branch_target(term_inst.ea)):
+      yield fixup_function_return_address(term_inst, next_ea)  # Not recognised as a `noreturn` function.
 
-  if is_function_call(inst):  # Indirect function call, system call.
+  if is_function_call(term_inst):  # Indirect function call, system call.
+    yield fixup_function_return_address(term_inst, next_ea)
+
+  elif is_conditional_jump(term_inst):
     yield next_ea
+    yield get_direct_branch_target(term_inst.ea)
 
-  elif is_conditional_jump(inst):
-    yield next_ea
-    yield get_direct_branch_target(inst.ea)
+  elif is_direct_jump(term_inst):
+    yield get_direct_branch_target(term_inst.ea)
 
-  elif is_direct_jump(inst):
-    yield get_direct_branch_target(inst.ea)
+  elif is_indirect_jump(term_inst):
+    table = get_jump_table(term_inst, binary_is_pie)
+    target_eas = set(idautils.CodeRefsFrom(term_inst.ea, True))
 
-  elif is_indirect_jump(inst):
-    table = get_jump_table(inst, binary_is_pie)
-    target_eas = set(idautils.CodeRefsFrom(inst.ea, True))
+    # Over the course of execution, `idautils.CodeRefsFrom` might change to
+    # include delayed instructions.
+    if delayed_inst.ea in target_eas:
+      target_eas.remove(delayed_inst.ea)
+
     if table:
       for target_ea in table.entries.values():
         target_eas.add(target_ea)
-    
+
     # Opportunistically add more flows to this instruction if it seems like
     # there are any blocks in the function with no predecessors.
     if not len(target_eas) and sub_ea in _MISSING_FLOWS:
@@ -149,14 +174,22 @@ def get_static_successors(sub_ea, inst, binary_is_pie):
       for target_ea in missing_flows:
         if not has_flow_to_code(target_ea):
           DEBUG("Assuming that jump at {:x} targets block {:x} with missing flow.")
-          idc.add_cref(inst.ea, target_ea, idc.XREF_USER | idc.fl_JN)
+          idc.add_cref(term_inst.ea, target_ea, idc.XREF_USER | idc.fl_JN)
           target_eas.add(target_ea)
 
-    for target_ea in target_eas:
-      yield target_ea
+    # If the jump table is not recovered add the next_ea as
+    # the successor eas and throw a warning to look into later
+    if len(target_eas) == 0:
+      DEBUG("WARNING: No table entries for indirect jump at {:x}; Adding next_ea {:x} as successor." \
+            .format(term_inst.ea, next_ea))
+      yield next_ea
+    else:
+      for target_ea in target_eas:
+        yield target_ea
 
-  elif not is_control_flow(inst):
-    if not is_noreturn_inst(inst):
+  elif not is_control_flow(term_inst):
+    if not is_noreturn_inst(term_inst) \
+      and next_ea not in _FUNC_HEAD_EAS:
       yield next_ea
 
 _BAD_BLOCK = (tuple(), set())
@@ -187,14 +220,19 @@ def analyse_block(func_ea, ea, binary_is_pie=False):
       break
 
     next_ea = inst.ea + inst.size
-    if next_ea in _BLOCK_HEAD_EAS:
+    if next_ea in _BLOCK_HEAD_EAS or \
+       has_our_dref_to(next_ea) or \
+       is_jump_table_target(next_ea):
       break
 
   successors = []
   if inst_eas:
+    delayed_inst, delayed_ea = get_delayed_instruction(insts[-1])
+    successors = get_static_successors(func_ea, insts[-1], delayed_inst, binary_is_pie)
     _TERMINATOR_EAS.add(inst_eas[-1])
-    successors = get_static_successors(func_ea, insts[-1], binary_is_pie)
     successors = [succ for succ in successors if is_code(succ)]
+    if delayed_ea not in inst_eas:
+      inst_eas.append(delayed_ea)
   
   return (inst_eas, set(successors))
 
@@ -210,7 +248,6 @@ def find_default_block_heads(sub_ea):
   _FUNC_HEAD_EAS.add(sub_ea)
   heads = set([sub_ea])
 
-  seg_start, seg_end = idc.get_segm_start(sub_ea), idc.get_segm_end(sub_ea)
   min_ea, max_ea = get_function_bounds(sub_ea)
 
   DEBUG("Default block heads for function {:x} with loose bounds [{:x}, {:x})".format(
@@ -242,10 +279,11 @@ def find_default_block_heads(sub_ea):
   if max_ea:
     ea = sub_ea
     while min_ea <= ea < max_ea and ea != idc.BADADDR:
-      if ea not in _BLOCK_HEAD_EAS \
-      and 16 < idaapi.get_alignment(ea) \
-      and read_byte(ea) not in _ALIGNMENT_BYTES \
-      and not has_flow_to_code(ea):
+      if ea not in _BLOCK_HEAD_EAS and \
+         16 < idaapi.get_alignment(ea) and \
+         read_byte(ea) not in _ALIGNMENT_BYTES and \
+         not has_flow_to_code(ea):
+
         if is_data_reference(ea):
           DEBUG("  {:x} in function {:x} looks like an embedded jump table entry".format(
               ea, sub_ea))
@@ -323,14 +361,15 @@ def analyse_subroutine(sub_ea, binary_is_pie):
     # Check the instruction next to term_instr for recovery, if it has missing flow
     # IDA heuristics misses the landing pad and exception blocks in some cases; Linear
     # scan identifies the missing blocks and recover them
-    next_ea = term_inst.ea + len(inst_bytes)
+    delayed_inst, delayed_ea = get_delayed_instruction(term_inst)
+    next_ea = delayed_inst.ea + delayed_inst.size
     if next_ea not in _FUNC_HEAD_EAS and next_ea not in _BLOCK_HEAD_EAS:
       block_head_eas.add(next_ea)
 
-    #log.debug("Linear terminator of {:08x} is {:08x}".format(
+    #DEBUG("Linear terminator of {:08x} is {:08x}".format(
     #    block_head_ea, term_inst.ea))
 
-    for succ_ea in get_static_successors(sub_ea, term_inst, binary_is_pie):
+    for succ_ea in get_static_successors(sub_ea, term_inst, delayed_inst, binary_is_pie):
       if succ_ea not in _FUNC_HEAD_EAS or succ_ea == sub_ea:
         block_head_eas.add(succ_ea)
 

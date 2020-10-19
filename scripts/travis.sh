@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specifi
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 SOURCE_DIR="${SCRIPT_DIR}/../"
@@ -82,6 +84,13 @@ main() {
   local platform_name="$1"
   local operation_type="$2"
 
+  # This makes life simpler for github actions
+  if [[ "${platform_name}" == "macos-latest" ]] ; then
+    platform_name="osx"
+  elif [[ "${platform_name}" == "ubuntu-latest" ]] ; then
+    platform_name="linux"
+  fi
+
   if [[ "${platform_name}" != "osx" && "${platform_name}" != "linux" ]] ; then
     printf "Invalid platform: ${platform_name}\n"
     return 1
@@ -134,7 +143,11 @@ linux_initialize() {
                             libstdc++6:i386 \
                             zlib1g-dev:i386 \
                             liblzma-dev:i386 \
-                            libtinfo-dev:i386 
+                            libtinfo-dev:i386
+
+  # install clang and ccsyspath for ABI libraries generation
+  pip install clang ccsyspath
+
   if [ $? -ne 0 ] ; then
     printf " x Could not install the required dependencies\n"
     return 1
@@ -256,14 +269,6 @@ linux_build_helper() {
   local log_file=`mktemp`
 
   printf " > Cloning remill...\n"
-  local remill_commit_id=`cat .remill_commit_id`
-  if [ $? -ne 0 ] ; then
-    printf " x Failed to read the Remill commit id from file. Error output follows:\n"
-    printf "===\n"
-    cat "${log_file}"
-    return 1
-  fi
-
   git clone "https://github.com/lifting-bits/remill.git" > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to clone the remill repository. Error output follows:\n"
@@ -271,17 +276,11 @@ linux_build_helper() {
     cat "${log_file}"
     return 1
   fi
-
-  ( cd remill && git checkout -b temp $remill_commit_id ) > "${log_file}" 2>&1
-  if [ $? -ne 0 ] ; then
-    printf " x Failed to switch to the correct remill commit. Error output follows:\n"
-    printf "===\n"
-    cat "${log_file}"
-    return 1
-  fi
+  
+  cd remill
 
   # we are supposed to put mcsema inside the remill folder
-  mkdir "remill/tools/mcsema" > "${log_file}" 2>&1
+  mkdir -p "remill/tools/mcsema" > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to create the remill/tools/mcsema folder. Error output follows:\n"
     printf "===\n"
@@ -290,7 +289,7 @@ linux_build_helper() {
   fi
 
   printf " > Copying the mcsema folder...\n"
-  local file_list=( "cmake" "tools" "examples" "scripts" "tests" "docs" "mcsema" "generated" ".remill_commit_id" "CMakeLists.txt" "README.md" "CONTRIBUTING.md" ".gdbinit" "LICENSE" "ACKNOWLEDGEMENTS.md" ".gitignore" ".travis.yml" )
+  local file_list=( "cmake" "tools" "examples" "scripts" "tests" "docs" "mcsema" "generated" "CMakeLists.txt" "README.md" "CONTRIBUTING.md" ".gdbinit" "LICENSE" "ACKNOWLEDGEMENTS.md" ".gitignore" ".travis.yml" )
   for file_name in "${file_list[@]}" ; do
     cp -r "${file_name}" "remill/tools/mcsema" > "${log_file}" 2>&1
     if [ $? -ne 0 ] ; then

@@ -1,16 +1,17 @@
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import collections
 import idaapi
@@ -121,3 +122,129 @@ PERSONALITIES.update({
 
 def fixup_personality(inst, p):
   return p
+
+def has_delayed_slot(inst):
+  return False
+
+def fixup_delayed_instr_size(inst):
+  return inst.size
+
+def fixup_instr_as_nop(inst):
+  return False
+
+def fixup_function_return_address(inst, next_ea):
+  return next_ea
+
+_INVALID_THUNK_ADDR = (False, idc.BADADDR)
+
+def is_ELF_thunk_by_structure(ea):
+  """Try to manually identify an ELF thunk by its structure."""
+  from util import decode_instruction, is_direct_jump, is_indirect_jump
+  from util import is_invalid_ea, get_reference_target
+  
+  global _INVALID_THUNK_ADDR
+  
+  seg_name = idc.get_segm_name(ea).lower()  
+  if ".plt" not in seg_name:
+    return _INVALID_THUNK_ADDR
+
+  inst, _ = decode_instruction(ea)
+  if not inst or not (is_indirect_jump(inst) or is_direct_jump(inst)):
+    return _INVALID_THUNK_ADDR
+
+  target_ea = get_reference_target(inst.ea)
+  if is_invalid_ea(target_ea):
+    return _INVALID_THUNK_ADDR
+
+  seg_name = idc.get_segm_name(target_ea).lower()
+  if ".got" in seg_name or ".plt" in seg_name:
+    target_ea = get_reference_target(target_ea)
+    seg_name = idc.get_segm_name(target_ea).lower()
+
+  if "extern" == seg_name:
+    return True, target_ea
+
+  return _INVALID_THUNK_ADDR
+
+def try_get_ref_addr(inst, op, op_val, all_refs, _NOT_A_REF):
+  return op_val, 0, 0
+
+def recover_preserved_regs(M, F, inst, xrefs, preserved_reg_sets):
+  return False
+
+def recover_deferred_preserved_regs(M):
+  return
+
+if idaapi.get_inf_structure().is_64bit():
+  def return_values():
+    return {
+      "register": "RAX",
+      "type": "L"
+    }
+
+  def return_address():
+    return {
+      "memory": {
+        "register": "RSP",
+        "offset": 0
+      },
+      "type": "L"
+    }
+
+  def return_stack_pointer():
+    return {
+      "register": "RSP",
+      "offset": 8,
+      "type": "L"
+    }
+
+elif idaapi.get_inf_structure().is_32bit():
+  def return_values():
+    return {
+      "register": "EAX",
+      "type": "I"
+    }
+
+  def return_address():
+    return {
+      "memory": {
+        "register": "ESP",
+        "offset": 0
+      },
+      "type": "I"
+    }
+
+  def return_stack_pointer():
+    return {
+      "register": "ESP",
+      "offset": 4,
+      "type": "I"
+    }
+
+def recover_value_spec(V, spec):
+  """Recovers the default value specification."""
+  V.type = spec["type"]
+
+  if "name" in spec and len(spec["name"]):
+    V.name = spec["name"]
+
+  if "register" in spec:
+    V.register = spec["register"]
+  elif "memory" in spec:
+    mem_spec = spec["memory"]
+    V.memory.register = mem_spec["register"]
+    if mem_spec["offset"]:
+      V.memory.offset = mem_spec["offset"]
+
+def recover_function_spec_from_arch(E):
+  """ recover the basic information about the function spec"""
+  D = E.decl
+  if E.argument_count >= 8:
+    D.is_noreturn = E.no_return
+    D.is_variadic = (E.argument_count >= 8)
+    D.calling_convention = 0
+    if D.is_noreturn == False:
+      V = D.return_values.add()
+      recover_value_spec(V, return_values())
+    recover_value_spec(D.return_address, return_address())
+    recover_value_spec(D.return_stack_pointer, return_stack_pointer())

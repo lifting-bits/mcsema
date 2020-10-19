@@ -1,23 +1,26 @@
-# Copyright (c) 2018 Trail of Bits, Inc.
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 project(mcsema)
 cmake_minimum_required(VERSION 3.2)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/settings.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/BCCompiler.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/ccache.cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 configureCcache()
 FindAndSelectClangCompiler()
@@ -25,6 +28,20 @@ FindAndSelectClangCompiler()
 set(MCSEMA_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
 
 option(MCSEMA_ENABLE_RUNTIME "Should runtimes for re-compilation of bitcode be produced?" ON)
+
+find_package(Python2 QUIET)
+if(Python2_FOUND)
+  option(MCSEMA_INSTALL_PYTHON2_LIBS "Install Python 2 libraries" ON)
+else()
+  option(MCSEMA_INSTALL_PYTHON2_LIBS "Install Python 2 libraries")
+endif()
+
+find_package(Python3 QUIET)
+if(Python3_FOUND)
+  option(MCSEMA_INSTALL_PYTHON3_LIBS "Install Python 3 libraries" ON)
+else()
+  option(MCSEMA_INSTALL_PYTHON3_LIBS "Install Python 3 libraries")
+endif()
 
 # warnings and compiler settings
 if(NOT DEFINED WIN32)
@@ -35,6 +52,17 @@ if(NOT DEFINED WIN32)
     -Wno-unreachable-code-return 
   )
 endif()
+
+#
+# libraries
+#
+
+# remill
+if("${PLATFORM_NAME}" STREQUAL "windows")
+  set(REMILL_FINDPACKAGE_HINTS HINTS "${CMAKE_INSTALL_PREFIX}/remill/lib")
+endif()
+
+find_package(remill REQUIRED ${REMILL_FINDPACKAGE_HINTS})
 
 # protobuf
 find_package(Protobuf REQUIRED)
@@ -62,10 +90,6 @@ add_custom_target(protobuf_python_module_ida
   DEPENDS ${PROJECT_PROTOBUFPYTHONMODULE}
 )
 
-add_custom_target(protobuf_python_module_binja
-  DEPENDS ${PROJECT_PROTOBUFPYTHONMODULE}
-)
-
 # disable -Werror on these file since they have been generated
 set_source_files_properties(${PROJECT_PROTOBUFSOURCEFILES} PROPERTIES
   COMPILE_FLAGS "-Wno-sign-conversion -Wno-shorten-64-to-32 -Wno-conversion"
@@ -81,10 +105,12 @@ set_source_files_properties(${PROJECT_PROTOBUFHEADERFILES} PROPERTIES
 
 set(MCSEMA_LIFT mcsema-lift-${REMILL_LLVM_VERSION})
 
+# for version information
+add_subdirectory(mcsema/Version)
+
 add_executable(${MCSEMA_LIFT}
   ${PROJECT_PROTOBUFSOURCEFILES}
 
-  mcsema/Arch/ABI.cpp
   mcsema/Arch/Arch.cpp
 
   mcsema/CFG/CFG.cpp
@@ -108,13 +134,7 @@ add_executable(${MCSEMA_LIFT}
 add_custom_command(
   TARGET protobuf_python_module_ida POST_BUILD
   DEPENDS {PROJECT_PROTOBUFPYTHONMODULE}
-  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/ida
-)
-
-add_custom_command(
-  TARGET protobuf_python_module_binja POST_BUILD
-  DEPENDS {PROJECT_PROTOBUFPYTHONMODULE}
-  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/binja
+  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/ida7
 )
 
 # this is needed for the #include directives with absolutes paths to work correctly; it must
@@ -122,9 +142,8 @@ add_custom_command(
 list(APPEND PROJECT_INCLUDEDIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_dependencies(${MCSEMA_LIFT}
-  semantics protobuf_python_module_ida
-  protobuf_python_module_binja
-)
+  semantics
+  protobuf_python_module_ida)
 
 #
 # libraries
@@ -141,41 +160,75 @@ endif()
 
 list(APPEND PROJECT_LIBRARIES remill)
 
-# llvm
-find_package(LLVM REQUIRED CONFIG HINTS ${FINDPACKAGE_LLVM_HINTS})
+# anvill
+if(NOT TARGET anvill-${REMILL_LLVM_VERSION})
+  find_package(anvill REQUIRED)
+  if(NOT anvill_FOUND)
+    message(FATAL_ERROR "McSema depends upon Anvill being installed")
+  endif()
+endif()
+list(APPEND PROJECT_LIBRARIES anvill-${REMILL_LLVM_VERSION})
 
-string(REPLACE "." ";" LLVM_VERSION_LIST ${LLVM_PACKAGE_VERSION})
-list(GET LLVM_VERSION_LIST 0 LLVM_MAJOR_VERSION)
-list(GET LLVM_VERSION_LIST 1 LLVM_MINOR_VERSION)
+# mcsema-disass
 
-set(LLVM_LIBRARIES
-  LLVMCore LLVMSupport LLVMAnalysis LLVMipo LLVMIRReader
-  LLVMBitReader LLVMBitWriter LLVMTransformUtils LLVMScalarOpts
-  LLVMLTO
+set(MCSEMA_PYTHON_SOURCES
+    tools/setup.py
+    tools/mcsema_disass/__init__.py
+    tools/mcsema_disass/__main__.py
+    tools/mcsema_disass/ida7/__init__.py
+    tools/mcsema_disass/ida7/anvill_compat.py
+    tools/mcsema_disass/ida7/arm_util.py
+    tools/mcsema_disass/ida7/CFG_pb2.py
+    tools/mcsema_disass/ida7/disass.py
+    tools/mcsema_disass/ida7/exception.py
+    tools/mcsema_disass/ida7/flow.py
+    tools/mcsema_disass/ida7/get_cfg.py
+    tools/mcsema_disass/ida7/refs.py
+    tools/mcsema_disass/ida7/segment.py
+    tools/mcsema_disass/ida7/table.py
+    tools/mcsema_disass/ida7/util.py
+    tools/mcsema_disass/ida7/x86_util.py
 )
 
-list(APPEND PROJECT_LIBRARIES ${LLVM_LIBRARIES})
-list(APPEND PROJECT_DEFINITIONS ${LLVM_DEFINITIONS})
-list(APPEND PROJECT_INCLUDEDIRECTORIES ${LLVM_INCLUDE_DIRS})
+if(MCSEMA_INSTALL_PYTHON2_LIBS)
+  add_custom_target(build_mcsema_disass_python2
+    DEPENDS ${MCSEMA_PYTHON_SOURCES})
+    
+  add_custom_command(
+      TARGET build_mcsema_disass_python2 POST_BUILD
+      COMMAND which python2 && python2 setup.py build --force
+      COMMENT "Building McSema Python 2 mcsema-disass"
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tools")
 
-# xed
-find_package(XED REQUIRED)
-list(APPEND PROJECT_LIBRARIES ${XED_LIBRARIES})
-list(APPEND PROJECT_INCLUDEDIRECTORIES ${XED_INCLUDE_DIRS})
+  add_dependencies(${MCSEMA_LIFT}
+    build_mcsema_disass_python2)
 
-# google log module
-find_package(glog REQUIRED)
-list(APPEND PROJECT_LIBRARIES glog::glog)
+  add_dependencies(build_mcsema_disass_python2
+    protobuf_python_module_ida)
+endif()
 
-# gflags
-find_package(gflags REQUIRED)
-list(APPEND PROJECT_LIBRARIES gflags)
+if(MCSEMA_INSTALL_PYTHON3_LIBS)
+  add_custom_target(build_mcsema_disass_python3
+    DEPENDS ${MCSEMA_PYTHON_SOURCES})
+    
+  add_custom_command(
+      TARGET build_mcsema_disass_python3 POST_BUILD
+      COMMAND which python3 && python3 setup.py build --force
+      COMMENT "Building McSema Python 3 mcsema-disass"
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tools")
+
+  add_dependencies(${MCSEMA_LIFT}
+    build_mcsema_disass_python3)
+
+  add_dependencies(build_mcsema_disass_python3
+    protobuf_python_module_ida)
+endif()
 
 #
 # target settings
 #
 
-target_link_libraries(${MCSEMA_LIFT} PRIVATE ${PROJECT_LIBRARIES})
+target_link_libraries(${MCSEMA_LIFT} PRIVATE ${PROJECT_LIBRARIES} McSemaVersion)
 target_include_directories(${MCSEMA_LIFT} SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTORIES})
 target_compile_definitions(${MCSEMA_LIFT} PUBLIC ${PROJECT_DEFINITIONS})
 target_compile_options(${MCSEMA_LIFT} PRIVATE ${PROJECT_CXXFLAGS})
@@ -231,17 +284,6 @@ install(
   LIBRARY DESTINATION "${install_folder}/lib"
 )
 
-set(python_package_installer "${CMAKE_CURRENT_SOURCE_DIR}/tools/setup_launcher")
-
-if(DEFINED WIN32)
-  string(REPLACE "/" "\\" python_package_install_path "${install_folder}")
-  set(python_package_installer "${python_package_installer}.bat")
-  set(optional_interpreter "cmd.exe /C")
-else()
-  set(python_package_install_path "${install_folder}")
-  set(python_package_installer "${python_package_installer}.sh")
-endif()
-
 # target for dyninst frontend
 if (DEFINED BUILD_MCSEMA_DYNINST_DISASS)
     if(${BUILD_MCSEMA_DYNINST_DISASS} EQUAL 1)
@@ -249,12 +291,27 @@ if (DEFINED BUILD_MCSEMA_DYNINST_DISASS)
     endif()
 endif()
 
-install(CODE
-  "execute_process(COMMAND ${optional_interpreter} \"${python_package_installer}\" \"${python_package_install_path}\" WORKING_DIRECTORY \"${PROJECT_SOURCE_DIR}/tools\" RESULT_VARIABLE exit_code)
-   if(NOT exit_code EQUAL 0)
-     message(FATAL_ERROR \"Failed to install the Python package\")
-   endif()"
-)
+set(python_package_installer "${CMAKE_CURRENT_SOURCE_DIR}/tools/setup_launcher")
+if(DEFINED WIN32)
+  string(REPLACE "/" "\\" python_package_install_path "${install_folder}")
+  set(python_package_installer2 "${python_package_installer}.bat")
+  set(python_package_installer3 "${python_package_installer}.bat")
+  set(optional_interpreter "cmd.exe /C")
+else()
+  set(python_package_install_path "${install_folder}")
+  set(python_package_installer2 "${python_package_installer}_py2.sh")
+  set(python_package_installer3 "${python_package_installer}_py3.sh")
+endif()
+
+if(MCSEMA_INSTALL_PYTHON2_LIBS)
+  install(CODE
+    "execute_process(COMMAND ${optional_interpreter} \"${python_package_installer2}\" \"${python_package_install_path}\"\nWORKING_DIRECTORY \"${PROJECT_SOURCE_DIR}/tools\"\nRESULT_VARIABLE exit_code2)\n   if(NOT exit_code2 EQUAL 0)\n       message(FATAL_ERROR \"Failed to install the Python 2 package\")\n     endif()")
+endif()
+
+if(MCSEMA_INSTALL_PYTHON3_LIBS)
+  install(CODE
+    "execute_process(COMMAND ${optional_interpreter} \"${python_package_installer3}\" \"${python_package_install_path}\"\nWORKING_DIRECTORY \"${PROJECT_SOURCE_DIR}/tools\"\nRESULT_VARIABLE exit_code3)\n   if(NOT exit_code3 EQUAL 0)\n       message(FATAL_ERROR \"Failed to install the Python 3 package\")\n     endif()")
+endif()
 
 add_subdirectory(examples)
 

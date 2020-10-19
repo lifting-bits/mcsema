@@ -138,6 +138,8 @@ function lift_binary
 		--os linux \
 		--cfg ${OUT_DIR}/${in_file}.cfg \
 		--output ${OUT_DIR}/${in_file}.bc \
+    --explicit_args \
+    --local_state_pointer \
 		--libc_constructor __libc_csu_init \
 		--libc_destructor __libc_csu_fini \
     --abi-libraries=${ABI_DIR}/ABI_exceptions_amd64.bc \

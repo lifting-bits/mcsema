@@ -1,15 +1,17 @@
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specifi
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # CMAKE_C_COMPILER or CMAKE_CXX_COMPILER *must* be set before project()
 # otherwise it causes infinite loops for some cmake versions
@@ -155,7 +157,7 @@ function (ExportCFG target_name architecture binary_path)
   else ()
     add_custom_command(
       OUTPUT "${output_file}"
-      COMMAND "${MCSEMADISASS_PATH}" --disassembler "${IDAT64_PATH}" --arch "${architecture}" --os "${platform}" --binary "${binary_path}" --output "${output_file}" --entrypoint main
+      COMMAND "${MCSEMADISASS_EXE}" --disassembler "${IDAT64_PATH}" --arch "${architecture}" --os "${platform}" --binary "${binary_path}" --output "${output_file}" --entrypoint main
       DEPENDS "${binary_path}"
       VERBATIM
     )
@@ -224,7 +226,7 @@ function (AddBinaryTest target_name)
 
     add_custom_command(
       OUTPUT "${bc_file_name}"
-      COMMAND "${MCSEMALIFT_PATH}" --arch "${architecture}" --os "${platform}" --cfg "${cfg_file_name}" --output "${bc_file_name}"
+      COMMAND "${MCSEMALIFT_EXE}" --arch "${architecture}" --os "${platform}" --cfg "${cfg_file_name}" --output "${bc_file_name}"
       DEPENDS "${cfg_file_name}"
       VERBATIM
     )
@@ -309,7 +311,7 @@ function (GenerateTest target_name)
 
       add_custom_command(
         OUTPUT "${current_target_name}.bc"
-        COMMAND "${MCSEMALIFT_PATH}" --arch "${architecture}" --os "${platform}" --cfg "${current_target_name}.cfg" --output "${current_target_name}.bc"
+	COMMAND "${MCSEMALIFT_EXE}" --arch "${architecture}" --os "${platform}" --cfg "${current_target_name}.cfg" --output "${current_target_name}.bc"
         DEPENDS "${current_target_name}.cfg"
         VERBATIM
       )
@@ -346,13 +348,17 @@ if ("$ENV{TRAILOFBITS_LIBRARIES}" STREQUAL "")
   message(FATAL_ERROR "The TRAILOFBITS_LIBRARIES environment variable has not been defined!")
 endif ()
 
-string(SUBSTRING "${CMAKE_CXX_COMPILER_VERSION}" 0 3 LLVM_VERSION_SUFFIX)
-set(LLVM_VERSION_SUFFIX "-${LLVM_VERSION_SUFFIX}")
+string(REPLACE "." ";" LLVM_VERSION_LIST ${CMAKE_CXX_COMPILER_VERSION})
+list(GET LLVM_VERSION_LIST 0 LLVM_VERSION_MAJOR)
+list(GET LLVM_VERSION_LIST 1 LLVM_VERSION_MINOR)
+
+set(LLVM_VERSION_SUFFIX "-${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}")
 
 find_program(MCSEMALIFT_PATH "mcsema-lift${LLVM_VERSION_SUFFIX}")
 if ("${MCSEMALIFT_PATH}" STREQUAL "MCSEMALIFT_PATH-NOTFOUND")
   message(FATAL_ERROR "Failed to locate the mcsema-lift${LLVM_VERSION_SUFFIX} executable!")
 endif ()
+set(MCSEMALIFT_EXE "${MCSEMALIFT_PATH}")
 
 find_program(IDAT64_PATH "idat64")
 if ("${IDAT64_PATH}" STREQUAL "IDAT64_PATH-NOTFOUND")
@@ -366,26 +372,31 @@ if ("${IDAT64_PATH}" STREQUAL "IDAT64_PATH-NOTFOUND")
   endif()
 endif ()
 
-find_program(MCSEMADISASS_PATH "mcsema-disass")
+find_program(MCSEMADISASS_PATH "mcsema-disass$")
 if ("${MCSEMADISASS_PATH}" STREQUAL "MCSEMADISASS_PATH-NOTFOUND")
   message(FATAL_ERROR "Failed to locate the mcsema-disass executable!")
 endif ()
+set(MCSEMADISASS_EXE "${MCSEMADISASS_PATH}")
 
 message("Toolset")
-message(" > mcsema-lift: ${MCSEMALIFT_PATH}")
+message(" > mcsema-lift: ${MCSEMALIFT_EXE}")
 message(" > clang: ${CLANG_PATH}")
 if (NOT "${IDAT64_PATH}" STREQUAL "IDAT64_PATH-NOTFOUND")
   message(" > idat64: ${IDAT64_PATH}")
 else()
   message(" > using prebuilt cfgs: ${MCSEMA_PREBUILT_CFG_PATH}")
 endif ()
-message(" > mcsema-disass: ${MCSEMADISASS_PATH}")
+message(" > mcsema-disass: ${MCSEMADISASS_EXE}")
 
 set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/test_suite")
 
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)|(x86_64)")
-  set(ARCHITECTURE_LIST x86 amd64)
-  
+  if(APPLE)
+    set(ARCHITECTURE_LIST amd64)
+  else()
+    set(ARCHITECTURE_LIST x86 amd64)
+  endif()
+
 elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "ARM")
   set(ARCHITECTURE_LIST aarch64)
 

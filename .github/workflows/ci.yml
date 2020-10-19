@@ -1,0 +1,84 @@
+name: CI
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  schedule:
+    # run CI every day even if no PRs/merges occur
+    - cron:  '0 6 * * *'
+jobs:
+  VersionFile:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bump.outputs.VERSION }}
+    steps:
+    - id: bump
+      name: Bump Version Info For Release
+      run: |
+        curl -H "Authorization: token ${GITHUB_TOKEN}" -s https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/latest | jq -r '[.tag_name][0] | split(".") as $ver | $ver[-1]|tonumber as $last | $ver[:-1] as $first | $first + [$last+1] | map(tostring) |  join(".")' > VERSION
+        echo "::set-output name=VERSION::$(<VERSION)"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  Docker_Linux:
+    runs-on: ubuntu-latest
+    needs: [VersionFile]
+    strategy:
+      matrix:
+        llvm: ["800", "900", "1000"]
+        ubuntu: ["20.04", "18.04"]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build LLVM ${{ matrix.llvm }} on ${{ matrix.ubuntu }}
+      run: |
+        echo ${{needs.VersionFile.outputs.version}} > VERSION
+        docker build . -t docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest -f Dockerfile --build-arg UBUNTU_VERSION=${{ matrix.ubuntu }} --build-arg ARCH=amd64 --build-arg LLVM_VERSION=${{ matrix.llvm }}
+    - name: Test final Docker image
+      run: |
+        docker run --rm docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest --version
+        docker run --rm --entrypoint=mcsema-disass-2 docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest --help
+    - name: Push Image for LLVM ${{ matrix.llvm }} on ${{ matrix.ubuntu }}
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      run: |
+        docker login docker.pkg.github.com -u "${GH_USER}" -p "${GH_TOKEN}"
+        for i in 1 2 3; do docker push docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest && break || sleep 10; done
+        docker login -u "${DOCKER_HUB_USER}" -p "${DOCKER_HUB_TOKEN}"
+        docker tag docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest trailofbits/mcsema:llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64
+        docker push trailofbits/mcsema:llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64
+      env:
+        GH_USER: ${{ github.actor }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        DOCKER_HUB_USER: ${{  secrets.DOCKER_HUB_USER  }}
+        DOCKER_HUB_TOKEN: ${{  secrets.DOCKER_HUB_TOKEN  }}
+    - name: Compress Artifacts LLVM ${{ matrix.llvm }} on ${{ matrix.ubuntu }}
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      run: |
+        mkdir -p artifacts
+        cp -v scripts/emit-artifact.sh ./artifacts/
+        docker run -v "$(pwd)/artifacts:/out" --rm --entrypoint /bin/bash docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest -c "/out/emit-artifact.sh /out/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64.tar.xz"
+        ls -l artifacts/
+    - uses: actions/upload-artifact@v1
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      with:
+        name: mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64.tar.xz
+        path: artifacts/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64.tar.xz
+  CreateRelease:
+    needs: [Docker_Linux, VersionFile]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download all artifacts
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      uses: actions/download-artifact@v2
+      with:
+        path: releases
+    - name: Verify Artifact Downloads
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      run: ls -R
+    - name: Publish Release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ needs.VersionFile.outputs.version }}
+        files: releases/*/*.xz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

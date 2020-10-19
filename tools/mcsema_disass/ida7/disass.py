@@ -55,8 +55,12 @@ def execute(args, command_args):
   script_cmd.append(args.arch)
   script_cmd.append("--os")
   script_cmd.append(args.os)
-  script_cmd.append("--entrypoint")
-  script_cmd.append(args.entrypoint)
+  if args.rebase:
+    script_cmd.append("--rebase")
+    script_cmd.append(str(args.rebase))
+  if args.entrypoint is not None and len(args.entrypoint):
+    script_cmd.append("--entrypoint")
+    script_cmd.append(args.entrypoint)
   script_cmd.extend(command_args)  # Extra, script-specific arguments.
 
   cmd = []

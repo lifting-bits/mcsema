@@ -1,17 +1,19 @@
 #!/usr/bin/env python
-# Copyright (c) 2017 Trail of Bits, Inc.
+
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
 import os
@@ -24,7 +26,7 @@ import traceback
 import textwrap
 
 
-SUPPORTED_OS = ('linux', 'windows',)
+SUPPORTED_OS = ('linux', 'macos', 'windows', 'solaris')
 SUPPORTED_ARCH = ('x86', 'x86_avx', 'x86_avx512',
                   'amd64', 'amd64_avx', 'amd64_avx512',
                   'aarch64')
@@ -98,7 +100,13 @@ def main():
   arg_parser.add_argument(
       '--entrypoint',
       help="The entrypoint where disassembly should begin",
-      required=True)
+      required=False)
+
+  arg_parser.add_argument(
+      '--rebase',
+      help="Amount by which to rebase a binary",
+      required=False,
+      default=0)
 
   args, command_args = arg_parser.parse_known_args()
 
@@ -149,10 +157,7 @@ def main():
   ret = 1
   try:
     if 'ida' in args.disassembler:
-      if 'idat' in args.disassembler:
-        import ida7.disass as disass
-      else:
-        import ida.disass as disass
+      import ida7.disass as disass
       ret = disass.execute(args, fixed_command_args)
       # in case IDA somehow says success, but no output was generated
       if not os.path.isfile(args.output):
@@ -165,11 +170,7 @@ def main():
         # remove the zero-sized file
         os.unlink(args.output)
         ret = 1
-    elif 'binja' in args.disassembler or 'binaryninja' in args.disassembler:
-      if not _find_binary_ninja(args.disassembler):
-        arg_parser.error("Could not `import binaryninja`. Is it in your PYTHONPATH?")
-      from binja.cfg import get_cfg
-      ret = get_cfg(args, fixed_command_args)
+
     elif 'dyninst' in args.disassembler:
       # TODO: This can almost certainly be done in cleaner way
       pass_args = [
@@ -179,7 +180,8 @@ def main():
         "--entrypoint", args.entrypoint,
         "--os", args.os,
         "--output", args.output,
-        "--binary", args.binary
+        "--binary", args.binary,
+        "--rebase", args.rebase
       ]
       subprocess.run(pass_args)
     else:

@@ -1,17 +1,19 @@
 #!/usr/bin/env python2
 
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specifi
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
 import os
@@ -187,11 +189,11 @@ def acquire_toolset():
   if sys.platform == "win32":
     toolset["llvm-dis"] += ".exe"
 
-  llvm_version = subprocess.check_output([toolset["clang"], "--version"]).split(" ")[2]
+  llvm_version = subprocess.check_output([toolset["clang"], "--version"]).split(" ")[2].split("-")[0]
   print(" i Found LLVM version: " + llvm_version)
   print("   in: {}".format(os.path.dirname(toolset["clang"])))
 
-  mcsema_llvm_version = llvm_version[0:3]
+  mcsema_llvm_version = llvm_version.rsplit('.', 1)[0]
   print(" i Using the following mcsema tools: " + mcsema_llvm_version)
 
   toolset["mcsema-lift"] = spawn.find_executable("mcsema-lift-" + mcsema_llvm_version)
@@ -219,15 +221,17 @@ def acquire_toolset():
     # assumes this must be Windows
     lib_suffix = ".lib"
 
-  toolset["libmcsema_rt32"] = os.path.join(mcsema_root, "lib", "libmcsema_rt32-" + mcsema_llvm_version + lib_suffix)
-  toolset["libmcsema_rt64"] = os.path.join(mcsema_root, "lib", "libmcsema_rt64-" + mcsema_llvm_version + lib_suffix)
+  rt_32 = "libmcsema_rt32-" + mcsema_llvm_version + lib_suffix
+  rt_64 = "libmcsema_rt64-" + mcsema_llvm_version + lib_suffix
+  toolset["libmcsema_rt32"] = os.path.join(mcsema_root, "lib", rt_32)
+  toolset["libmcsema_rt64"] = os.path.join(mcsema_root, "lib", rt_64)
 
   if not os.path.isfile(toolset["libmcsema_rt32"]):
-    print(" x Failed to locate the 32-bit mcsema runtime")
+    print(" x Failed to locate the 32-bit mcsema runtime: " + rt_32)
     return None
 
   if not os.path.isfile(toolset["libmcsema_rt64"]):
-    print(" x Failed to locate the 64-bit mcsema runtime")
+    print(" x Failed to locate the 64-bit mcsema runtime" + rt_64)
     return None
 
   #TODO(artem): support other architectures
@@ -240,7 +244,7 @@ def acquire_toolset():
         mcsema_root,
         "share",
         "mcsema",
-        llvm_version[:3],
+        mcsema_llvm_version,
         "ABI",
         "linux",
         "ABI_{abi}_{arch}.bc".format(abi=abi, arch=arch))
@@ -373,6 +377,8 @@ def lift_test_cfg(test_directory, toolset, test):
                   "--arch", test.architecture(),
                   "--os", test.platform(), "--cfg", test.cfg_path(),
                   "--output", output_file_path,
+                  "--explicit_args",
+                  "--local_state_pointer",
                   "--libc_constructor", "init",
                   "--libc_destructor", "fini", 
                   "--abi_libraries", abi_libs,

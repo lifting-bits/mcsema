@@ -1,16 +1,17 @@
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2020 Trail of Bits, Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import collections
 import idaapi
@@ -61,3 +62,124 @@ def fixup_personality(inst, p):
     if 0 <= inst.segpref <= 0xf and inst.segpref != 0xe:
       return PERSONALITY_CONDITIONAL_BRANCH
   return p
+
+def has_delayed_slot(inst):
+  return False
+
+def fixup_delayed_instr_size(inst):
+  return 4  # All isntructions are four bytes.
+
+def fixup_instr_as_nop(inst):
+  return False
+
+def fixup_function_return_address(inst, next_ea):
+  return next_ea
+
+
+_BAD_ARM_REF_OFF = (idc.BADADDR, 0, 0)
+_INVALID_THUNK_ADDR = (False, idc.BADADDR)
+
+
+def is_ELF_thunk_by_structure(ea):
+  """Try to manually identify an ELF thunk by its structure."""
+  from util import decode_instruction, is_direct_jump, is_indirect_jump
+  from util import is_invalid_ea, get_reference_target
+  global _INVALID_THUNK_ADDR
+  inst = None
+  
+  for i in range(4):  # 1 is good enough for x86, 4 for aarch64.
+    inst, _ = decode_instruction(ea)
+    if not inst:
+      break
+    # elif is_direct_jump(inst):
+    #   ea = get_direct_branch_target(inst)
+    #   inst = None
+    if is_indirect_jump(inst) or is_direct_jump(inst):
+      target_ea = get_reference_target(inst.ea)
+      if not is_invalid_ea(target_ea):
+        seg_name = idc.get_segm_name(target_ea).lower()
+        if ".got" in seg_name or ".plt" in seg_name:
+          target_ea = get_reference_target(target_ea)
+          seg_name = idc.get_segm_name(target_ea).lower()
+
+        if "extern" == seg_name:
+          return True, target_ea
+
+    ea = inst.ea + inst.size
+
+  return _INVALID_THUNK_ADDR
+
+_ARM_REF_CANDIDATES = set()
+
+def _get_arm_ref_candidate(mask, op_val, op_str, all_refs):
+  global _BAD_ARM_REF_OFF, _ARM_REF_CANDIDATES
+
+  try:
+    op_name = op_str.split("@")[0][1:]  # `#asc_400E5C@PAGE` -> `asc_400E5C`.
+    op_name = op_name.split("#")[-1]
+    op_name = op_name.split("+")[0]
+    op_name = op_name.split("(")[-1]
+    ref_ea = idc.get_name_ea_simple(op_name)
+
+    #if (ref_ea & mask) == op_val:
+    return ref_ea, mask, 0
+  except:
+    pass
+
+  # NOTE(pag): We deal with candidates because it's possible that this
+  #            instruction will have multiple references. In the case of
+  #            `@PAGE`-based offsets, it's problematic when the wrong base
+  #            is matched, because it really throws off the C++ side of things
+  #            because the arrangement of the lifted data being on the same
+  #            page is not guaranteed.
+  _ARM_REF_CANDIDATES.clear()
+  for ref_ea in all_refs:
+    if (ref_ea & mask) == op_val:
+      _ARM_REF_CANDIDATES.add(ref_ea)
+      return ref_ea, mask, 0
+
+  if len(_ARM_REF_CANDIDATES):
+    for candidate_ea in _ARM_REF_CANDIDATES:
+      if candidate_ea == op_val:
+        return candidate_ea, mask, 0
+
+    return _ARM_REF_CANDIDATES.pop(), mask, 0
+
+  return _BAD_ARM_REF_OFF
+
+# Try to handle `@PAGE` and `@PAGEOFF` references, resolving them to their
+# 'intended' address.
+#
+# TODO(pag): There must be a better way than just string searching :-/
+def try_get_ref_addr(inst, op, op_val, all_refs, _NOT_A_REF):
+  global _BAD_ARM_REF_OFF
+
+  from util import is_invalid_ea
+
+  #if op.type not in (idc.o_imm, idc.o_displ):
+    # This is a reference type that the other ref tracking code
+    # can handle, return defaults
+  #  return op_val, 0, 0
+
+  op_str = idc.print_operand(inst.ea, op.n)
+
+  if '@PAGEOFF' in op_str:
+    return _get_arm_ref_candidate(4095, op_val, op_str, all_refs)
+
+  elif '@PAGE' in op_str:
+    return _get_arm_ref_candidate(-4096, op_val, op_str, all_refs)
+
+  elif not is_invalid_ea(op_val) and inst.get_canon_mnem().lower() == "adr":
+    return op_val, 0, 0
+
+  return _BAD_ARM_REF_OFF
+
+
+def recover_preserved_regs(M, F, inst, xrefs, preserved_reg_sets):
+  return False
+
+def recover_deferred_preserved_regs(M):
+  return
+
+def recover_function_spec_from_arch(E):
+  return

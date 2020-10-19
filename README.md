@@ -11,7 +11,7 @@ McSema enables analysts to find and retroactively harden binary programs against
 
 McSema supports lifting both Linux (ELF) and Windows (PE) executables, and understands most x86 and amd64 instructions, including integer, X87, MMX, SSE and AVX operations. AARCH64 (ARMv8) instruction support is in active development.
 
-Using McSema is a two-step process: control flow recovery, and instruction translation. Control flow recovery is performed using the `mcsema-disass` tool, which relies on IDA Pro, Binary Ninja, or DynInst to disassemble a binary file and produce a control flow graph. Instruction translation is then performed using the `mcsema-lift` tool, which converts the control flow graph into LLVM bitcode. Under the hood, the instruction translation capability of `mcsema-lift` is implemented in the [`remill` library](https://github.com/lifting-bits/remill). The development of `remill` was a result of refactoring and improvements to McSema, and was first introduced with McSema version 2.0.0. Read more about `remill` [here](https://github.com/lifting-bits/remill).
+Using McSema is a two-step process: control flow recovery, and instruction translation. Control flow recovery is performed using the `mcsema-disass` tool, which relies on IDA Pro to disassemble a binary file and produce a control flow graph. Instruction translation is then performed using the `mcsema-lift` tool, which converts the control flow graph into LLVM bitcode. Under the hood, the instruction translation capability of `mcsema-lift` is implemented in the [`remill` library](https://github.com/lifting-bits/remill). The development of `remill` was a result of refactoring and improvements to McSema, and was first introduced with McSema version 2.0.0. Read more about `remill` [here](https://github.com/lifting-bits/remill).
 
 McSema and `remill` were developed and are maintained by Trail of Bits, funded by and used in research for DARPA and the US Department of Defense.
 
@@ -19,7 +19,7 @@ McSema and `remill` were developed and are maintained by Trail of Bits, funded b
 
 |       | master                                   |
 | ----- | ---------------------------------------- |
-| Linux | [![Build Status](https://travis-ci.org/lifting-bits/mcsema.svg?branch=master)](https://travis-ci.org/lifting-bits/mcsema) |
+| Linux | [![Build Status](https://github.com/lifting-bits/mcsema/workflows/CI/badge.svg)](https://github.com/lifting-bits/mcsema/actions?query=workflow%3ACI) |
 
 ## Features
 
@@ -45,7 +45,7 @@ Why would anyone translate binaries *back* to bitcode?
 * **Write one set of analysis tools**. Lifting to LLVM IR means that one set of analysis tools can work on both the source and the binary. Maintaining a single set of tools saves development time and effort, and allows for a single set of better tools.
 
 ## Comparison with other machine code to LLVM bitcode lifters
-|   | McSema | [dagger](https://github.com/repzret/dagger) | [llvm-mctoll](https://github.com/Microsoft/llvm-mctoll) | [retdec](https://github.com/avast-tl/retdec) | [reopt](https://github.com/GaloisInc/reopt) | [rev.ng](https://github.com/revng/revamb) | [bin2llvm](https://github.com/cojocar/bin2llvm) | [fcd](https://github.com/zneak/fcd) | [RevGen](https://github.com/S2E/tools/tree/master/tools) | [Fracture](https://github.com/draperlaboratory/fracture) | [libbeauty](https://github.com/jcdutton/libbeauty) |
+|   | McSema | [dagger](https://github.com/repzret/dagger) | [llvm-mctoll](https://github.com/Microsoft/llvm-mctoll) | [retdec](https://github.com/avast-tl/retdec) | [reopt](https://github.com/GaloisInc/reopt) | [rev.ng](https://github.com/revng/revamb) | [bin2llvm](https://github.com/cojocar/bin2llvm) | [fcd](https://github.com/zneak/fcd) | [RevGen](https://github.com/S2E/tools/tree/master/tools) | [Fracture](https://github.com/draperlaboratory/fracture) | [libbeauty](https://github.com/pgoodman/libbeauty) |
 |  ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
 |  Actively maintained? | Yes | No | Yes | Yes | Yes | No | Maybe | Maybe | Maybe | No | Yes |
 |  Commercial support available? | Yes | No | No | No | Maybe | No | No | No | No | Maybe | No |
@@ -53,7 +53,7 @@ Why would anyone translate binaries *back* to bitcode?
 |  Builds with CI? | Yes | No | No | Yes | No | No | Yes | Maybe | Maybe | No | No |
 |  32-bit architectures | x86 | x86 | ARM | x86, ARM, MIPS, PIC32, PowerPC |  | ARM, MIPS | S2E | S2E | S2E | ARM, x86 |  |
 |  64-bit architectures | x86-64, AArch64 | x86-64, [AArch64](https://github.com/IAIK/ios-analysis-dagger/)) | x86-64 | x86-64, arm64 & more | x86-64 | x86-64 |  | S2E | S2E | PowerPC | x86-64 |
-|  Control-flow recovery | IDA Pro, Binary Ninja, DynInst | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | McSema | Ad-hoc | Ad-hoc |
+|  Control-flow recovery | IDA Pro | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | McSema | Ad-hoc | Ad-hoc |
 |  File formats | ELF, PE | ELF, Mach-O |  | ELF, PE, Mach-O, COFF, AR, Intel HEX, Raw | ELF | ELF | ELF |  | ELF, PE | ELF, Mach-O (maybe) | ELF |
 |  Bitcode is executable? | Yes | Yes | Yes | Yes | Yes | Yes | No | No | CGC | No | No |
 |  C++ exceptions suport? | Yes | No | No | No | No | Indirectly | No | No | No | No | Maybe |
@@ -79,33 +79,48 @@ Why would anyone translate binaries *back* to bitcode?
 | [Python](https://www.python.org/) | 2.7 | 
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
+| [python-clang](https://pypi.org/project/clang/) | 3.5.0 |
+| [ccsyspath](https://pypi.org/project/ccsyspath/) | 1.1.0 |
 | [IDA Pro](https://www.hex-rays.com/products/ida) | 7.1+ |
-| [Binary Ninja](https://binary.ninja/) | Latest |
-| [Dyninst](https://www.dyninst.org/) | 9.3.2 |
+| [Dyninst](https://www.dyninst.org/) | 9.3.2 * |
+
+* DynInst support is optional if you use the experimental DynInst disassembler. Note: We do not provide support for the DynInst disassembler.
 
 ## Getting and building the code
 
 ### Docker
 
-#### Step 1: Download Dockerfile
+#### Step 1: Clone the repo
 
-`wget https://raw.githubusercontent.com/lifting-bits/mcsema/master/tools/Dockerfile`
-
-#### Step 2: Add your disassembler
-
-Currently IDA, Binary Ninja, and Dyninst are supported for control-flow recovery, it's left as an exercise to the reader to install your disassembler of choice, but an example of installing Binary Ninja is provided (remember for Docker that paths need to be relative to where you built from):
+```bash
+git clone https://github.com/lifting-bits/mcsema
+cd mcsema
 ```
-ADD local-relative/path/to/binaryninja/ /root/binaryninja/
-ADD local-relative/path/to/.binaryninja/ /root/.binaryninja/ # <- Make sure there's no `lastrun` file
-RUN /root/binaryninja/scripts/linux-setup.sh
-```
+
+#### Step 2: Add your disassembler to the Dockerfile
+
+Currently IDA is the only supported frontend for control-flow recovery, it's left as an exercise to the reader to install your disassembler of choice. Experimental support for DynInst is available but may be buggy and sometimes get out of date, as we do not officially support it. DynInst support is provided as an exemplar of how to make a third-party disassembler.
 
 #### Step 3: Build & Run Dockerfile
 
-This will build the container for you and run it with your local directory mounted into the container (at /home/user/local) such that your work in the container is saved locally:
-`docker build -t=mcsema . && docker run --rm -it --ipc=host -v "${PWD}":/home/user/local mcsema`
+This will build the container for you and run it with your local directory mounted into the container (at `/mcsema/local`) such that your work in the container is saved locally:
 
-### On Linux
+```sh
+# build mcsema container
+ARCH=amd64; UBUNTU=18.04; LLVM=800; docker build . \
+  -t mcsema:llvm${LLVM}-ubuntu${UBUNTU}-${ARCH} \
+  -f Dockerfile \
+  --build-arg UBUNTU_VERSION=${UBUNTU} \
+  --build-arg LLVM_VERSION=${LLVM} \
+  --build-arg ARCH=${ARCH}
+
+# run mcsema container lifter
+docker run --rm -it --ipc=host -v "$(pwd)":/mcsema/local mcsema:llvm${LLVM}-ubuntu{$UBUNTU}-${ARCH}
+# run mcsema container disassembler
+docker run --rm -it --entrypoint=mcsema-disass --ipc=host -v "$(pwd)":/mcsema/local mcsema:llvm${LLVM}-ubuntu{$UBUNTU}-${ARCH}
+```
+
+### Native Build On Linux
 
 #### Step 1: Install dependencies
 
@@ -165,15 +180,11 @@ popd
 
 The next step is to clone the [Remill](https://github.com/lifting-bits/remill) repository. We then clone the McSema repository into the `tools` subdirectory of Remill. This is kind of like how Clang and LLVM are distributed separately, and the Clang source code needs to be put into LLVM's tools directory.
 
-**Notice that when building McSema, you should always use a specific Remill commit hash (the one we test). This hash can be found in the .remill_commit_id file**.
-
 ```shell
 git clone --depth 1 https://github.com/lifting-bits/mcsema.git
-export REMILL_VERSION=`cat ./mcsema/.remill_commit_id`
 
 git clone https://github.com/lifting-bits/remill.git
 cd remill
-git checkout -b temp ${REMILL_VERSION}
 
 mv ../mcsema tools
 ```
@@ -268,7 +279,7 @@ Note that for production usage you should always use a specific remill commit (`
 ```
 cd remill
 git fetch --unshallow
-git checkout -b production `cat tools/mcsema/.remill_commit_id`
+git checkout -b production <commit>
 ```
 
 #### Step 3: Enabling the LLVM toolchain for Visual Studio
@@ -304,7 +315,7 @@ Make sure to always execute the `vcvars64.bat` script from the "x64 Native Tools
 mkdir remill_build
 cd remill_build
 
-cmake -G "Visual Studio 16 2019" -T llvm -A x64 -DCMAKE_BUILD_TYPE=Release -DLIBRARY_REPOSITORY_ROOT=C:\Projects\tob_libraries -DCMAKE_INSTALL_PREFIX=C:\ ..\remill
+cmake -G "Visual Studio 16 2019" -T llvm -A x64 -DCMAKE_BUILD_TYPE=Release -DCXX_COMMON_REPOSITORY_ROOT=C:\Projects\tob_libraries -DCMAKE_INSTALL_PREFIX=C:\ ..\remill
 cmake --build . --config Release -- /maxcpucount:%NUMBER_OF_PROCESSORS%
 ```
 
@@ -372,7 +383,7 @@ This is a hotly contested issue. We must explore the etymology of the name to fi
 
 ### Why do I need IDA Pro to use McSema
 
-You don't! You can also use Binary Ninja or [Dyninst](tools/mcsema_disass/dyninst/README.md) to fill the role of IDA Pro; however, in our experiments, IDA Pro tends to be most reliable and both the product itself, and our scripts using it, have more person-years of development behind them.
+IDA Pro is an excellent disassembler, and in our experience, it has been the most reliable disassembler to use in McSema. The way in which IDA Pro exposes information about cross-references closely matches how McSema stores that information in its CFG file, which is convenient. We also feature an experimental, not officially supported [DynInst disassembler frontend](tools/mcsema_disass/dyninst/README.md). This frontent exists mostly to support open-source uses cases, but is not actively maintained, and may be out of date. The Dyninst frontend is a good example of how to make a new frontend.
 
 ### What is Remill, and why does McSema need it
 

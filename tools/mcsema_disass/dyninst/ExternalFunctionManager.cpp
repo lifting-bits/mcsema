@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2018 Trail of Bits, Inc.
+ * Copyright (c) 2020 Trail of Bits, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "ExternalFunctionManager.h"
 
 #include <glog/logging.h>
 
-mcsema::ExternalFunction *ExternalFunction::WriteHelper(
-    mcsema::Module &module,
-    uint64_t ea) {
+mcsema::ExternalFunction *ExternalFunction::WriteHelper(mcsema::Module &module,
+                                                        uint64_t ea) {
   auto cfg_external_func = module.add_external_funcs();
 
   cfg_external_func->set_name(symbol_name);
@@ -34,8 +34,7 @@ mcsema::ExternalFunction *ExternalFunction::WriteHelper(
   return cfg_external_func;
 }
 
-mcsema::ExternalFunction *ExternalFunction::Write(
-    mcsema::Module &module) {
+mcsema::ExternalFunction *ExternalFunction::Write(mcsema::Module &module) {
   WriteHelper(module, ea);
   return WriteHelper(module, imag_ea);
 }
@@ -46,8 +45,7 @@ ExternalFunction::CfgCC ExternalFunction::CfgCallingConvention() const {
       return mcsema::ExternalFunction::CallerCleanup;
     case CallingConvention::CalleeCleanup:
       return mcsema::ExternalFunction::CalleeCleanup;
-    default:
-      return mcsema::ExternalFunction::FastCall;
+    default: return mcsema::ExternalFunction::FastCall;
   }
 }
 
@@ -58,11 +56,11 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &name,
 
 void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
   if (s.empty()) {
-    return; // Empty line
+    return;  // Empty line
   } else if (s.front() == '#') {
-    return; // Comment line
+    return;  // Comment line
   } else if (s.substr(0, 5) == "DATA:") {
-    return; // Refers to external data, not a function
+    return;  // Refers to external data, not a function
   }
 
   std::string rest = s;
@@ -119,8 +117,8 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
 
         bool is_weak = true;
 
-        ExternalFunction func{symbolName, callConv, !noReturn, argCount,
-                              is_weak, signature};
+        ExternalFunction func{symbolName, callConv, !noReturn,
+                              argCount,   is_weak,  signature};
 
         external_funcs[symbolName] = std::move(func);
         return;
@@ -158,14 +156,16 @@ ExternalFunctionManager::GetExternalFunction(const std::string &name) {
   return external_func->second;
 }
 
-void ExternalFunctionManager::ClearUsed() { used_funcs.clear(); }
+void ExternalFunctionManager::ClearUsed() {
+  used_funcs.clear();
+}
 
 void ExternalFunctionManager::MarkAsUsed(const std::string &name) {
   used_funcs.insert(name);
 }
 
-std::vector<ExternalFunction> ExternalFunctionManager::GetAllUsed(
-    std::vector<std::string>& unknowns) const {
+std::vector<ExternalFunction>
+ExternalFunctionManager::GetAllUsed(std::vector<std::string> &unknowns) const {
 
   std::vector<ExternalFunction> result;
 
