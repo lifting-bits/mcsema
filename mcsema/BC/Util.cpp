@@ -222,4 +222,28 @@ llvm::Value *GetTLSBaseAddress(llvm::IRBuilder<> &ir) {
   return nullptr;
 }
 
+void SetMetadata(llvm::GlobalObject &go,
+                 const std::string &kind, const std::string &val) {
+  if (go.getMetadata(kind)) {
+    LOG(WARNING) << remill::LLVMThingToString(&go) << " already has metadata of kind: "
+                 << kind;
+  }
+  auto &ctx = go.getContext();
+  auto node = llvm::MDNode::get(ctx, llvm::MDString::get(ctx, val));
+  go.setMetadata(kind, node);
+}
+
+MetaValue GetMetadata(llvm::GlobalObject &go, const std::string &kind) {
+  auto node = go.getMetadata(kind);
+  if (!node) {
+    return {};
+  }
+
+  CHECK(node->getNumOperands() == 1)
+    << "util::GetMetada does not support nodes with more than one operand";
+
+  return { llvm::cast<llvm::MDString>(node->getOperand(0))->getString().str() };
+}
+
+
 }  // namespace mcsema

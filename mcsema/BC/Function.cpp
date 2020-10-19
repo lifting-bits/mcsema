@@ -44,6 +44,7 @@
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Callback.h"
 #include "mcsema/BC/Instruction.h"
+#include "mcsema/BC/Info.h"
 #include "mcsema/BC/Legacy.h"
 #include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Optimize.h"
@@ -1452,6 +1453,9 @@ static llvm::Function *LiftFunction(const NativeModule *cfg_module,
   lifted_func->removeFnAttr(llvm::Attribute::AlwaysInline);
   lifted_func->removeFnAttr(llvm::Attribute::InlineHint);
   lifted_func->addFnAttr(llvm::Attribute::NoInline);
+  
+  // Annotate the lifted function.
+  info::Set( { cfg_func->name, cfg_func->ea }, *lifted_func );
 
   if (FLAGS_stack_protector) {
     lifted_func->addFnAttr(llvm::Attribute::StackProtectReq);
