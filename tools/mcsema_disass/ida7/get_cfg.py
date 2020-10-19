@@ -634,9 +634,9 @@ def try_recovery_external_flow(I, inst, refs):
   R.operand_type = CFG_pb2.CodeReference.ControlFlowOperand
 
   if is_indirect_jump(inst):
-    DEBUG("Tail-calls external {}".format(R.name))
+    DEBUG("Tail-calls external {}".format(R.ea))
   else:
-    DEBUG("Calls external {}".format(R.name))
+    DEBUG("Calls external {}".format(R.ea))
 
 # Groups preserved register sets that save/restore the same set of registers.
 _REG_SETS = {}
