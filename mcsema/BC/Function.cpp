@@ -1436,12 +1436,6 @@ static llvm::Function *LiftFunction(const NativeModule *cfg_module,
     return lifted_func;
   }
 
-  if (cfg_func->blocks.empty()) {
-    LOG(WARNING) << "Function " << cfg_func->lifted_name << " is empty!";
-    remill::AddTerminatingTailCall(lifted_func, intrinsics.missing_block);
-    return lifted_func;
-  }
-
   remill::CloneBlockFunctionInto(lifted_func);
 
   lifted_func->removeFnAttr(llvm::Attribute::NoReturn);
@@ -1473,9 +1467,15 @@ static llvm::Function *LiftFunction(const NativeModule *cfg_module,
 
   // Collect the known set of blocks into a work list, and add basic blocks
   // for each of them.
-  for (const auto cfg_block : cfg_func->blocks) {
-    const auto block_ea = cfg_block->ea;
-    (void) GetOrCreateBlock(ctx, block_ea, true /* force */);
+  if (cfg_func->blocks.empty()) {
+    LOG(WARNING) << "Function " << cfg_func->lifted_name << " is empty!";
+    GetOrCreateBlock(ctx, cfg_func->ea, true /* force */);
+
+  } else {
+    for (const auto cfg_block : cfg_func->blocks) {
+      const auto block_ea = cfg_block->ea;
+      (void) GetOrCreateBlock(ctx, block_ea, true /* force */);
+    }
   }
 
   std::sort(ctx.work_list.begin(), ctx.work_list.end(),
