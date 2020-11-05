@@ -25,6 +25,7 @@ McSema and `remill` were developed and are maintained by Trail of Bits, funded b
 
 * Lifts 32- and 64-bit Linux ELF and Windows PE binaries to bitcode, including executables and shared libraries for each platform.
 * Supports a large subset of x86 and x86-64 instructions, including most integer, X87, MMX, SSE, and AVX operations.
+* Supports a large subset of AArch64, SPARCv8+ (SPARC32), and SPARCv9 (SPARC64) instuctions.
 * McSema runs on Windows and Linux and has been tested on Windows 7, 10, Ubuntu (14.04, 16.04, 18.04), and openSUSE.
 * McSema can cross-lift: it can translate Linux binaries on Windows, or Windows binaries on Linux.
 * Output bitcode is compatible with the LLVM toolchain (versions 3.5 and up).
@@ -51,8 +52,8 @@ Why would anyone translate binaries *back* to bitcode?
 |  Commercial support available? | Yes | No | No | No | Maybe | No | No | No | No | Maybe | No |
 |  LLVM versions | 3.5 - current | 5 | current | 4.0 | 3.8 | 3.8 | 3.2 | 4 | 3.9 | 3.4 | 6 |
 |  Builds with CI? | Yes | No | No | Yes | No | No | Yes | Maybe | Maybe | No | No |
-|  32-bit architectures | x86 | x86 | ARM | x86, ARM, MIPS, PIC32, PowerPC |  | ARM, MIPS | S2E | S2E | S2E | ARM, x86 |  |
-|  64-bit architectures | x86-64, AArch64 | x86-64, [AArch64](https://github.com/IAIK/ios-analysis-dagger/)) | x86-64 | x86-64, arm64 & more | x86-64 | x86-64 |  | S2E | S2E | PowerPC | x86-64 |
+|  32-bit architectures | x86, SPARC32 | x86 | ARM | x86, ARM, MIPS, PIC32, PowerPC |  | ARM, MIPS | S2E | S2E | S2E | ARM, x86 |  |
+|  64-bit architectures | x86-64, AArch64, SPARC64 | x86-64, [AArch64](https://github.com/IAIK/ios-analysis-dagger/)) | x86-64 | x86-64, arm64 & more | x86-64 | x86-64 |  | S2E | S2E | PowerPC | x86-64 |
 |  Control-flow recovery | IDA Pro | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | McSema | Ad-hoc | Ad-hoc |
 |  File formats | ELF, PE | ELF, Mach-O |  | ELF, PE, Mach-O, COFF, AR, Intel HEX, Raw | ELF | ELF | ELF |  | ELF, PE | ELF, Mach-O (maybe) | ELF |
 |  Bitcode is executable? | Yes | Yes | Yes | Yes | Yes | Yes | No | No | CGC | No | No |
@@ -68,21 +69,17 @@ Why would anyone translate binaries *back* to bitcode?
 | Name | Version | 
 | ---- | ------- |
 | [Git](https://git-scm.com/) | Latest |
-| [CMake](https://cmake.org/) | Latest |
-| [Google Protobuf](https://github.com/google/protobuf) | 2.6.1 |
-| [Google Flags](https://github.com/google/glog) | Latest |
-| [Google Log](https://github.com/google/glog) | Latest |
-| [Google Test](https://github.com/google/googletest) | Latest |
-| [Intel XED](https://github.com/intelxed/xed) | Latest |
-| [LLVM](http://llvm.org/) | 3.5+ |
-| [Clang](http://clang.llvm.org/) | 3.5+ |
-| [Python](https://www.python.org/) | 2.7 | 
+| [CMake](https://cmake.org/) | 3.2+ |
+| [Remill](https://github.com/lifting-bits/remill) | Latest |
+| [Anvill](https://github.com/lifting-bits/anvill) | Latest |
+| [Python](https://www.python.org/) | 2.7, 3.8 | 
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
 | [python-clang](https://pypi.org/project/clang/) | 3.5.0 |
 | [ccsyspath](https://pypi.org/project/ccsyspath/) | 1.1.0 |
-| [IDA Pro](https://www.hex-rays.com/products/ida) | 7.1+ |
-| [Dyninst](https://www.dyninst.org/) | 9.3.2 * |
+| [IDA Pro](https://www.hex-rays.com/products/ida) | 7.5+ |
+| macOS | Latest |
+| Ubuntu | 18.04, 20.04 |
 
 * DynInst support is optional if you use the experimental DynInst disassembler. Note: We do not provide support for the DynInst disassembler.
 
@@ -90,7 +87,7 @@ Why would anyone translate binaries *back* to bitcode?
 
 ### Docker
 
-#### Step 1: Clone the repo
+#### Step 1: Clone the repository
 
 ```bash
 git clone https://github.com/lifting-bits/mcsema
@@ -106,7 +103,7 @@ Currently IDA is the only supported frontend for control-flow recovery, it's lef
 This will build the container for you and run it with your local directory mounted into the container (at `/mcsema/local`) such that your work in the container is saved locally:
 
 ```sh
-# build mcsema container
+# Build McSema container
 ARCH=amd64; UBUNTU=18.04; LLVM=800; docker build . \
   -t mcsema:llvm${LLVM}-ubuntu${UBUNTU}-${ARCH} \
   -f Dockerfile \
@@ -114,15 +111,19 @@ ARCH=amd64; UBUNTU=18.04; LLVM=800; docker build . \
   --build-arg LLVM_VERSION=${LLVM} \
   --build-arg ARCH=${ARCH}
 
-# run mcsema container lifter
+# Run McSema container lifter
 docker run --rm -it --ipc=host -v "$(pwd)":/mcsema/local mcsema:llvm${LLVM}-ubuntu{$UBUNTU}-${ARCH}
-# run mcsema container disassembler
+
+# Run McSema container disassembler
 docker run --rm -it --entrypoint=mcsema-disass --ipc=host -v "$(pwd)":/mcsema/local mcsema:llvm${LLVM}-ubuntu{$UBUNTU}-${ARCH}
 ```
 
-### Native Build On Linux
+### Native Build
 
-#### Step 1: Install dependencies
+#### Linux pre-requisites
+
+Native builds on Linux are supported for Ubuntu 18.04 and 20.04. We only support
+LTS Ubuntu releases.
 
 ```shell
 sudo apt-get update
@@ -138,22 +139,58 @@ sudo apt-get install \
      gcc-multilib g++-multilib \
      libtinfo-dev \
      lsb-release \
+     zip \
      zlib1g-dev \
      ccache
 ```
 
-For Ubuntu 16.04 and 14.04 you also need to install the realpath package.
+##### Ubuntu 14.04 and Ubuntu 16.04
 
-If you are going to be using IDA Pro for CFG recovery also do the following:
-
-```shell
-sudo dpkg --add-architecture i386
-sudo apt-get install zip zlib1g-dev:i386
+```bash
+sudo apt-get install realpath
 ```
 
-#### Step 1.5 (Optional): Create a virtualenv for your McSema installation
+##### Ubuntu 18.04
 
-Using a [virtualenv](https://virtualenv.pypa.io/en/stable/) ensures that your mcsema installation does not interfere with other software packages. This setup is especially helpful if you are hacking on mcsema and want to avoid clobbering a global, working version with development code.
+```bash
+sudo apt-get install -qqy --no-install-recommends libtinfo5
+```
+
+##### Ubuntu 20.04
+
+```bash
+sudo apt-get install -qqy --no-install-recommends libtinfo6
+```
+
+#### macOS pre-requisites
+
+Download and install the [Homebrew](https://brew.sh) package manager.
+
+Make sure to download XCode from the App Store if you don't have it. After
+downloading XCode, make sure to open it at least once, as it might install
+more stuff.
+
+```bash
+brew update
+xcode-select --install 2>&1 > /dev/null
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+brew install coreutils ccache
+pip3 install requests
+```
+
+Double check that you have the correct Clang installed. You should see something like this:
+
+```bash
+% clang -v
+Apple clang version 12.0.0 (clang-1200.0.32.21)
+Target: x86_64-apple-darwin19.6.0
+Thread model: posix
+InstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
+```
+
+#### Step 1 (Optional): Create a virtualenv for your McSema installation
+
+Using a [virtualenv](https://virtualenv.pypa.io/en/stable/) ensures that your McSema installation does not interfere with other software packages. This setup is especially helpful if you are hacking on McSema and want to avoid clobbering a global, working version with development code.
 
 ```shell
 mkdir mcsema-ve
@@ -161,96 +198,66 @@ virtualenv mcsema-ve
 cd mcsema-ve
 source bin/activate
 ```
-##### Fixing IDA Pro's Python installation (Ubuntu 14.04)
 
-Note: If you are using IDA on 64 bit Ubuntu and your IDA install does not use the system Python, you can add the `protobuf` library manually to IDA's zip of modules.
-
-```shell
-# Python module dir is generally in /usr/lib or /usr/local/lib
-IDAPYTHON=/home/$USER/ida-6.9/python/lib/python27.zip
-GOOGLEMODULE=$(python -c "import os; import sys; import google; sys.stdout.write(os.path.dirname(google.__file__))")
-pushd ${GOOGLEMODULE}/..
-chmod +w ${IDAPYTHON}
-zip -rv ${IDAPYTHON} google/
-chmod -w ${IDAPYTHON}
-popd
-```
-
-#### Step 2: Clone the repository
+#### Step 2: Clone the repository and its dependencies
 
 The next step is to clone the [Remill](https://github.com/lifting-bits/remill) repository. We then clone the McSema repository into the `tools` subdirectory of Remill. This is kind of like how Clang and LLVM are distributed separately, and the Clang source code needs to be put into LLVM's tools directory.
 
 ```shell
-git clone --depth 1 https://github.com/lifting-bits/mcsema.git
+git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/remill.git
+git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/anvill.git
+git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/mcsema.git
 
-git clone https://github.com/lifting-bits/remill.git
-cd remill
-
-mv ../mcsema tools
-```
-
-#### Step 3: Build McSema
-
-McSema is a kind of sub-project of Remill, similar to how Clang is a sub-project of LLVM. To that end, we invoke Remill's build script to build both Remill and McSema. It will also download all remaining dependencies needed by Remill.
-
-The following script will build Remill and McSema into the `remill-build` directory, which will be placed in the current working directory.
-
-```shell
-if [ -z "${VIRTUAL_ENV}" ]
-then
-  # no virtualenv; global install for all users
-  ./scripts/build.sh
-else
-  # found a virtualenv; local install
-  ./scripts/build.sh --prefix $(realpath ../)
-fi
-```
-
-In case you want to use Dyninst as the frontend do this instead (after Dyninst 9.3.2 has been installed to the standard /usr/local location):
-```shell
-export CMAKE_PREFIX_PATH=/usr/local/lib/cmake/Dyninst
-if [ -z "${VIRTUAL_ENV}" ]
-then
-  # no virtualenv; global install for all users
-  ./scripts/build.sh --dyninst-frontend
-else
-  # found a virtualenv; local install
-  ./scripts/build.sh --dyninst-frontend --prefix $(realpath ../)
-fi
-```
-Details can be found in [Dyninst frontend](tools/mcsema_disass/dyninst/README.md).
-
-This script accepts several command line options:
-
-* `--prefix PATH`: Install files to `PATH`. By default, `PATH` is `/usr/local`.
-* `--llvm-version MAJOR.MINOR`: Download pre-built dependencies for LLVM version MAJOR.MINOR. The default is to use LLVM 4.0.
-* `--build-dir PATH`: Produce all intermediate build files in `PATH`. By default, `PATH` is `$CWD/remill-build`.
-* `--use-host-compiler`: Compile Remill+McSema using the system compiler toolchain (typically the GCC). **If you encounter linker errors when compiling McSema, and did not use this option, then re-try with this option.**
-* `--debug`: Build McSema and Remill with debug symbols. If you're trying to debug McSema, then this option is for you.
-
-#### Step 4: Install McSema
-
-The next step is to build the code.
-
-```shell
-cd remill-build
 if [ -z "${VIRTUAL_ENV}" ]
 then
   # no virtualenv; global install for all users requires sudo
-  sudo make install
+  function make_install { ;  sudo make install ; }
 else
   # found a virtualenv; local install does not need root
-  make install
+  function make_install { ;  make install ; }
 fi
+
+# Download cxx-common, build Remill. 
+./remill/scripts/build.sh --llvm-version 9.0
+cd remill-build
+make_install
+
+export TRAILOFBITS_LIBRARIES=`pwd`/remill-build/libraries
+
+# Build and install Anvill
+mkdir anvill-build
+pushd anvill-build
+${TRAILOFBITS_LIBRARIES}/cmake/bin/cmake ../anvill
+make
+make_install
+popd
+
+# Build and install McSema
+mkdir mcsema-build
+pushd mcsema-build
+${TRAILOFBITS_LIBRARIES}/cmake/bin/cmake ../mcsema
+make
+make_install
+popd
 ```
 
 Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcsema-lift-4.0` for lifting the disassembled binaries. If you specified `--llvm-version 3.6` to the `build.sh` script, then you would use `mcsema-lift-3.6`.
 
-#### Step 5: Verifying Your McSema Installation
+#### Step 3: Verifying Your McSema Installation
+
+Step 2 specified `--llvm-version 9.0` to Remill's `build.sh` script. This means
+that Remill, Anvill, and McSema have all been built against a copy of LLVM 9.0.
+To enable you to use multiple LLVM versions simultaneously, we suffix our binaries
+with the LLVM version. Thus, you may use `mcsema-lift-9.0` to lift to LLVM 9.0 bitcode.
+
+Try running `mcsema-lift-9.0 --version` to see if McSema has been installed.
+
+##### Run the integration tests
 
 In order to verify that McSema works correctly as built, head on over to [the documentation on integration tests](tests/MakingTests.md). Check that you can run the tests and that they pass.
 
-### On Windows
+### On Windows (Experimental, may not work)
+
 #### Step 1: Installing the toolchain
 **Visual Studio**
 1. Click on "Tools for Visual Studio 2019" and download the "Build Tools for Visual Studio 2019" installer from the [Visual Studio downloads page](https://visualstudio.microsoft.com/downloads/)
@@ -274,7 +281,7 @@ git clone https://github.com/lifting-bits/remill.git --depth=1
 git clone https://github.com/lifting-bits/mcsema.git --depth=1 remill/tools/mcsema
 ```
 
-Note that for production usage you should always use a specific remill commit (`remill/tools/mcsema/.remill_commit_id`) when building mcsema. At the time of writing, it is however best to use HEAD (or at least make sure that commit `e7795be` is present in the remill branch).
+Note that for production usage you should always use a specific remill commit (`remill/tools/mcsema/.remill_commit_id`) when building McSema. At the time of writing, it is however best to use HEAD (or at least make sure that commit `e7795be` is present in the remill branch).
 
 ```
 cd remill
@@ -301,7 +308,7 @@ The extension is in fact a ZIP archive; extract it and copy the VCTargets folder
 
 Its time to fetch library dependencies. You can either build them yourself using our [cxx-common](https://github.com/trailofbits/cxx-common) dependency manager or download a pre-built package.
 
-There are two versions of LLVM used by remill and mcsema. One version (currently 7.0.1) builds remill and mcsema. Another version (currently 5.0.1) is used to build the translation semantics.
+There are two versions of LLVM used by Remill and McSema. One version (currently 7.0.1) builds remill and McSema. Another version (currently 5.0.1) is used to build the translation semantics.
 
 On Windows, only the LLVM 5.0.1 package is supported for building semantics. If you build it yourself, use the Visual Studio 2017 Win64 generator with the LLVM 5.0.1 toolchain. The cxx-common script will automatically take care of this requirement.
 

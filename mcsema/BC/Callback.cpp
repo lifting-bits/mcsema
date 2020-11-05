@@ -317,27 +317,31 @@ static llvm::Constant *InitialStackPointerValue(void) {
 
 static llvm::InlineAsm *ThreadPointerAsm(void) {
   auto fty = llvm::FunctionType::get(gWordType, false);
-  if (gArch->IsX86()) {
+  switch (gArch->arch_name) {
+    case remill::kArchX86:
+    case remill::kArchX86_AVX:
+    case remill::kArchX86_AVX512: {
+      switch (gArch->os_name) {
+        case remill::kOSLinux:
+          return llvm::InlineAsm::get(fty, "mov %gs:0, $0", "=r,~{memory}", false,
+                                      false, llvm::InlineAsm::AD_ATT);
 
-    switch (gArch->os_name) {
-      case remill::kOSLinux:
-        return llvm::InlineAsm::get(fty, "mov %gs:0, $0", "=r,~{memory}", false,
-                                    false, llvm::InlineAsm::AD_ATT);
+        case remill::kOSmacOS:
+          LOG(FATAL) << "32-bit macOS targets are not supported";
+          break;
 
-      case remill::kOSmacOS:
-        LOG(FATAL) << "32-bit macOS targets are not supported";
-        break;
+        case remill::kOSWindows:
+          return llvm::InlineAsm::get(fty, "mov %fs:0, $0", "=r,~{memory}", false,
+                                      false, llvm::InlineAsm::AD_ATT);
 
-      case remill::kOSWindows:
-        return llvm::InlineAsm::get(fty, "mov %fs:0, $0", "=r,~{memory}", false,
-                                    false, llvm::InlineAsm::AD_ATT);
-
-      default: break;
+        default: break;
+      }
+      break;
     }
 
-  } else if (gArch->IsAMD64()) {
-    if (gArch->IsX86()) {
-
+    case remill::kArchAMD64:
+    case remill::kArchAMD64_AVX:
+    case remill::kArchAMD64_AVX512: {
       switch (gArch->os_name) {
         case remill::kOSLinux:
           return llvm::InlineAsm::get(fty, "mov %fs:0, $0", "=r,~{memory}",
@@ -353,14 +357,19 @@ static llvm::InlineAsm *ThreadPointerAsm(void) {
 
         default: break;
       }
+      break;
     }
-  } else if (gArch->IsAArch64()) {
-    return llvm::InlineAsm::get(fty, "mov $0, %TPIDR_EL0", "=r,~{memory}",
-                                false, false, llvm::InlineAsm::AD_ATT);
+    case remill::kArchAArch64LittleEndian:
+      return llvm::InlineAsm::get(fty, "mov $0, %TPIDR_EL0", "=r,~{memory}",
+                                  false, false, llvm::InlineAsm::AD_ATT);
 
-  } else if (gArch->IsSPARC32() || gArch->IsSPARC64()) {
-    return llvm::InlineAsm::get(fty, "mov $0, %g7", "=r,~{memory}", false,
-                                false, llvm::InlineAsm::AD_ATT);
+    case remill::kArchSparc32:
+    case remill::kArchSparc64:
+      return llvm::InlineAsm::get(fty, "mov $0, %g7", "=r,~{memory}", false,
+                                  false, llvm::InlineAsm::AD_ATT);
+
+    default:
+      break;
   }
 
   LOG(FATAL) << "Cannot determine inline assembly for accessing thread base";
