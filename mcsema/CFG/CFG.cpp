@@ -15,9 +15,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wdocumentation"
+#pragma clang diagnostic ignored "-Wswitch-enum"
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <llvm/IR/Module.h>
+#pragma clang diagnostic pop
 
 #include <cctype>
 #include <fstream>
@@ -32,6 +39,7 @@
 #pragma clang diagnostic ignored "-Wshorten-64-to-32"
 #include <CFG.pb.h>
 #pragma clang diagnostic pop
+
 #include <anvill/Decl.h>
 #include <anvill/TypeParser.h>
 #include <google/protobuf/io/coded_stream.h>
@@ -1356,6 +1364,17 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     entry.second = func;
 
     if (!func->is_exported && !func->is_external) {
+      continue;
+    }
+
+    // Don't export these. They shouldn't be allowed to conflict with any
+    // originals if we recompile to sparc/x86.
+    if ((func->is_exported && gArch->IsSPARC64() &&
+         func->name.find("__sparc_get_pc_thunk") == 0) ||
+        (func->is_exported && gArch->IsX86() &&
+         func->name.find("__x86.get_pc_thunk") == 0)) {
+
+      func->is_exported = false;
       continue;
     }
 

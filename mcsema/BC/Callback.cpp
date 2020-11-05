@@ -17,8 +17,12 @@
 
 #include "mcsema/BC/Callback.h"
 
-#include <anvill/Decl.h>
-#include <anvill/Lift.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wdocumentation"
+#pragma clang diagnostic ignored "-Wswitch-enum"
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <llvm/IR/BasicBlock.h>
@@ -29,6 +33,10 @@
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
+#pragma clang diagnostic pop
+
+#include <anvill/Decl.h>
+#include <anvill/Lift.h>
 #include <remill/Arch/Arch.h>
 #include <remill/Arch/Name.h>
 #include <remill/BC/ABI.h>
@@ -70,6 +78,9 @@ DEFINE_uint32(explicit_args_stack_size, 4096 * 256 /* 1 MiB */,
 
 DEFINE_uint32(explicit_args_tls_size, 4 * 4096,
               "Number of bytes of thread local storage");
+
+DEFINE_bool(use_native_thread_base, false,
+            "Try to find and use the native thread base pointer.");
 
 DECLARE_bool(stack_protector);
 
@@ -283,7 +294,85 @@ static llvm::Constant *InitialStackPointerValue(void) {
   auto gep =
       llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, stack, indexes);
 #endif
-  return llvm::ConstantExpr::getPtrToInt(gep, gWordType);
+  auto ival = llvm::ConstantExpr::getPtrToInt(gep, gWordType);
+
+  if (gArch->IsLinux() || gArch->IsMacOS() || gArch->IsSolaris()) {
+
+    // SysV ABI requires that `esp + 4` is 16-byte aligned.
+    if (gArch->IsX86()) {
+      ival = llvm::ConstantExpr::getAnd(
+          ival, llvm::ConstantInt::get(gWordType, ~15u));
+      ival = llvm::ConstantExpr::getSub(ival,
+                                        llvm::ConstantInt::get(gWordType, 4u));
+
+    // `rsp` is 16-byte aligned on entry to a function.
+    } else if (gArch->IsAMD64()) {
+      ival = llvm::ConstantExpr::getAnd(
+          ival, llvm::ConstantInt::get(gWordType, ~15ull));
+    }
+  }
+
+  return ival;
+}
+
+static llvm::InlineAsm *ThreadPointerAsm(void) {
+  auto fty = llvm::FunctionType::get(gWordType, false);
+  switch (gArch->arch_name) {
+    case remill::kArchX86:
+    case remill::kArchX86_AVX:
+    case remill::kArchX86_AVX512: {
+      switch (gArch->os_name) {
+        case remill::kOSLinux:
+          return llvm::InlineAsm::get(fty, "mov %gs:0, $0", "=r,~{memory}", false,
+                                      false, llvm::InlineAsm::AD_ATT);
+
+        case remill::kOSmacOS:
+          LOG(FATAL) << "32-bit macOS targets are not supported";
+          break;
+
+        case remill::kOSWindows:
+          return llvm::InlineAsm::get(fty, "mov %fs:0, $0", "=r,~{memory}", false,
+                                      false, llvm::InlineAsm::AD_ATT);
+
+        default: break;
+      }
+      break;
+    }
+
+    case remill::kArchAMD64:
+    case remill::kArchAMD64_AVX:
+    case remill::kArchAMD64_AVX512: {
+      switch (gArch->os_name) {
+        case remill::kOSLinux:
+          return llvm::InlineAsm::get(fty, "mov %fs:0, $0", "=r,~{memory}",
+                                      false, false, llvm::InlineAsm::AD_ATT);
+
+        case remill::kOSmacOS:
+          LOG(FATAL) << "32-bit macOS targets are not supported";
+          break;
+
+        case remill::kOSWindows:
+          return llvm::InlineAsm::get(fty, "mov %gs:0, $0", "=r,~{memory}",
+                                      false, false, llvm::InlineAsm::AD_ATT);
+
+        default: break;
+      }
+      break;
+    }
+    case remill::kArchAArch64LittleEndian:
+      return llvm::InlineAsm::get(fty, "mov $0, %TPIDR_EL0", "=r,~{memory}",
+                                  false, false, llvm::InlineAsm::AD_ATT);
+
+    case remill::kArchSparc32:
+    case remill::kArchSparc64:
+      return llvm::InlineAsm::get(fty, "mov $0, %g7", "=r,~{memory}", false,
+                                  false, llvm::InlineAsm::AD_ATT);
+
+    default:
+      break;
+  }
+
+  LOG(FATAL) << "Cannot determine inline assembly for accessing thread base";
 }
 
 static const char *ThreadPointerNameX86(void) {
@@ -325,7 +414,10 @@ static const char *ThreadPointerName(void) {
 }
 
 // Create an array of data for holding thread-local storage.
-static llvm::Constant *InitialThreadLocalStorage(void) {
+static llvm::Value *InitialThreadLocalStorage(llvm::IRBuilder<> &ir) {
+  if (FLAGS_use_native_thread_base) {
+    return ir.CreateCall(ThreadPointerAsm());
+  }
 
   // Add some TLS pages.
   llvm::ArrayType *tls_type = llvm::ArrayType::get(
@@ -404,7 +496,7 @@ static llvm::Function *CreateVerifyRegState(void) {
   // Store the address of `__mcsema_tls` into the TLS register.
   if (auto tp_name = ThreadPointerName(); tp_name) {
     if (auto tp_reg = gArch->RegisterByName(tp_name); tp_reg) {
-      ir.CreateStore(InitialThreadLocalStorage(),
+      ir.CreateStore(InitialThreadLocalStorage(ir),
                      tp_reg->AddressOf(reg_state, is_null_block));
     }
   }
@@ -493,7 +585,7 @@ ImplementExplicitArgsEntryPoint(const NativeFunction *cfg_func,
   llvm::IRBuilder<> ir(block);
 
   // Invent a memory pointer.
-  const auto mem_ptr_type = remill::MemoryPointerType(gModule.get());
+  const auto mem_ptr_type = gArch->MemoryPointerType();
   llvm::Value *mem_ptr = llvm::Constant::getNullValue(mem_ptr_type);
 
   const auto state_ptr = ir.CreateCall(GetVerifyRegState());

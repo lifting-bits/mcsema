@@ -24,7 +24,7 @@ from setuptools import setup, find_packages
 
 setup(name="mcsema-disass",
       description="Binary program disassembler for McSema.",
-      version="3.0.{}.{}".format(sys.version_info.major, sys.version_info.minor),
+      version="3.1.{}.{}".format(sys.version_info.major, sys.version_info.minor),
       url="https://github.com/lifting-bits/mcsema",
       author="Trail of Bits",
       author_email="mcsema@trailofbits.com",

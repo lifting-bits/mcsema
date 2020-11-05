@@ -129,8 +129,8 @@ def get_static_successors(sub_ea, term_inst, delayed_inst, binary_is_pie):
   # delayed_inst will be term_inst if there is no delay slot
   #
   # NOTE(pag): It is possible that there is an apparently single instruction
-  #            block containing a synthetic instruction that is actually two underlying
-  #            instructions, and so we want to use `term_inst.size` (8 in this case) to find `next_ea`
+  #            block containing a `set` in SPARC (`sethi+or`), and so we
+  #            want to use `term_inst.size` (8 in this case) to find `next_ea`
   #            if `term_inst` and `delayed_inst` match.
   global _FUNC_HEAD_EAS
 
@@ -345,7 +345,7 @@ def analyse_subroutine(sub_ea, binary_is_pie):
       found_block_eas.remove(block_head_ea)
       continue
 
-    #log.debug("Found block head at {:08x}".format(block_head_ea))
+    #DEBUG("Found block head at {:08x}".format(block_head_ea))
     term_inst, inst_bytes = find_linear_terminator(block_head_ea)
     if not term_inst:
       DEBUG("  Block at {:x} has no terminator!".format(block_head_ea))

@@ -17,6 +17,12 @@
 
 #include "Instruction.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wdocumentation"
+#pragma clang diagnostic ignored "-Wswitch-enum"
 #include <glog/logging.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
@@ -25,6 +31,11 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
+#pragma clang diagnostic pop
+
+#include <remill/Arch/Arch.h>
+#include <remill/Arch/Instruction.h>
+#include <remill/BC/Util.h>
 
 #include <sstream>
 #include <string>
@@ -35,10 +46,6 @@
 #include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
-#include "remill/Arch/Arch.h"
-#include "remill/Arch/Instruction.h"
-#include "remill/BC/Util.h"
-
 
 namespace mcsema {
 
@@ -124,20 +131,20 @@ llvm::Value *InstructionLifter::LiftImmediateOperand(remill::Instruction &inst,
     llvm::DataLayout data_layout(gModule.get());
     auto arg_size = data_layout.getTypeSizeInBits(arg_type);
 
-    CHECK(arg_size <= arch->address_size)
+    CHECK(arg_size <= gArch->address_size)
         << "Immediate operand size " << op.size << " of " << op.Serialize()
         << " in instuction " << std::hex << inst.pc
         << " is wider than the architecture pointer size (" << std::dec
-        << arch->address_size << ").";
+        << gArch->address_size << ").";
 
-    if (arg_type != imm_ref->getType() && arg_size < arch->address_size) {
+    if (arg_type != imm_ref->getType() && arg_size < gArch->address_size) {
       llvm::IRBuilder<> ir(block);
       imm_ref = ir.CreateTrunc(imm_ref, arg_type);
     }
 
     return imm_ref;
 
-  } else if (op.size == arch->address_size && 4096 <= op.imm.val) {
+  } else if (op.size == gArch->address_size && 4096 <= op.imm.val) {
     auto seg = ctx.cfg_module->TryGetSegment(op.imm.val);
     LOG_IF(WARNING, seg != nullptr)
         << "Immediate operand '" << op.Serialize() << "' of instruction "
@@ -157,12 +164,12 @@ llvm::Value *InstructionLifter::LiftAddressOperand(remill::Instruction &inst,
 
   auto &mem = op.addr;
 
-//  // A higher layer will resolve any code refs; this is a static address and
-//  // we want to preserve it in the register state structure.
-//  if (mem.IsControlFlowTarget()) {
-//    return this->remill::InstructionLifter::LiftAddressOperand(
-//        inst, block, state_ptr, arg, op);
-//  }
+  //  // A higher layer will resolve any code refs; this is a static address and
+  //  // we want to preserve it in the register state structure.
+  //  if (mem.IsControlFlowTarget()) {
+  //    return this->remill::InstructionLifter::LiftAddressOperand(
+  //        inst, block, state_ptr, arg, op);
+  //  }
 
   if ((mem.base_reg.name.empty() && mem.index_reg.name.empty()) ||
       (mem.base_reg.name == "PC" && mem.index_reg.name.empty())) {

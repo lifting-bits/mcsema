@@ -7,183 +7,143 @@ The binary we'll be translating is `xz`, a [compression and decompression suite 
 Here is the exact version and hash of our test binary:
 
 ```shell
-$ ./xz -V
-xz (XZ Utils) 5.1.0alpha
-liblzma 5.1.0alpha
+$ xz -V
+xz (XZ Utils) 5.2.2
+liblzma 5.2.2
 
-$ sha256sum ./xz
-c3512fe134c78d7d734c6607a379b5f0d65276e8953a0a985e3e688356303223  ./xz
+$ sha256sum `which xz`
+047e0a03fc04722dfa273bfc99895da4049609dd3468ec4c2e1d1c78509d71ef  /usr/bin/xz
+
+$ file `which xz`
+/usr/bin/xz: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 2.6.32, BuildID[sha1]=e39115ef0c15f513cab77537cb13c9beaec0fdc1, stripped
 ```
 
-This binary was chosen since it has complex features, it was easy to verify that the core functionality works, and at the time of writing, it demonstrated some common lifting failures and how to work around them.
+This binary was chosen since it has complex features, it was easy to verify that the core functionality works.
 
 ## Assumptions
 
-This guide assumes that you are working on a Linux system, have already built and installed a working version of McSema, and that `mcsema-lift` and `mcsema-disass` are in your execution path. We assume that the McSema repository was cloned into `$MCSEMA_DIR`.
+This guide assumes that you are working on a Linux system, have already built and installed a working version of McSema, and that `mcsema-lift-9.0` (for LLVM 9) and `mcsema-disass-3.8` (for Python 3.8) are in your execution path.
 
-The guide also assumes that you have working version of IDA Pro, which is required for control flow recovery.  Note that IDA Pro will not function until it has been launched once in standalone mode and the EULA pop-up has been accepted.  If using IDA Pro 7, the legacy x86 32-bit version should be installed as the 64-bit version is not yet supported.
+The guide also assumes that you have working version of IDA Pro 7.1+ that has been installed to use the system Python 3.8 interpreter. A 64-bit IDA Pro 7.x is required for control flow recovery.  Note that IDA Pro will not function until it has been launched once in standalone mode and the EULA pop-up has been accepted.
 
-For clarity, we assume that all operations happen in `~/mcsema`, but any directory will work.
+The rest of this walkthrough assumes that you have set an environment variable, `IDA_PATH` to point to your IDA installation directory. For example, on macOS, this might be something like:
+
+```bash
+export IDA_PATH=/Users/<username here>/Applications/IDA\ Pro\ 7.5/idabin
+```
+
+The directory that you put into your `IDA_PATH` should contain executables named `idat` (for disassembling 32-bit binaries) and `idat64` (for disassembling 64-bit binaries).
 
 ## Control Flow Recovery
 
-The first step in translation is to identify all the instructions, functions, and data in the binary. This is done via `mcsema-disass`, which will use the IDA Pro disassembler to do most of the initial analysis. As of this writing IDA Pro is required for the control flow recovery step, but we hope to transition to other tools in the future.
+The first step in translation is to identify all the instructions, functions, and data in the binary. This is done via `mcsema-disass-3.8`, which will use the IDA Pro disassembler to do most of the initial analysis. As of this writing IDA Pro is required for the control flow recovery step, but we hope to transition to other tools in the future.
 
-First, let's place a copy of the binary in our working directory:
-
-```shell
-cd ~/mcsema
-cp /usr/bin/xz ./
-```
-
-Next, we'll use `mcsema-disass`, the CFG recovery portion of mcsema, to recover `xz`'s control flow.
+First, let's place a copy of the binary into `/tmp`, which we'll use as our working directory:
 
 ```shell
-mcsema-disass --disassembler ~/ida-6.9/idal64 --os linux --arch amd64 --output xz.cfg --binary xz --entrypoint main --log_file xz.log
+cp /usr/bin/xz /tmp
 ```
 
-Let's walk through each option:
+Next, we'll use `mcsema-disass-3.8`, the CFG recovery portion of mcsema, to recover `xz`'s control flow.
 
-* `--disassembler ~/ida-6.9/idal64`: This is a path to the IDA Pro executable which will do the bulk of the disassembly work.
-* `--os linux`: The binary we are lifting is for the Linux operating system. It is possible to use mcsema on any supported platform for any supported binary (e.g. Windows binaries can be lifted on Linux and vice versa).
-* `--arch amd64`: The binary we are lifting is a 64-bit binary that uses the amd64 or x86_64 instruction set.
-* `--output xz.cfg`: Store the recovered control flow information in the file named `xz.cfg`.
-* `--binary xz`: Use `xz` as the input binary
+```shell
+mcsema-disass-3.8 \
+    --disassembler "${IDA_PATH}/idat64" \
+    --arch amd64 \
+    --os linux \
+    --entrypoint main \
+    --pie-mode \
+    --rebase 535822336 \
+    --binary /tmp/xz \
+    --output /tmp/xz.cfg \
+    --log_file /tmp/log
+```
+
+The following explains each command-line flag:
+
+* `--disassembler "${IDA_PATH}/idat64"`: This is a path to the IDA Pro executable which will do the bulk of the disassembly work. We're using `idat64` because `xz` is a 64-bit bit binary. If it was a 32-bit binary, we'd use `idat`.
+* `--os linux`: The binary we are lifting is for the Linux operating system. It is possible to use McSema on any supported platform for any supported binary (e.g. Windows binaries can be lifted on Linux and vice versa).
+* `--arch amd64`: The binary we are lifting is a 64-bit binary that uses the amd64 or x86-64 instruction set.
+* `--output /tmp/xz.cfg`: Store the recovered control flow information in the file named `xz.cfg`.
+* `--log_file /tmp/log`: Store a human-readable log of what was discovered into `/tmp/log`. Sometimes errors or warnings are reported in here.
+* `--binary /tmp/xz`: Use `/tmp/xz` as the input binary.
 * `--entrypoint main`: Specifies where the disassembler should start recovering control flow. This tells it to use the `main` function as the starting point for CFG recovery.
-* `--log_file xz.log`: Where to store the disassembly log. This is optional, but it greatly aids in debugging, as we shall see later in this guide.
-
-### Fixing Errors
-
-This section documents how to fix a common CFG recovery problem: undefined external functions. By the time you are reading this guide, the functions described here may have already been added to the [list of common external Linux functions that comes with mcsema](https://github.com/lifting-bits/mcsema/blob/master/tools/mcsema_disass/defs/linux.txt) and you can skip this section.
-
-The previous command may have failed (as in this snippet). If it did, read on. If not, skip this section and move on to Translation To Bitcode.
-
-```shell
-$ mcsema-disass --disassembler ~/ida-6.9/idal64 --os linux --arch amd64 --output xz.cfg --binary xz --entrypoint main --log_file xz.log
-Generated an invalid (zero-sized) CFG. Please use the --log_file option to see an error log.
-```
-
-Let's take a look at the log, like the message suggests:
-
-```shell
-$ tail xz.log
-  File "/home/artem/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg/mcsema_disass/ida/get_cfg.py", line 1693, in recoverFunction
-    recoverFunctionFromSet(M, F, blockset, new_eas)
-  File "/home/artem/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg/mcsema_disass/ida/get_cfg.py", line 1681, in recoverFunctionFromSet
-    I, endBlock = instructionHandler(M, B, head, new_eas)
-  File "/home/artem/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg/mcsema_disass/ida/get_cfg.py", line 817, in instructionHandler
-    if doesNotReturn(fn):
-  File "/home/artem/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg/mcsema_disass/ida/get_cfg.py", line 220, in doesNotReturn
-    raise Exception("Unknown external: " + fname)
-Exception: Unknown external: __open_2
-```
-
-This means the binary is trying to call an external function, but mcsema does not know what calling convention it is, or how many arguments to give it. After searching for `__open_2` we can see that it's a C library function that takes two arguments. We can tell mcsema about it via a custom external definitions file.
-
-Create a new file in your working directory named `xz_defs.txt` with the following content:
-
-    __open_2 2 C N
-
-This tells mcsema that the function is named `__open_2`, it takes `2` arguments, its calling convention is `C`aller cleanup, and the function returns (or is `N`ot noreturn, as mcsema sees it).
-
-Now let's tell `mcsema-disass` about our new definitions file:
-
-```shell
-$ mcsema-disass --disassembler ~/ida-6.9/idal64 --os linux --arch amd64 --output xz.cfg --binary xz --entrypoint main --log_file xz.log --std-defs xz_defs.txt
-Generated an invalid (zero-sized) CFG. Please use the --log_file option to see an error log.
-```
-
-Oh no! It's still failing? Let's check the log again:
-
-```shell
-$ tail xz.log
-  File "/home/artem/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg/mcsema_disass/ida/get_cfg.py", line 1693, in recoverFunction
-    recoverFunctionFromSet(M, F, blockset, new_eas)
-  File "/home/artem/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg/mcsema_disass/ida/get_cfg.py", line 1681, in recoverFunctionFromSet
-    I, endBlock = instructionHandler(M, B, head, new_eas)
-  File "/home/artem/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg/mcsema_disass/ida/get_cfg.py", line 817, in instructionHandler
-        if doesNotReturn(fn):
-  File "/home/artem/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg/mcsema_disass/ida/get_cfg.py", line 220, in doesNotReturn
-    raise Exception("Unknown external: " + fname)
-Exception: Unknown external: __vfprintf_chk
-```
-
-The culprit is another missing external function. Let's add this one is as well. Our new `xz_defs.txt` should now look like:
-
-    __open_2 2 C N
-    __vfprintf_chk 4 C N
-
-Finally, our command should succeed. We can verify that the CFG recovery completed by looking at the size of the generated CFG:
-
-```shell
-$ mcsema-disass --disassembler ~/ida-6.9/idal64 --os linux --arch amd64 --output xz.cfg --binary xz --entrypoint main --log_file xz.log --std-defs xz_defs.txt
-$ ls -lh xz.cfg
--rw-rw-r-- 1 artem artem 212K Mar  8 14:54 xz.cfg
-```
-
-If header files are available that declare these external functions, these files can be automatically generated using the [DEF file generation script](DEFFileGeneration.md).
+* `--pie-mode`: The file is an "LSB shared object", which means that it is a position-independent executable. Most binaries on modern operating systems (Ubuntu 18.04+, macOS, Windows) are position independent. This flag changes how the disassembler interprets numbers that may look like addresses.
+* `--rebase 535822336`: This tells IDA to re-position the binary and pretend to load it at the address `535822336` (`0x1ff00000` in hex). This is useful for PIE binaries, otherwise IDA might load them at the zero address, and then our heuristics would have to try to interpret whether or not small numbers are actually addresses or just small numbers. We'll take advantage of this number later when re-linking the binary.
 
 ## Translation to Bitcode
 
-Once we have the program's control flow information, we can translate it to LLVM bitcode using `mcsema-lift-4.0`. The `4.0` here is the version of the LLVM toolchain being used. McSema can be built to use LLVM version 3.6 and up.
+Once we have the program's control flow information, we can translate it to LLVM bitcode using `mcsema-lift-9.0`. The `9.0` here is the version of the LLVM toolchain being used. McSema can be built to use LLVM version 3.6 and up. The officially supported versions are LLVM 9+.
 
 Here is the command to translate the CFG into bitcode:
 
 ```shell
-mcsema-lift-4.0 --os linux --arch amd64 --cfg xz.cfg --output xz.bc
+mcsema-lift-9.0 \
+    --arch amd64 \
+    --os linux \
+    --cfg /tmp/xz.cfg \
+    --output /tmp/xz.bc \
+    --explicit_args \
+    --merge_segments \
+    --name_lifted_sections
 ```
 
-Let's explore the options one by one:
+The following explains each command-line flag:
 
-* `--os linux`: The CFG came from a binary for the Linux operating system. Currently the valid options are `linux` or `windows`. This option is required for certain aspects of translation, like ABI compatibility for external functions, etc.
-* `--arch amd64`: Use instruction semantics for the `amd64` architecture. Valid options are `x86` and `x86_avx` (32-bit x86 semantics), `amd64` and `amd64_avx` (64-bit x86), and `aarch64` (64-bit ARMv8).
-* `--cfg xz.cfg`: The input control flow graph to convert into bitcode.
-* `--output xz.bc`: Where to write the bitcode. If the `--output` option is not specified, the bitcode will be written to stdout.
+* `--os linux`: Tell the lifter the OS of the binary represented by the CFG. This should match what was passed to `mcsema-disass-3.8`.
+* `--arch amd64`: Tell the lifter the architecture of the binary represented by the CFG. This should match what was passed to `mcsema-disass-3.8`.
+* `--cfg /tmp/xz.cfg`: The input control flow graph to convert into bitcode.
+* `--output /tmp/xz.bc`: Where to write the bitcode. If the `--output` option is not specified, the bitcode will be written to `stdout`.
+* `--explicit_args`: This is a bit tricky to explain. Basically, if an external function is called, then we are asking McSema to try to call it as if it were calling any old LLVM function. This means that a call in the binary to an external function shows up as a call to an LLVM function, with explicitly represented arguments passed to that function (hence the name). The lifting of explicit argument calls isn't always accurate, however. The accuracy depends entirely on IDA Pro's ability to infer or know prototype of a function, the presence/absence of floating point arguments, and the presence/absence of variadic arguments. If you are using the bitcode with KLEE then you definitely want this option; the alternative is for all externals to be called through assembly stubs without any "high level" arguments being passed. Behind the scenes, the assembly stub translates McSema's emulated registers into native machine registers, and swaps stacks. This is only supported on 64-bit Linux.
+* `--merge_segments`: McSema lifts each "segment" (area containing code, data, etc.) as a global variable in LLVM. Sometimes, two or more segments are adjacent or nearby in the binary. Some addresses may point to the beginning of a segment, but be validly interpreted as one past the end of the prior (adjacent) segment. Other addresses may be formed dynamically by combining a high portion of an address (pointing into one segment) and the low portion of an address (a displacement that moves the address into the next segment). To best handle all these corner cases, we use this option to merge all these global variables into one single massive global varible. It's a bit crazy but it's more reliable.
+* `--name_lifted_sections`: This tells McSema to assign each lifted segment variable to its own section. In our case, because we merged all segments into one global variable, and because we specified `--rebase 535822336` (`0x1ff00000`) at disassembly time, there will be a single section named `.section_1ff00000`. Right now this seems like an unusual thing to do; however, our goal is to recompile this bitcode to machine code. We admit that the disassembly process may miss things. Sometimes it might see a number and interpret it as an address or vice versa. To counteract these kinds of issues, we're going to position the lifted segments so that they would end up where they were rebased to in the binary. This will ensure that any numbers or addresses that may have been misinterpreted have the same bit/integer representation! Again, this is an option to improve reliability. For something like KLEE, this won't help you.
 
-The `mcsema-lift-4.0` program may print out errors or warnings to `stderr`. Oftentimes these are not critical. The full lift log can be found in `/tmp/mcsema-lift-4.0.INFO`, and this is a link to a process/thread-ID-specific file. Make sure to clean out these log files if you use `mcsema-lift-4.0` a lot!
+The `mcsema-lift-9.0` program may print out errors or warnings to `stderr`. Oftentimes these are not critical. The full lift log can be found in `/tmp/mcsema-lift-9.0.INFO`, and this is a link to a process/thread-ID-specific file. Make sure to clean out these log files if you use `mcsema-lift-9.0` a lot!
 
-And there will be a generated bitcode file in the output location we specified:
+And there will be a generated bitcode file in the output location that we specified.
 
 ```shell
-$ ls -lh xz.bc
--rw-rw-r-- 1 artem artem 1.9M Mar  8 14:57 xz.bc
+% file /tmp/xz.bc 
+/tmp/xz.bc: LLVM IR bitcode
 ```
 
 ## Building a New Binary
 
 The new bitcode can be used for a variety of purposes ranging from informational analyses to hardening and transformation. Eventually, though, you may want to re-create a new, working binary. Here is how to do that.
 
-First, you'll need McSema's runtime libraries that are generated during installation. These are located at the installation prefix of McSema, typically in `/usr/local` on Unix machines. Alternatively, these can be found in the Remill build directory, under `tools/mcsema/mcsema/Arch/X86/Runtime` (for X86). You will also need to link against any libraries that the original program was linked against. For this example, make sure that the liblzma-dev package is installed on your machine:
+First, we need to find out the dependent libraries of `xz`. We'll need to link against each of these, as well as linking against `libm`.
 
-```shell
-sudo apt-get install liblzma-dev
+```
+% ldd `which xz`
+  linux-vdso.so.1 (0x00007ffc8b5c4000)
+  liblzma.so.5 => /lib/x86_64-linux-gnu/liblzma.so.5 (0x00007f5c72ece000)
+  libpthread.so.0 => /lib/x86_64-linux-gnu/libpthread.so.0 (0x00007f5c72caf000)
+  libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f5c728be000)
+  libdl.so.2 => /lib/x86_64-linux-gnu/libdl.so.2 (0x00007f5c726ba000)
+  /lib64/ld-linux-x86-64.so.2 (0x00007f5c7330b000)
 ```
 
-When Remill/McSema is installed, so should a prefixed version of clang for the build toolchain. For example, building Remill/McSema with the LLVM 4.0 toolchain should also install `remill-clang-4.0`. If not, you can always find the toolchain-specific version of the LLVM binaries and libraries in the Remill build directory, under `libraries/llvm/bin`.
+Before installing McSema, you likely had to install Remill. As a result, you should have `remill-clang-9.0` installed as an available binary. If you don't have this then be sure to use `clang-9`, as it should be compatible with the LLVM 9 bitcode produced by `mcsema-lift-9.0`.
 
-Now, let's re-create a new `xz` binary and see it in action!
-
-```shell
-remill-clang-4.0 -rdynamic -O3 -o xz.new xz.bc /usr/local/lib/libmcsema_rt64-4.0.a -llzma
+```bash
+remill-clang-9.0 -o /tmp/xz.lifted /tmp/xz.bc -lpthread -lm -ldl -llzma -Wl,--section-start=.section_1ff00000=0x1ff00000
 ```
 
-This is a fairly ordinary clang command line; the only thing of note is `/usr/local/lib/libmcsema_rt64-4.0.a`, which is the path to the aforementioned runtime libraries. The `libmcsema_rt64-4.0.a` is the library to use for 64-bit bitcode using the LLVM 4.0 toolchain, and `libmcsema_rt32-4.0.a` is the library to use for 32-bit bitcode using the LLVM 4.0 toolchain. On Windows, these libraries are named `mcsema_rt64-4.0.lib` and `mcsema_rt32-4.0.lib`, respectively.
+This is a fairly ordinary clang command line; the only thing of note is `-Wl,--section-start=.section_1ff00000=0x1ff00000`, which tells the linker to position the lifted segment variable, located in the section `.section_1ff00000` at the address `0x1ff00000`.
 
-We can verify that our new binary, `xz.new`, works, and compresses output that can be read by `unxz`:
+We can verify that our new binary, /tmp/xz.lifted`, works, and compresses output that can be read by `unxz`:
 
 ```shell
-$ echo "testing compression" | ./xz.new | unxz
-testing compression
+% /tmp/xz.lifted -V
+xz (XZ Utils) 5.2.2
+liblzma 5.2.2
 ```
 
 Command line arguments to `xz.new` also work:
 
 ```shell
-$ ./xz.new --version
-xz (XZ Utils) 5.1.0alpha
-liblzma 5.1.0alpha
-$ ./xz.new --help
-Usage: ./xz.new [OPTION]... [FILE]...
+% /tmp/xz.lifted --help
+Usage: /tmp/xz.lifted [OPTION]... [FILE]...
 Compress or decompress FILEs in the .xz format.
 
   -z, --compress      force compression
@@ -197,6 +157,8 @@ Compress or decompress FILEs in the .xz format.
                       decompressor memory usage into account before using 7-9!
   -e, --extreme       try to improve compression ratio by using more CPU time;
                       does not affect decompressor memory requirements
+  -T, --threads=NUM   use at most NUM threads; the default is 1; set to 0
+                      to use as many threads as there are processor cores
   -q, --quiet         suppress warnings; specify twice to suppress errors too
   -v, --verbose       be verbose; specify twice for even more verbose
   -h, --help          display this short help and exit

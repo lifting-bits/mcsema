@@ -17,6 +17,12 @@
 
 #include "mcsema/BC/Function.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wdocumentation"
+#pragma clang diagnostic ignored "-Wswitch-enum"
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <llvm/IR/CallSite.h>
@@ -35,6 +41,18 @@
 #include <llvm/IR/PassManager.h>
 #include <llvm/IR/Type.h>
 #include <llvm/Transforms/Utils/Cloning.h>
+#pragma clang diagnostic pop
+
+#include <remill/Arch/Arch.h>
+#include <remill/Arch/Instruction.h>
+#include <remill/BC/ABI.h>
+#include <remill/BC/Annotate.h>
+#include <remill/BC/Compat/Error.h>
+#include <remill/BC/Compat/ScalarTransforms.h>
+#include <remill/BC/IntrinsicTable.h>
+#include <remill/BC/Lifter.h>
+#include <remill/BC/Util.h>
+#include <remill/BC/Version.h>
 
 #include <memory>
 #include <unordered_map>
@@ -50,16 +68,6 @@
 #include "mcsema/BC/Segment.h"
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
-#include "remill/Arch/Arch.h"
-#include "remill/Arch/Instruction.h"
-#include "remill/BC/ABI.h"
-#include "remill/BC/Annotate.h"
-#include "remill/BC/Compat/Error.h"
-#include "remill/BC/Compat/ScalarTransforms.h"
-#include "remill/BC/IntrinsicTable.h"
-#include "remill/BC/Lifter.h"
-#include "remill/BC/Util.h"
-#include "remill/BC/Version.h"
 
 DECLARE_bool(legacy_mode);
 DECLARE_bool(explicit_args);
@@ -187,7 +195,7 @@ static llvm::Function *GetValueTracer(void) {
   args.push_back(nullptr);  // Format.
   args.push_back(remill::NthArgument(gValueTracer, remill::kPCArgNum));
 
-  auto format = gArch->address_size == 64 ? "=%016llx " : "=%018x ";
+  auto format = gArch->address_size == 64 ? "=%016llx " : "=%08x ";
   auto block = llvm::BasicBlock::Create(*gContext, "", gValueTracer);
   auto state_ptr =
       remill::NthArgument(gValueTracer, remill::kStatePointerArgNum);
@@ -292,7 +300,7 @@ static llvm::Function *GetBreakPoint(uint64_t pc) {
     return func;
   }
 
-  static const auto mem_ptr_type = remill::MemoryPointerType(gModule.get());
+  static const auto mem_ptr_type = gArch->MemoryPointerType();
   llvm::Type *const params[1] = {mem_ptr_type};
   const auto fty = llvm::FunctionType::get(mem_ptr_type, params, false);
   func = llvm::Function::Create(fty, llvm::GlobalValue::ExternalLinkage,
@@ -494,23 +502,23 @@ static llvm::Function *DevirtualizeIndirectFlow(TranslationContext &ctx,
 // an external function then we try to return the external version of the
 // function.
 static std::pair<const NativeFunction *, llvm::Function *>
-FindFunction(TranslationContext &ctx, uint64_t target_pc) {
+FindFunction(TranslationContext &ctx, uint64_t target_pc,
+             const remill::IntrinsicTable &intrinsics) {
 
   const NativeFunction *cfg_func = nullptr;
   if (ctx.cfg_inst) {
     if (auto flow = ctx.cfg_inst->flow; flow) {
       cfg_func = ctx.cfg_module->TryGetFunction(flow->target_ea);
       if (cfg_func) {
-        return {cfg_func, CallableLiftedFunc(
-                              cfg_func, ctx.lifter->intrinsics->function_call)};
+        return {cfg_func,
+                CallableLiftedFunc(cfg_func, intrinsics.function_call)};
       }
     }
   }
 
   cfg_func = ctx.cfg_module->TryGetFunction(target_pc);
   if (cfg_func) {
-    return {cfg_func, CallableLiftedFunc(
-                          cfg_func, ctx.lifter->intrinsics->function_call)};
+    return {cfg_func, CallableLiftedFunc(cfg_func, intrinsics.function_call)};
   }
 
   return {nullptr, nullptr};
@@ -843,8 +851,7 @@ static void LiftIndirectJump(TranslationContext &ctx, llvm::BasicBlock *block,
       fallback_block_eas.push_back(ea);
     }
 
-    switch_inst->addCase(
-        llvm::ConstantInt::get(ctx.lifter->word_type, ea, false), block);
+    switch_inst->addCase(llvm::ConstantInt::get(gWordType, ea, false), block);
   }
 
   llvm::BranchInst::Create(switch_block, block);
@@ -878,8 +885,7 @@ static void LiftIndirectJump(TranslationContext &ctx, llvm::BasicBlock *block,
 
     for (auto [ea, block] : block_map) {
       switch_inst->addCase(
-          llvm::ConstantInt::get(ctx.lifter->word_type, max_ea - ea, false),
-          block);
+          llvm::ConstantInt::get(gWordType, max_ea - ea, false), block);
     }
   } else {
     llvm::BranchInst::Create(fallback_block2, fallback_block1);
@@ -1089,8 +1095,8 @@ void SaveAndRestoreFunctionPreservedRegs(TranslationContext &ctx,
     // However, if after optimization the two parameters don't match, then
     // we need to preserve the restore, and we'll replace all uses of
     // `%restore_val` with `%reg`.
-    const auto reg_ptr = ctx.lifter->LoadRegAddress(
-        entry_block, ctx.state_ptr, reg_name);
+    const auto reg_ptr =
+        ctx.lifter->LoadRegAddress(entry_block, ctx.state_ptr, reg_name);
     const auto reg = ir.CreateLoad(reg_ptr);
     const auto reg_latest = restore_ir.CreateLoad(reg_ptr);
     llvm::Value *restorer_args[] = {reg, reg_latest};
@@ -1123,8 +1129,8 @@ static void LiftSavedRegs(TranslationContext &ctx, llvm::BasicBlock *block) {
   ctx.cfg_module->ForEachInstructionPreservedRegister(
       ctx.inst.pc, [=, &ir, &ctx](const std::string &reg_name) {
         if (const auto reg = gArch->RegisterByName(reg_name); reg) {
-          const auto reg_ptr = ctx.lifter->LoadRegAddress(
-              block, ctx.state_ptr, reg_name);
+          const auto reg_ptr =
+              ctx.lifter->LoadRegAddress(block, ctx.state_ptr, reg_name);
           const auto reg_val = ir.CreateLoad(reg_ptr);
           ctx.preserved_regs.emplace_back(reg_ptr, reg_val);
         }
@@ -1170,12 +1176,22 @@ static void KillPCAndNextPC(TranslationContext &ctx, llvm::BasicBlock *block) {
   ir.CreateStore(kill_value, npc_ref);
 }
 
+static void RevivePCAndNextPC(TranslationContext &ctx, llvm::BasicBlock *block,
+                              uint64_t pc) {
+  const auto pc_ref = LoadProgramCounterRef(ctx, block);
+  const auto npc_ref = LoadNextProgramCounterRef(ctx, block);
+  llvm::IRBuilder<> ir(block);
+  const auto revive_value = LiftXrefInCode(pc);
+  ir.CreateStore(revive_value, pc_ref);
+  ir.CreateStore(revive_value, npc_ref);
+}
+
 static void LiftKilledRegs(TranslationContext &ctx, llvm::BasicBlock *block) {
   llvm::IRBuilder<> ir(block);
   ctx.cfg_module->ForEachInstructionKilledRegister(
       ctx.inst.pc, [=, &ir, &ctx](const std::string &reg_name) {
-        const auto reg_ptr = ctx.lifter->LoadRegAddress(
-            block, ctx.state_ptr, reg_name);
+        const auto reg_ptr =
+            ctx.lifter->LoadRegAddress(block, ctx.state_ptr, reg_name);
         if (!reg_ptr) {
           return;
         }
@@ -1204,15 +1220,68 @@ llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx, uint64_t pc,
   return block;
 }
 
-// Figure out the fall-through return address for a function call. On some
-// architectures we need more logic here.
+// Figure out the fall-through return address for a function call. There are
+// annoying SPARC-isms to deal with due to their awful ABI choices.
 static uint64_t FunctionReturnAddress(TranslationContext &ctx) {
-  return ctx.inst.branch_not_taken_pc;
+  static const bool is_sparc = gArch->IsSPARC32() || gArch->IsSPARC64();
+  const auto pc = ctx.inst.branch_not_taken_pc;
+  if (!is_sparc) {
+    return pc;
+  }
+
+  auto byte = ctx.cfg_module->FindByte(pc);
+  if (!byte.IsExecutable()) {
+    return pc;
+  }
+
+  uint8_t bytes[4] = {};
+
+  for (auto i = 0u; i < 4u && byte && byte.IsExecutable();
+       ++i, byte = ctx.cfg_module->FindNextByte(byte)) {
+    auto maybe_val = byte.Value();
+    if (remill::IsError(maybe_val)) {
+      (void) remill::GetErrorString(maybe_val);  // Drop the error.
+    } else {
+      bytes[i] = remill::GetReference(maybe_val);
+    }
+  }
+
+  union Format0a {
+    uint32_t flat;
+    struct {
+      uint32_t imm22 : 22;
+      uint32_t op2 : 3;
+      uint32_t rd : 5;
+      uint32_t op : 2;
+    } u __attribute__((packed));
+  } __attribute__((packed)) enc = {};
+  static_assert(sizeof(Format0a) == 4, " ");
+
+  enc.flat |= bytes[0];
+  enc.flat <<= 8;
+  enc.flat |= bytes[1];
+  enc.flat <<= 8;
+  enc.flat |= bytes[2];
+  enc.flat <<= 8;
+  enc.flat |= bytes[3];
+
+  // This looks like an `unimp <imm22>` instruction, where the `imm22` encodes
+  // the size of the value to return. See "Programming Note" in v8 manual, B.31,
+  // p 137.
+  if (!enc.u.op && !enc.u.op2) {
+    LOG(INFO) << "Found structure return of size " << enc.u.imm22 << " to "
+              << std::hex << pc << " at " << ctx.inst.pc << std::dec;
+    return pc + 4u;
+
+  } else {
+    return pc;
+  }
 }
 
 // Lift a decoded block into a function.
 static void LiftInstIntoFunction(TranslationContext &ctx,
-                                 llvm::BasicBlock *block) {
+                                 llvm::BasicBlock *block,
+                                 const remill::IntrinsicTable &intrinsics) {
   LiftInstIntoBlock(ctx, ctx.inst, block, false /* is_delayed */);
 
   // We might need to lift another instruction and execute it in the delay
@@ -1233,11 +1302,9 @@ static void LiftInstIntoFunction(TranslationContext &ctx,
 
   ctx.preserved_regs.clear();
 
-  const auto intrinsics = ctx.lifter->intrinsics;
-
   switch (ctx.inst.category) {
     case remill::Instruction::kCategoryInvalid:
-      remill::AddTerminatingTailCall(block, intrinsics->error);
+      remill::AddTerminatingTailCall(block, intrinsics.error);
       break;
 
     case remill::Instruction::kCategoryError:
@@ -1245,7 +1312,7 @@ static void LiftInstIntoFunction(TranslationContext &ctx,
       LiftFuncRestoredRegs(ctx, block, true);
       KillPCAndNextPC(ctx, block);
       LiftKilledRegs(ctx, block);
-      remill::AddTerminatingTailCall(block, intrinsics->error);
+      remill::AddTerminatingTailCall(block, intrinsics.error);
       break;
 
     case remill::Instruction::kCategoryNormal: {
@@ -1286,8 +1353,10 @@ static void LiftInstIntoFunction(TranslationContext &ctx,
       LiftDelayedInstIntoBlock(ctx, block, true);
 
       if (auto [targ_cfg_func, targ_func] =
-              FindFunction(ctx, ctx.inst.branch_taken_pc);
+              FindFunction(ctx, ctx.inst.branch_taken_pc, intrinsics);
           targ_cfg_func && targ_func) {
+
+        const auto ret_pc = FunctionReturnAddress(ctx);
 
         if (!ctx.cfg_inst || !ctx.cfg_inst->lp_ea) {
           LiftSavedRegs(ctx, block);
@@ -1295,14 +1364,17 @@ static void LiftInstIntoFunction(TranslationContext &ctx,
           LiftKilledRegs(ctx, block);
           LiftSubFuncCall(ctx, block, targ_func, PCValueKind::kUndefPC);
           LiftRestoredRegs(ctx, block);
-          llvm::BranchInst::Create(
-              GetOrCreateBlock(ctx, FunctionReturnAddress(ctx)), block);
+          RevivePCAndNextPC(ctx, block, ret_pc);
+          llvm::BranchInst::Create(GetOrCreateBlock(ctx, ret_pc), block);
 
         // TODO(pag): The save/restore optimization will produce unexpected
         //            lifts when exceptions are involved.
+        //
+        // TODO(pag): Revive the program counter / next program counter after
+        //            the invoke inst.
         } else {
           auto exception_block = ctx.lp_to_block[ctx.cfg_inst->lp_ea];
-          auto normal_block = GetOrCreateBlock(ctx, FunctionReturnAddress(ctx));
+          auto normal_block = GetOrCreateBlock(ctx, ret_pc);
           KillPCAndNextPC(ctx, block);
           LiftKilledRegs(ctx, block);
           InlineSubFuncInvoke(ctx, block, targ_func, normal_block,
@@ -1312,7 +1384,7 @@ static void LiftInstIntoFunction(TranslationContext &ctx,
 
       // Treat a `call +5` as not actually needing to call out to a
       // new subroutine.
-      } else if (ctx.inst.branch_taken_pc != ctx.inst.next_pc) {
+      } else if (ctx.inst.branch_taken_pc == ctx.inst.next_pc) {
         LOG(WARNING) << "Not adding a subroutine self-call at " << std::hex
                      << ctx.inst.pc << std::dec;
         llvm::BranchInst::Create(
@@ -1330,9 +1402,10 @@ static void LiftInstIntoFunction(TranslationContext &ctx,
         LiftSavedRegs(ctx, block);
         KillPCAndNextPC(ctx, block);
         LiftKilledRegs(ctx, block);
-        LiftSubFuncCall(ctx, block, intrinsics->function_call,
+        LiftSubFuncCall(ctx, block, intrinsics.function_call,
                         PCValueKind::kConcretePC, ctx.inst.branch_taken_pc);
         LiftRestoredRegs(ctx, block);
+        RevivePCAndNextPC(ctx, block, ctx.inst.branch_not_taken_pc);
         llvm::BranchInst::Create(
             GetOrCreateBlock(ctx, ctx.inst.branch_not_taken_pc), block);
       }
@@ -1350,6 +1423,8 @@ static void LiftInstIntoFunction(TranslationContext &ctx,
 
       LiftDelayedInstIntoBlock(ctx, block, true);
 
+      const auto ret_pc = FunctionReturnAddress(ctx);
+
       if (!ctx.cfg_inst || !ctx.cfg_inst->lp_ea) {
         LiftSavedRegs(ctx, block);
         LiftKilledRegs(ctx, block);
@@ -1360,12 +1435,13 @@ static void LiftInstIntoFunction(TranslationContext &ctx,
           LiftSubFuncCall(ctx, block, target_func, PCValueKind::kUndefPC);
         }
         LiftRestoredRegs(ctx, block);
-        llvm::BranchInst::Create(
-            GetOrCreateBlock(ctx, FunctionReturnAddress(ctx)), block);
+        RevivePCAndNextPC(ctx, block, ret_pc);
+        llvm::BranchInst::Create(GetOrCreateBlock(ctx, ret_pc), block);
 
+      // TODO(pag): Revive the PC and next PC after the invoke.
       } else {
         auto exception_block = ctx.lp_to_block[ctx.cfg_inst->lp_ea];
-        auto normal_block = GetOrCreateBlock(ctx, FunctionReturnAddress(ctx));
+        auto normal_block = GetOrCreateBlock(ctx, ret_pc);
 
         if (fallback_func == target_func) {
           InlineSubFuncInvoke(ctx, block, target_func, normal_block,
@@ -1409,7 +1485,7 @@ static void LiftInstIntoFunction(TranslationContext &ctx,
 
     case remill::Instruction::kCategoryAsyncHyperCall:
       LiftDelayedInstIntoBlock(ctx, block, true);
-      LiftSubFuncCall(ctx, block, ctx.lifter->intrinsics->async_hyper_call);
+      LiftSubFuncCall(ctx, block, intrinsics.async_hyper_call);
       llvm::BranchInst::Create(GetOrCreateBlock(ctx, ctx.inst.branch_taken_pc),
                                block);
       break;
@@ -1443,9 +1519,17 @@ static llvm::Function *LiftFunction(const NativeModule *cfg_module,
   lifted_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
   lifted_func->setLinkage(llvm::GlobalValue::ExternalLinkage);
 
-  lifted_func->removeFnAttr(llvm::Attribute::AlwaysInline);
-  lifted_func->removeFnAttr(llvm::Attribute::InlineHint);
-  lifted_func->addFnAttr(llvm::Attribute::NoInline);
+  if ((gArch->IsSPARC64() &&
+       cfg_func->name.find("__sparc_get_pc_thunk") == 0) ||
+      (gArch->IsX86() && cfg_func->name.find("__x86.get_pc_thunk") == 0)) {
+    lifted_func->removeFnAttr(llvm::Attribute::NoInline);
+    lifted_func->addFnAttr(llvm::Attribute::AlwaysInline);
+    lifted_func->addFnAttr(llvm::Attribute::InlineHint);
+  } else {
+    lifted_func->removeFnAttr(llvm::Attribute::AlwaysInline);
+    lifted_func->removeFnAttr(llvm::Attribute::InlineHint);
+    lifted_func->addFnAttr(llvm::Attribute::NoInline);
+  }
 
   if (FLAGS_stack_protector) {
     lifted_func->addFnAttr(llvm::Attribute::StackProtectReq);
@@ -1545,8 +1629,7 @@ static llvm::Function *LiftFunction(const NativeModule *cfg_module,
 
         auto mem_ptr = LiftSubFuncCall(
             ctx, block,
-            CallableLiftedFunc(tail_called_func,
-                               ctx.lifter->intrinsics->function_call));
+            CallableLiftedFunc(tail_called_func, intrinsics.function_call));
         LiftFuncRestoredRegs(ctx, block, true);
         (void) llvm::ReturnInst::Create(*gContext, mem_ptr, block);
         continue;
@@ -1572,7 +1655,7 @@ static llvm::Function *LiftFunction(const NativeModule *cfg_module,
     } else {
       ctx.cfg_block = ctx.cfg_module->TryGetBlock(inst_ea, ctx.cfg_block);
       ctx.cfg_inst = ctx.cfg_module->TryGetInstruction(inst_ea);
-      LiftInstIntoFunction(ctx, block);
+      LiftInstIntoFunction(ctx, block, intrinsics);
     }
   }
 

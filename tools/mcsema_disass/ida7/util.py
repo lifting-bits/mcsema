@@ -36,6 +36,8 @@ FUNC_LSDA_ENTRIES = collections.defaultdict()
 
 IS_ARM = "ARM" in _INFO.procName
 
+IS_SPARC = "sparc" in _INFO.procName
+
 # True if we are running on an ELF file.
 IS_ELF = (idaapi.f_ELF == _INFO.filetype) or \
          (idc.get_inf_attr(idc.INF_FILETYPE) == idc.FT_ELF)
@@ -45,6 +47,8 @@ IS_PE = idaapi.f_PE == _INFO.filetype
 
 if IS_ARM:
   from arm_util import *
+elif IS_SPARC:
+  from sparc_util import *
 else:
   from x86_util import *
 
@@ -281,8 +285,11 @@ def disassemble(ea):
 def is_invalid_ea(ea):
   """Returns `True` if `ea` is not valid, i.e. it doesn't point into any
   valid segment."""
-  if (idc.BADADDR == ea) or \
-    (idc.get_segm_name(ea) == "LOAD"):
+  if (idc.BADADDR == ea):
+    return True
+
+  #if not IS_SPARC:
+  if (idc.get_segm_name(ea) == "LOAD"):
     return True
 
   try:

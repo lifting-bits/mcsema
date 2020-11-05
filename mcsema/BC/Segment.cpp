@@ -17,6 +17,13 @@
 
 #include "mcsema/BC/Segment.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-compare"
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wdocumentation"
+#pragma clang diagnostic ignored "-Wswitch-enum"
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <llvm/IR/Constants.h>
@@ -26,6 +33,8 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
+#pragma clang diagnostic pop
+
 #include <remill/Arch/Arch.h>
 #include <remill/BC/Compat/GlobalValue.h>
 #include <remill/BC/Util.h>
@@ -738,17 +747,16 @@ void MergeSegments(const NativeModule *cfg_module) {
   }
 
 
-  std::sort(segs.begin(), segs.end(), [](SegPair a, SegPair b) {
-    return a.first->ea < b.first->ea;
-  });
+  std::sort(segs.begin(), segs.end(),
+            [](SegPair a, SegPair b) { return a.first->ea < b.first->ea; });
 
   if (segs.empty()) {
     return;
   }
 
   const auto &dl = gModule->getDataLayout();
-  llvm::Type * const u8 = llvm::Type::getInt8Ty(*gContext);
-  llvm::Type * const u32 = llvm::Type::getInt32Ty(*gContext);
+  llvm::Type *const u8 = llvm::Type::getInt8Ty(*gContext);
+  llvm::Type *const u32 = llvm::Type::getInt32Ty(*gContext);
 
   auto start_ea = segs.front().first->ea & ~4095ull;
   const auto min_ea = start_ea;
@@ -763,9 +771,8 @@ void MergeSegments(const NativeModule *cfg_module) {
       continue;
     }
 
-    LOG(INFO)
-        << "Merging segment " << cfg_seg->name << " at " << std::hex
-        << cfg_seg->ea << " of size " << std::dec << cfg_seg->size;
+    LOG(INFO) << "Merging segment " << cfg_seg->name << " at " << std::hex
+              << cfg_seg->ea << " of size " << std::dec << cfg_seg->size;
 
     const auto ea = cfg_seg->ea;
     if (start_ea < ea) {
@@ -775,11 +782,10 @@ void MergeSegments(const NativeModule *cfg_module) {
       start_ea = ea;
 
     } else if (start_ea > ea) {
-      LOG(FATAL)
-          << "Segment " << cfg_seg->name << " starting at " << std::hex << ea
-          << " overlaps with previous segment " << prev_cfg_seg->name
-          << " starting at " << prev_cfg_seg->ea << " and ending at "
-          << start_ea << std::dec;
+      LOG(FATAL) << "Segment " << cfg_seg->name << " starting at " << std::hex
+                 << ea << " overlaps with previous segment "
+                 << prev_cfg_seg->name << " starting at " << prev_cfg_seg->ea
+                 << " and ending at " << start_ea << std::dec;
     }
 
     const auto init = seg_var->getInitializer();
@@ -791,14 +797,14 @@ void MergeSegments(const NativeModule *cfg_module) {
     prev_cfg_seg = cfg_seg;
   }
 
-  llvm::StructType * const new_type = llvm::StructType::get(
-      *gContext, new_types, true);
+  llvm::StructType *const new_type =
+      llvm::StructType::get(*gContext, new_types, true);
 
-  llvm::Constant * const new_val = llvm::ConstantStruct::get(new_type, new_vals);
+  llvm::Constant *const new_val = llvm::ConstantStruct::get(new_type, new_vals);
 
-  auto new_var = new llvm::GlobalVariable(
-      *gModule, new_type, false, llvm::GlobalValue::InternalLinkage, new_val,
-      "__mcsema_all_segments");
+  auto new_var = new llvm::GlobalVariable(*gModule, new_type, false,
+                                          llvm::GlobalValue::InternalLinkage,
+                                          new_val, "__mcsema_all_segments");
 
   if (FLAGS_name_lifted_sections) {
     std::stringstream ss;

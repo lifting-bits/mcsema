@@ -1,4 +1,5 @@
 #pragma once
+
 // Copyright (C) 2020 Trail of Bits
 // Based on: https://github.com/andrew-hardin/cmake-git-version-tracking/blob/master/better-example/git.h
 // Which is (C) 2020 Andrew Hardin

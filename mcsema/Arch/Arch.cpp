@@ -17,6 +17,12 @@
 
 #include "mcsema/Arch/Arch.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wdocumentation"
+#pragma clang diagnostic ignored "-Wswitch-enum"
 #include <glog/logging.h>
 #include <llvm/ADT/ArrayRef.h>
 #include <llvm/IR/BasicBlock.h>
@@ -29,7 +35,11 @@
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
+#pragma clang diagnostic pop
+
 #include <remill/Arch/Arch.h>
+#include <remill/Arch/Name.h>
+#include <remill/OS/OS.h>
 
 #include <unordered_set>
 
@@ -44,7 +54,10 @@ std::unique_ptr<const remill::Arch> gArch(nullptr);
 bool InitArch(const std::string &os, const std::string &arch) {
   LOG(INFO) << "Initializing for " << arch << " code on " << os;
 
-  remill::Arch::GetTargetArch(*gContext).swap(gArch);
+  auto os_name = remill::GetOSName(os);
+  auto arch_name = remill::GetArchName(arch);
+
+  remill::Arch::Build(gContext.get(), os_name, arch_name).swap(gArch);
   gWordType = llvm::Type::getIntNTy(*gContext,
                                     static_cast<unsigned>(gArch->address_size));
 
