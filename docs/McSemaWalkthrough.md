@@ -61,7 +61,7 @@ mcsema-disass-3.8 \
 
 The following explains each command-line flag:
 
-* `--disassembler "${IDA_PATH}/idabin/idat64"`: This is a path to the IDA Pro executable which will do the bulk of the disassembly work. We're using `idat64` because `xz` is a 64-bit bit binary. If it was a 32-bit binary, we'd use `idat`.
+* `--disassembler "${IDA_PATH}/idat64"`: This is a path to the IDA Pro executable which will do the bulk of the disassembly work. We're using `idat64` because `xz` is a 64-bit bit binary. If it was a 32-bit binary, we'd use `idat`.
 * `--os linux`: The binary we are lifting is for the Linux operating system. It is possible to use McSema on any supported platform for any supported binary (e.g. Windows binaries can be lifted on Linux and vice versa).
 * `--arch amd64`: The binary we are lifting is a 64-bit binary that uses the amd64 or x86-64 instruction set.
 * `--output /tmp/xz.cfg`: Store the recovered control flow information in the file named `xz.cfg`.
@@ -73,12 +73,12 @@ The following explains each command-line flag:
 
 ## Translation to Bitcode
 
-Once we have the program's control flow information, we can translate it to LLVM bitcode using `mcsema-lift-10.0`. The `10.0` here is the version of the LLVM toolchain being used. McSema can be built to use LLVM version 3.6 and up. The officially supported versions are LLVM 9+.
+Once we have the program's control flow information, we can translate it to LLVM bitcode using `mcsema-lift-9.0`. The `9.0` here is the version of the LLVM toolchain being used. McSema can be built to use LLVM version 3.6 and up. The officially supported versions are LLVM 9+.
 
 Here is the command to translate the CFG into bitcode:
 
 ```shell
-mcsema-lift-10.0 \
+mcsema-lift-9.0 \
     --arch amd64 \
     --os linux \
     --cfg /tmp/xz.cfg \
@@ -94,11 +94,11 @@ The following explains each command-line flag:
 * `--arch amd64`: Tell the lifter the architecture of the binary represented by the CFG. This should match what was passed to `mcsema-disass-3.8`.
 * `--cfg /tmp/xz.cfg`: The input control flow graph to convert into bitcode.
 * `--output /tmp/xz.bc`: Where to write the bitcode. If the `--output` option is not specified, the bitcode will be written to `stdout`.
-* `--explicit_args`: This is a bit tricky to explain. Basically, if an external function is called, then we are asking McSema to try to call it as if it were calling any old LLVM function. This isn't always accurate, however. The accuracy of this flag depends entirely on IDA Pro and also the presence/absence of floating point arguments or variadic arguments. If you are using the bitcode with KLEE then you definitely want this option; the alternative is for all externals to be called through assembly stubs, which is only supported on 64-bit Linux.
+* `--explicit_args`: This is a bit tricky to explain. Basically, if an external function is called, then we are asking McSema to try to call it as if it were calling any old LLVM function. This means that a call in the binary to an external function shows up as a call to an LLVM function, with explicitly represented arguments passed to that function (hence the name). The lifting of explicit argument calls isn't always accurate, however. The accuracy depends entirely on IDA Pro's ability to infer or know prototype of a function, the presence/absence of floating point arguments, and the presence/absence of variadic arguments. If you are using the bitcode with KLEE then you definitely want this option; the alternative is for all externals to be called through assembly stubs without any "high level" arguments being passed. Behind the scenes, the assembly stub translates McSema's emulated registers into native machine registers, and swaps stacks. This is only supported on 64-bit Linux.
 * `--merge_segments`: McSema lifts each "segment" (area containing code, data, etc.) as a global variable in LLVM. Sometimes, two or more segments are adjacent or nearby in the binary. Some addresses may point to the beginning of a segment, but be validly interpreted as one past the end of the prior (adjacent) segment. Other addresses may be formed dynamically by combining a high portion of an address (pointing into one segment) and the low portion of an address (a displacement that moves the address into the next segment). To best handle all these corner cases, we use this option to merge all these global variables into one single massive global varible. It's a bit crazy but it's more reliable.
 * `--name_lifted_sections`: This tells McSema to assign each lifted segment variable to its own section. In our case, because we merged all segments into one global variable, and because we specified `--rebase 535822336` (`0x1ff00000`) at disassembly time, there will be a single section named `.section_1ff00000`. Right now this seems like an unusual thing to do; however, our goal is to recompile this bitcode to machine code. We admit that the disassembly process may miss things. Sometimes it might see a number and interpret it as an address or vice versa. To counteract these kinds of issues, we're going to position the lifted segments so that they would end up where they were rebased to in the binary. This will ensure that any numbers or addresses that may have been misinterpreted have the same bit/integer representation! Again, this is an option to improve reliability. For something like KLEE, this won't help you.
 
-The `mcsema-lift-10.0` program may print out errors or warnings to `stderr`. Oftentimes these are not critical. The full lift log can be found in `/tmp/mcsema-lift-10.0.INFO`, and this is a link to a process/thread-ID-specific file. Make sure to clean out these log files if you use `mcsema-lift-10.0` a lot!
+The `mcsema-lift-9.0` program may print out errors or warnings to `stderr`. Oftentimes these are not critical. The full lift log can be found in `/tmp/mcsema-lift-9.0.INFO`, and this is a link to a process/thread-ID-specific file. Make sure to clean out these log files if you use `mcsema-lift-9.0` a lot!
 
 And there will be a generated bitcode file in the output location that we specified.
 
@@ -123,10 +123,10 @@ First, we need to find out the dependent libraries of `xz`. We'll need to link a
   /lib64/ld-linux-x86-64.so.2 (0x00007f5c7330b000)
 ```
 
-Before installing McSema, you likely had to install Remill. As a result, you should have `remill-clang-10.0` installed as an available binary. If you don't have this then be sure to use `clang-10`, as it should be compatible with the LLVM 10 bitcode produced by `mcsema-lift-10.0`.
+Before installing McSema, you likely had to install Remill. As a result, you should have `remill-clang-9.0` installed as an available binary. If you don't have this then be sure to use `clang-9`, as it should be compatible with the LLVM 9 bitcode produced by `mcsema-lift-9.0`.
 
 ```bash
-remill-clang-10.0 -o /tmp/xz.lifted /tmp/xz.bc -lpthread -lm -ldl -llzma -Wl,--section-start=.section_1ff00000=0x1ff00000
+remill-clang-9.0 -o /tmp/xz.lifted /tmp/xz.bc -lpthread -lm -ldl -llzma -Wl,--section-start=.section_1ff00000=0x1ff00000
 ```
 
 This is a fairly ordinary clang command line; the only thing of note is `-Wl,--section-start=.section_1ff00000=0x1ff00000`, which tells the linker to position the lifted segment variable, located in the section `.section_1ff00000` at the address `0x1ff00000`.

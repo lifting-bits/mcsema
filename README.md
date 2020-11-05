@@ -201,8 +201,6 @@ source bin/activate
 
 #### Step 2: Clone the repository and its dependencies
 
-The next step is to clone the [Remill](https://github.com/lifting-bits/remill) repository. We then clone the McSema repository into the `tools` subdirectory of Remill. This is kind of like how Clang and LLVM are distributed separately, and the Clang source code needs to be put into LLVM's tools directory.
-
 ```shell
 git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/remill.git
 git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/anvill.git
