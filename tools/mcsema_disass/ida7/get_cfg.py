@@ -1480,7 +1480,19 @@ def identify_program_entrypoints(func_eas):
 
   exclude = set(["_start", "__libc_csu_fini", "__libc_csu_init", "main",
                  "__data_start", "__dso_handle", "_IO_stdin_used",
-                 "_dl_relocate_static_pie", "__DTOR_END__"])
+                 "_dl_relocate_static_pie", "__DTOR_END__", "__ashlsi3",
+                 "__ashldi3", "__ashlti3", "__ashrsi3", "__ashrdi3", "__ashrti3",
+                 "__divsi3", "__divdi3", "__divti3", "__lshrsi3", "__lshrdi3",
+                 "__lshrti3", "__modsi3", "__moddi3", "__modti3", "__mulsi3",
+                 "__muldi3", "__multi3", "__negdi2", "__negti2", "__udivsi3",
+                 "__udivdi3", "__udivti3", "__udivmoddi4", "__udivmodti4",
+                 "__umodsi3", "__umoddi3", "__umodti3", "__cmpdi2", "__cmpti2",
+                 "__ucmpdi2", "__ucmpti2", "__absvsi2", "__absvdi2", "__addvsi3",
+                 "__addvdi3", "__mulvsi3", "__mulvdi3", "__negvsi2", "__negvdi2",
+                 "__subvsi3", "__subvdi3", "__clzsi2", "__clzdi2", "__clzti2",
+                 "__ctzsi2", "__ctzdi2", "__ctzti2", "__ffsdi2", "__ffsti2",
+                 "__paritysi2", "__paritydi2", "__parityti2", "__popcountsi2",
+                 "__popcountdi2", "__popcountti2", "__bswapsi2", "__bswapdi2"])
 
   exported_funcs = set()
   exported_vars = set()
@@ -1728,7 +1740,7 @@ if __name__ == "__main__":
     INIT_DEBUG_FILE(args.log_file)
     DEBUG("Debugging is enabled.")
 
-  addr_size = {"x86": 32, "amd64": 64, "aarch64": 64}.get(args.arch, 0)
+  addr_size = {"x86": 32, "amd64": 64, "aarch64": 64, "sparc32": 32,  "sparc64": 64}.get(args.arch, 0)
   if addr_size != get_address_size_in_bits():
     DEBUG("Arch {} address size does not match IDA's available bitness {}! Did you mean to use idal64?".format(
         args.arch, get_address_size_in_bits()))
@@ -1771,7 +1783,7 @@ if __name__ == "__main__":
   # other sane defaults.
   idc.set_inf_attr(idc.INF_AF, 0xdfff)
   idc.set_inf_attr(idc.INF_AF2, 0xfffd)
-  
+
   # Ensure that IDA is done processing
   DEBUG("Using Batch mode.")
   idaapi.auto_wait()

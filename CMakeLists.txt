@@ -16,6 +16,13 @@
 project(mcsema)
 cmake_minimum_required(VERSION 3.2)
 
+# remill
+if("${PLATFORM_NAME}" STREQUAL "windows")
+  set(REMILL_FINDPACKAGE_HINTS HINTS "${CMAKE_INSTALL_PREFIX}/remill/lib")
+endif()
+
+find_package(remill REQUIRED ${REMILL_FINDPACKAGE_HINTS})
+
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/settings.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/BCCompiler.cmake")
@@ -56,13 +63,6 @@ endif()
 #
 # libraries
 #
-
-# remill
-if("${PLATFORM_NAME}" STREQUAL "windows")
-  set(REMILL_FINDPACKAGE_HINTS HINTS "${CMAKE_INSTALL_PREFIX}/remill/lib")
-endif()
-
-find_package(remill REQUIRED ${REMILL_FINDPACKAGE_HINTS})
 
 # protobuf
 find_package(Protobuf REQUIRED)

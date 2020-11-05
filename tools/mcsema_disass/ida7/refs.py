@@ -348,7 +348,7 @@ def _get_ref_candidate(inst, op, all_refs, binary_is_pie):
 
   # WTF(pag): This silently kills IDA.
   # idc.add_dref(inst.ea, addr_val, idc.XREF_USER)
-    
+
   return ref
 
 def memop_is_actually_displacement(inst):
@@ -473,9 +473,15 @@ def get_instruction_references(arg, binary_is_pie=False):
 
     # Code reference.
     elif idc.o_near == op.type:
+      # ref.ea != op.addr for SPARC architecture
       # assert ref.ea == op.addr
       if ref.ea != op.addr:
         DEBUG("ERROR inst={:x} ref.ea={:x} op.addr={:x}".format(inst.ea, ref.ea, op.addr))
+
+      # Treat this instruction as nop; Delete any references cross references from it
+      # Special handling of SPARC `bn` instruction
+      if IS_SPARC and fixup_instr_as_nop(inst):
+        idaapi.del_cref(inst.ea, ref.ea, False)
 
       ref.type = Reference.CODE
       ref.symbol = get_symbol_name(op_ea, ref.ea)

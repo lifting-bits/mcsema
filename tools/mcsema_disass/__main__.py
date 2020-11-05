@@ -29,7 +29,7 @@ import textwrap
 SUPPORTED_OS = ('linux', 'macos', 'windows', 'solaris')
 SUPPORTED_ARCH = ('x86', 'x86_avx', 'x86_avx512',
                   'amd64', 'amd64_avx', 'amd64_avx512',
-                  'aarch64')
+                  'aarch64', 'sparc32', 'sparc64')
 
 # Make sure we can do an `import binaryninja`.
 def _find_binary_ninja(path_to_binaryninja):

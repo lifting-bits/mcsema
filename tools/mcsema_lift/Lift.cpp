@@ -17,6 +17,12 @@
 
 #include "mcsema/BC/Lift.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wdocumentation"
+#pragma clang diagnostic ignored "-Wswitch-enum"
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <llvm/IR/Function.h>
@@ -24,7 +30,8 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Support/CommandLine.h>
-#include <mcsema/Version/Version.h>
+#pragma clang diagnostic pop
+
 #include <remill/Arch/Arch.h>
 #include <remill/BC/Annotate.h>
 #include <remill/BC/Util.h>
@@ -38,6 +45,7 @@
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Util.h"
+#include "mcsema/Version/Version.h"
 
 #ifndef LLVM_VERSION_STRING
 #  define LLVM_VERSION_STRING LLVM_VERSION_MAJOR << "." << LLVM_VERSION_MINOR

@@ -58,7 +58,7 @@ def is_sane_reference_target(ea):
 
   # If the byte has value but no other flag is set
   # This is possibly not a true reference target
-  if not IS_ARM:
+  if not IS_ARM and not IS_SPARC:
     if (flags == idc.FF_IVL) \
       or (flags == idc.FF_UNK) \
       or (flags == 0xfff00300):
@@ -289,6 +289,8 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
       if is_sane_reference_target(target_ea):
         if make_dref(ea, target_ea, idc.FF_DWORD, 4):
           DEBUG("Adding dword reference from {:x} to {:x}".format(ea, target_ea))
+          if is_block_or_instruction_head(target_ea):
+            maybe_jump_table_entries.append((ea, 4))
           next_ea = ea + 4
           continue
 
@@ -383,8 +385,9 @@ def decode_segment_instructions(seg_ea, binary_is_pie):
   seg_end_ea = idc.get_segm_end(seg_ea)
   for head_ea in idautils.Heads(seg_ea, seg_end_ea):
     inst, _ = decode_instruction(head_ea)
-    get_instruction_references(inst, binary_is_pie)
-    table = get_jump_table(inst, binary_is_pie)
+    if inst:
+      get_instruction_references(inst, binary_is_pie)
+      table = get_jump_table(inst, binary_is_pie)
 
   for funcea in idautils.Functions(seg_ea, seg_end_ea):
     find_default_block_heads(funcea)
