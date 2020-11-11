@@ -52,6 +52,23 @@ def try_mark_as_function(address):
   idaapi.auto_wait()
   return True
 
+
+def is_start_of_function(ea):
+  """Returns `True` if `ea` is the start of a function."""
+  global _FUNC_HEAD_EAS
+
+  if ea in _FUNC_HEAD_EAS:
+    return True
+
+  if not is_code(ea):
+    return False
+
+  func = ida_funcs.get_func(ea)
+  if not func:
+    return False
+
+  return ea == func.start_ea
+
 def find_linear_terminator(ea, max_num=256):
   """Find the terminating instruction of a basic block, without actually
   associating the instructions with the block. This scans linearly until

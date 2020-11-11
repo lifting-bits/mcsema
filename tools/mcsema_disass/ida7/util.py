@@ -22,6 +22,7 @@ import struct
 import inspect
 import ida_ua
 import ida_bytes
+import ida_funcs
 import sys
 
 _DEBUG_FILE = None
