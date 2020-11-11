@@ -1392,7 +1392,8 @@ static llvm::Value *TryGetRegAlias(llvm::Value *ptr, unsigned offset) {
   const auto elem_type = ptr_type->getPointerElementType();
 
   std::stringstream ss;
-  ss << reg->name << "_" << std::hex << reinterpret_cast<uintptr_t>(elem_type);
+  ss << reg->name << '_' << offset << '_'
+     << std::hex << reinterpret_cast<uintptr_t>(elem_type);
   auto alias_name = ss.str();
   SanitizeNameForLinking(alias_name);
 
@@ -1628,7 +1629,6 @@ void OptimizeModule(const NativeModule *cfg_module) {
   pm.doFinalization();
 
   remill::RemoveDeadStores(gArch.get(), gModule.get(), bb_func, slots);
-
 
   // If some of the restores are *not* dead, then we will have eliminated
   // some loads and subsequent uses (in the `__remill_restore.*` argument lists)

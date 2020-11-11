@@ -17,6 +17,7 @@
 
 import idautils
 import idaapi
+import ida_funcs
 import idc
 import sys
 import os
@@ -460,16 +461,6 @@ def try_get_thunk_name(ea):
     ret = (is_thunk, target_ea, name)
     _ELF_THUNKS[ea] = ret
     return ret
-
-def is_start_of_function(ea):
-  """Returns `True` if `ea` is the start of a function."""
-  if not is_code(ea):
-    return False
-   
-  # originally name = idc.GetTrueName(ea) or idc.get_func_name(ea)
-  # removed since ida 7.4 not supported
-  name = idc.get_func_name(ea)
-  return ea == idc.get_name_ea_simple(name)
 
 _REFERENCE_OPERAND_TYPE = {
   Reference.IMMEDIATE: CFG_pb2.CodeReference.ImmediateOperand,
@@ -1478,7 +1469,7 @@ def identify_program_entrypoints(func_eas):
   DEBUG("Looking for entrypoints")
   DEBUG_PUSH()
 
-  exclude = set(["_start", "__libc_csu_fini", "__libc_csu_init", "main",
+  exclude = set(["_start", "__libc_csu_fini", "__libc_csu_init", 
                  "__data_start", "__dso_handle", "_IO_stdin_used",
                  "_dl_relocate_static_pie", "__DTOR_END__", "__ashlsi3",
                  "__ashldi3", "__ashlti3", "__ashrsi3", "__ashrdi3", "__ashrti3",
@@ -1581,6 +1572,11 @@ def recover_module(entrypoint, gvar_infile = None):
     if is_invalid_ea(entry_ea):
       if "main" == args.entrypoint and IS_ELF:
         entry_ea = find_main_in_ELF_file()
+
+    if not is_invalid_ea(entry_ea):
+      DEBUG("Found {} at {:x}".format(args.entrypoint, entry_ea))
+      if not is_start_of_function(entry_ea):
+        try_mark_as_function(entry_ea)
 
   if RECOVER_EHTABLE:
     recover_exception_table()

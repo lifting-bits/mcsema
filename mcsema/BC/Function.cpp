@@ -90,7 +90,7 @@ DEFINE_string(
 DEFINE_bool(add_pc_tracer, false,
             "Add a debug function that is invoked just before every lifted "
             "instruction, where the PC of the instruction is passed into the "
-            "tracer. This is similar to --add_reg_tracer, but it doesn't "
+            "tracer. This is similar to --trace_reg_values, but it doesn't "
             "negatively impact optimizations.");
 
 DEFINE_bool(
@@ -263,7 +263,7 @@ static llvm::Function *GetRegTracer(void) {
 // function handler, then the second argument is the emulated program counter,
 // and a logical stack trace feature can be implemented by recording these
 // program counters into a KLEE execution state.
-static llvm::Function *GetPCTracer(uint64_t pc) {
+static llvm::Function *GetPCTracer(void) {
   static llvm::Function *gPCTracer = nullptr;
   if (!gPCTracer) {
     gPCTracer = gModule->getFunction("__mcsema_pc_tracer");
@@ -274,12 +274,11 @@ static llvm::Function *GetPCTracer(uint64_t pc) {
       gPCTracer =
           llvm::Function::Create(func_type, llvm::GlobalValue::ExternalLinkage,
                                  "__mcsema_pc_tracer", gModule.get());
-      gPCTracer->addFnAttr(llvm::Attribute::NoDuplicate);
       gPCTracer->removeFnAttr(llvm::Attribute::AlwaysInline);
       gPCTracer->removeFnAttr(llvm::Attribute::InlineHint);
+      gPCTracer->addFnAttr(llvm::Attribute::NoDuplicate);
       gPCTracer->addFnAttr(llvm::Attribute::OptimizeNone);
       gPCTracer->addFnAttr(llvm::Attribute::NoInline);
-      gPCTracer->addFnAttr(llvm::Attribute::ReadNone);
     }
   }
   return gPCTracer;
@@ -951,9 +950,8 @@ static void Instrument(const TranslationContext &ctx, llvm::BasicBlock *block,
   }
 
   if (FLAGS_add_pc_tracer) {
-    auto tracer = GetPCTracer(inst_ea);
     llvm::Value *args[1] = {llvm::ConstantInt::get(gWordType, inst_ea)};
-    (void) llvm::CallInst::Create(tracer, args, "", block);
+    (void) llvm::CallInst::Create(GetPCTracer(), args, "", block);
   }
 }
 
