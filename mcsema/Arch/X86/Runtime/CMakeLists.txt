@@ -37,91 +37,9 @@ elseif(APPLE)
 
 else()    
   # Create the runtimes
-  # 32-bit binaries work on both 32 and 64 bit platforms
 
-  set(MCSMEMA_RT32 mcsema_rt32-${LLVM_MAJOR_VERSION}.${LLVM_MINOR_VERSION})
   set(MCSMEMA_RT64 mcsema_rt64-${LLVM_MAJOR_VERSION}.${LLVM_MINOR_VERSION})
 
-  if(WIN32)
-    add_executable(mcsema-print-runtime-x86
-      print_PE_32_windows.cpp
-    )
-
-    # this is going to import the public include headers of remill
-    target_link_libraries(mcsema-print-runtime-x86 PRIVATE remill)
-    target_include_directories(mcsema-print-runtime-x86 PRIVATE
-      "${REMILL_INCLUDE_LOCATION}" "${MCSEMA_SOURCE_DIR}"
-    )
-
-    # build a static library from this generated object
-    add_library(${MCSMEMA_RT32} STATIC ${MCSMEMA_RT32}.obj runtime_32.o)
-    set_target_properties(${MCSMEMA_RT32} PROPERTIES STATIC_LIBRARY_FLAGS "/machine:x86")
-
-    # add_library does not know how to link this thing together from an obj
-    # tell cmake its just like C (the same command line will work for the object)
-    set_target_properties(
-      ${MCSMEMA_RT32} 
-      PROPERTIES
-      LINKER_LANGUAGE C
-    )
-
-    # use a custom step to build asm->obj since cmake wont recognize how to build our asm
-    add_custom_command(
-      OUTPUT ${MCSMEMA_RT32}.obj
-      COMMAND "${CMAKE_C_COMPILER}" -m32 /Fo${MCSMEMA_RT32}.obj /c runtime_32.asm
-      DEPENDS runtime_32.asm
-      COMMENT "Building Runtime ASM..."
-    )
-
-    set_source_files_properties(
-      ${MCSMEMA_RT32}.obj
-      PROPERTIES
-      EXTERNAL_OBJECT True
-      GENERATED True
-    )
-
-    add_custom_command(
-      OUTPUT runtime_32.asm
-      COMMAND mcsema-print-runtime-x86
-      DEPENDS mcsema-print-runtime-x86
-      COMMENT "Generating 32-bit Windows PE runtime..."
-    )
-  
-  elseif(UNIX)
-    # Linux and friends
-    add_compile_options(-Wno-invalid-offsetof)
-    
-    add_executable(mcsema-print-runtime-x86
-      print_ELF_32_linux.cpp
-    )
-
-    # this is going to import the public include headers of remill
-    target_link_libraries(mcsema-print-runtime-x86 PRIVATE remill)
-    target_include_directories(mcsema-print-runtime-x86 PRIVATE
-      "${REMILL_INCLUDE_LOCATION}" "${MCSEMA_SOURCE_DIR}"
-    )
-
-    add_library(${MCSMEMA_RT32} STATIC runtime_32.S runtime_32.o)
-    set_target_properties(${MCSMEMA_RT32}
-      PROPERTIES COMPILE_FLAGS "-m32 -fPIC" LINK_FLAGS "-m32 -fPIC"
-    )
-
-    add_custom_command(
-      OUTPUT runtime_32.S
-      COMMAND mcsema-print-runtime-x86
-      DEPENDS mcsema-print-runtime-x86
-      COMMENT "Generating 32-bit Linux ELF runtime..."
-    )
-
-  else()
-    message(ERROR "Unsupported operating system")
-  endif()
-
-  install(
-    TARGETS ${MCSMEMA_RT32}
-    ARCHIVE DESTINATION "${install_folder}/lib"
-  )
- 
   # only do 64-bit binaries on 64-bit platforms
   if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     if(WIN32)
@@ -216,21 +134,6 @@ if(DEFINED REMILL_SOURCE_DIR)
   set(REMILL_SOURCE "-I${REMILL_SOURCE_DIR}")
 endif()
 
-# Create a runtime.
-add_custom_command(
-  OUTPUT runtime_32.o
-  COMMAND "${CMAKE_CXX_COMPILER}" -std=gnu++11 "${REMILL_INCLUDE}" "${REMILL_SOURCE}" "${REMILL_SOURCE_DIR}" -I"${MCSEMA_SOURCE_DIR}" -m32 -fPIC -c "${CMAKE_CURRENT_SOURCE_DIR}/Runtime.cpp" -o runtime_32.o
-  DEPENDS Runtime.cpp
-  COMMENT "Building 32-bit runtime"
-)
-
-set_source_files_properties(
-  runtime_32.o
-  PROPERTIES
-  EXTERNAL_OBJECT True
-  GENERATED True
-)
-
 # only do 64-bit binaries on 64-bit platforms
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
   add_custom_command(
@@ -247,14 +150,6 @@ if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     GENERATED True
   )
 endif()
-
-add_runtime(runtime_x86
-  SOURCES "Runtime.cpp"
-  ADDRESS_SIZE 32
-  BCFLAGS  "-xc++" "-m32" "-std=gnu++17" "-Wno-deprecated-declarations"
-  INCLUDEDIRECTORIES "${CMAKE_SOURCE_DIR}" "${MCSEMA_SOURCE_DIR}"  "${REMILL_INCLUDE_LOCATION}"
-  INSTALLDESTINATION "${install_folder}/lib"
-)
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
   add_runtime(runtime_amd64
