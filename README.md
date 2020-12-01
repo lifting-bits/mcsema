@@ -218,7 +218,7 @@ fi
 # Download cxx-common, build Remill. 
 ./remill/scripts/build.sh --llvm-version 9.0
 cd remill-build
-make_install
+make install
 
 export TRAILOFBITS_LIBRARIES=`pwd`/remill-build/libraries
 
@@ -227,7 +227,7 @@ mkdir anvill-build
 pushd anvill-build
 ${TRAILOFBITS_LIBRARIES}/cmake/bin/cmake ../anvill
 make
-make_install
+make install
 popd
 
 # Build and install McSema
@@ -235,7 +235,7 @@ mkdir mcsema-build
 pushd mcsema-build
 ${TRAILOFBITS_LIBRARIES}/cmake/bin/cmake ../mcsema
 make
-make_install
+make install
 popd
 ```
 
