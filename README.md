@@ -220,7 +220,8 @@ fi
 cd remill-build
 make install
 
-export TRAILOFBITS_LIBRARIES=`pwd`/remill-build/libraries
+export TRAILOFBITS_LIBRARIES=`pwd`/libraries
+cd ..
 
 # Build and install Anvill
 mkdir anvill-build
