@@ -1,0 +1,15 @@
+# Set default triplet to Release VCPKG build
+if (NOT DEFINED VCPKG_TARGET_TRIPLET)
+  if (APPLE)
+    set(VCPKG_TARGET_TRIPLET "x64-osx-rel" CACHE STRING "" FORCE)
+  elseif(UNIX)
+    set(VCPKG_TARGET_TRIPLET "x64-linux-rel" CACHE STRING "" FORCE)
+  endif()
+endif()
+
+set(VCPKG_ROOT "" CACHE PATH "Root directory to use for vcpkg-managed dependencies")
+if (VCPKG_ROOT)
+  set(CMAKE_TOOLCHAIN_FILE "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE PATH "" FORCE)
+else()
+  message(FATAL_ERROR "Usage of system dependencies is unsupported. Please define a path to VCPKG_ROOT. See https://github.com/ekilmer/vcpkg-lifting-ports for more details.")
+endif()
