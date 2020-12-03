@@ -13,17 +13,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# Find remill first because its config has useful dependency-finding info that
+# needs to be found before the CMake `project` declaration
+find_package(remill CONFIG REQUIRED)
+
 include(cmake/vcpkg_helper.cmake)
 
 project(mcsema)
 cmake_minimum_required(VERSION 3.2)
 
-# remill
-if("${PLATFORM_NAME}" STREQUAL "windows")
-  set(REMILL_FINDPACKAGE_HINTS HINTS "${CMAKE_INSTALL_PREFIX}/remill/lib")
-endif()
-
-find_package(remill REQUIRED ${REMILL_FINDPACKAGE_HINTS})
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/settings.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils.cmake")
@@ -67,7 +65,9 @@ endif()
 #
 
 # protobuf
-find_package(Protobuf REQUIRED)
+# Compatibility since we use older protobuf CMake functions
+set(protobuf_MODULE_COMPATIBLE ON CACHE BOOL "" FORCE)
+find_package(Protobuf CONFIG REQUIRED)
 list(APPEND PROJECT_LIBRARIES ${Protobuf_LIBRARIES})
 list(APPEND PROJECT_INCLUDEDIRECTORIES ${Protobuf_INCLUDE_DIR})
 list(APPEND PROJECT_DEFINITIONS "GOOGLE_PROTOBUF_NO_RTTI")
@@ -150,24 +150,10 @@ add_dependencies(${MCSEMA_LIFT}
 # libraries
 #
 
-# remill
-if(NOT TARGET remill)
-  if("${PLATFORM_NAME}" STREQUAL "windows")
-    set(REMILL_FINDPACKAGE_HINTS HINTS "${CMAKE_INSTALL_PREFIX}/remill/lib")
-  endif()
-
-  find_package(remill REQUIRED ${REMILL_FINDPACKAGE_HINTS})
-endif()
-
 list(APPEND PROJECT_LIBRARIES remill)
 
 # anvill
-if(NOT TARGET anvill-${REMILL_LLVM_VERSION})
-  find_package(anvill REQUIRED)
-  if(NOT anvill_FOUND)
-    message(FATAL_ERROR "McSema depends upon Anvill being installed")
-  endif()
-endif()
+find_package(anvill CONFIG REQUIRED)
 list(APPEND PROJECT_LIBRARIES anvill-${REMILL_LLVM_VERSION})
 
 # mcsema-disass
