@@ -15,19 +15,19 @@
 
 # Find remill first because its config has useful dependency-finding info that
 # needs to be found before the CMake `project` declaration
-find_package(remill CONFIG REQUIRED)
+find_package(remill COMPONENTS VCPKG_DEPS QUIET)
 
 include(cmake/vcpkg_helper.cmake)
 
 project(mcsema)
-cmake_minimum_required(VERSION 3.2)
+include(GNUInstallDirs)
+cmake_minimum_required(VERSION 3.14)
 
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/settings.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/BCCompiler.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/ccache.cmake")
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 configureCcache()
 FindAndSelectClangCompiler()
@@ -55,14 +55,18 @@ if(NOT DEFINED WIN32)
   set(PROJECT_CXXFLAGS
     ${GLOBAL_CXXFLAGS}
     -Wconversion
-    -pedantic 
-    -Wno-unreachable-code-return 
+    -pedantic
+    -Wno-unreachable-code-return
   )
 endif()
 
 #
 # libraries
 #
+
+find_package(remill CONFIG REQUIRED)
+list(APPEND PROJECT_LIBRARIES remill)
+get_target_property(REMILL_INCLUDE_LOCATION remill_settings INTERFACE_INCLUDE_DIRECTORIES)
 
 # protobuf
 # Compatibility since we use older protobuf CMake functions
@@ -143,14 +147,11 @@ add_custom_command(
 list(APPEND PROJECT_INCLUDEDIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_dependencies(${MCSEMA_LIFT}
-  semantics
   protobuf_python_module_ida)
 
 #
 # libraries
 #
-
-list(APPEND PROJECT_LIBRARIES remill)
 
 # anvill
 find_package(anvill CONFIG REQUIRED)
@@ -180,7 +181,7 @@ set(MCSEMA_PYTHON_SOURCES
 if(MCSEMA_INSTALL_PYTHON2_LIBS)
   add_custom_target(build_mcsema_disass_python2
     DEPENDS ${MCSEMA_PYTHON_SOURCES})
-    
+
   add_custom_command(
       TARGET build_mcsema_disass_python2 POST_BUILD
       COMMAND which python2 && python2 setup.py build --force
@@ -197,7 +198,7 @@ endif()
 if(MCSEMA_INSTALL_PYTHON3_LIBS)
   add_custom_target(build_mcsema_disass_python3
     DEPENDS ${MCSEMA_PYTHON_SOURCES})
-    
+
   add_custom_command(
       TARGET build_mcsema_disass_python3 POST_BUILD
       COMMAND which python3 && python3 setup.py build --force

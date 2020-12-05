@@ -35,7 +35,7 @@ elseif(APPLE)
   #TODO(artem): Support runtimes on MacOS
   message(WARNING "Runtime generation is not supported for your operating system. mcsema-lift will still work, but you can't rebuild the generated bitcode to native executables.")
 
-else()    
+else()
   # Create the runtimes
 
   set(MCSMEMA_RT64 mcsema_rt64-${LLVM_MAJOR_VERSION}.${LLVM_MINOR_VERSION})
@@ -48,7 +48,7 @@ else()
       )
 
       # this is going to import the public include headers of remill
-      target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill)
+      target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill_settings remill)
       target_include_directories(mcsema-print-runtime-amd64 PRIVATE
         "${REMILL_INCLUDE_LOCATION}" "${MCSEMA_SOURCE_DIR}"
       )
@@ -96,7 +96,7 @@ else()
       )
 
       # this is going to import the public include headers of remill
-      target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill)
+      target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill_settings remill)
 
       target_include_directories(mcsema-print-runtime-amd64 PRIVATE
         "${REMILL_INCLUDE_LOCATION}" "${MCSEMA_SOURCE_DIR}"
