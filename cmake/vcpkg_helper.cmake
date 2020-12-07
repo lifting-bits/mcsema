@@ -1,6 +1,6 @@
-set(I_KNOW_WHAT_IM_DOING OFF CACHE BOOL "I really know what I'm doing with dependencies")
+set(USE_SYSTEM_DEPENDENCIES OFF CACHE BOOL "Use system dependencies instead of trying to find vcpkg")
 
-if (NOT I_KNOW_WHAT_IM_DOING)
+if (NOT USE_SYSTEM_DEPENDENCIES)
   set(VCPKG_ROOT "" CACHE FILEPATH "Root directory to use for vcpkg-managed dependencies")
   if (VCPKG_ROOT)
     if (NOT EXISTS "${VCPKG_ROOT}")
@@ -14,7 +14,7 @@ if (NOT I_KNOW_WHAT_IM_DOING)
 
     set(CMAKE_TOOLCHAIN_FILE "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "" FORCE)
   else()
-    message(FATAL_ERROR "Usage of system dependencies is unsupported. Please define a path to VCPKG_ROOT. See https://github.com/ekilmer/vcpkg-lifting-ports for more details.")
+    message(FATAL_ERROR "Please define a path to VCPKG_ROOT. See https://github.com/ekilmer/vcpkg-lifting-ports for more details. Or if you don't want to use vcpkg dependencies, add '-DUSE_SYSTEM_DEPENDENCIES=ON'")
   endif()
 
   # Set default triplet to Release VCPKG build unless we can't find it
