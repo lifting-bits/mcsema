@@ -14,7 +14,7 @@ if (NOT USE_SYSTEM_DEPENDENCIES)
 
     set(CMAKE_TOOLCHAIN_FILE "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "" FORCE)
   else()
-    message(FATAL_ERROR "Please define a path to VCPKG_ROOT. See https://github.com/ekilmer/vcpkg-lifting-ports for more details. Or if you don't want to use vcpkg dependencies, add '-DUSE_SYSTEM_DEPENDENCIES=ON'")
+    message(FATAL_ERROR "Please define a path to VCPKG_ROOT. See https://github.com/trailofbits/cxx-common for more details. Or if you don't want to use vcpkg dependencies, add '-DUSE_SYSTEM_DEPENDENCIES=ON'")
   endif()
 
   # Set default triplet to Release VCPKG build unless we can't find it
