@@ -41,7 +41,7 @@ jobs:
         shell: bash
         run: |
           # Change to master after testing
-          git clone --depth=1 --branch vcpkg https://github.com/lifting-bits/remill.git
+          git clone --depth=1 --branch master https://github.com/lifting-bits/remill.git
           cd remill
           ./scripts/build.sh --llvm-version ${{ matrix.llvm }}
           cmake --build remill-build --target install -- -j "$(nproc)"
@@ -49,7 +49,7 @@ jobs:
         shell: bash
         run: |
           # Change to master after testing
-          git clone --depth=1 --branch vcpkg https://github.com/lifting-bits/anvill.git
+          git clone --depth=1 --branch master https://github.com/lifting-bits/anvill.git
           mkdir -p anvill/build && cd anvill/build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
           cmake --build . --target install -- -j "$(nproc)"
@@ -87,7 +87,7 @@ jobs:
         shell: bash
         run: |
           # Change to master after testing
-          git clone --depth=1 --branch vcpkg https://github.com/lifting-bits/remill.git
+          git clone --depth=1 --branch master https://github.com/lifting-bits/remill.git
           cd remill
           ./scripts/build.sh --llvm-version ${{ matrix.llvm }}
           cmake --build remill-build --target install -- -j "$(sysctl -n hw.logicalcpu)"
@@ -95,7 +95,7 @@ jobs:
         shell: bash
         run: |
           # Change to master after testing
-          git clone --depth=1 --branch vcpkg https://github.com/lifting-bits/anvill.git
+          git clone --depth=1 --branch master https://github.com/lifting-bits/anvill.git
           mkdir -p anvill/build && cd anvill/build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
           cmake --build . --target install -- -j "$(sysctl -n hw.logicalcpu)"
