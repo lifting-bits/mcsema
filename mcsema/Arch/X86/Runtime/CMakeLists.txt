@@ -48,7 +48,12 @@ else()
       )
 
       # this is going to import the public include headers of remill
-      target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill_settings remill)
+      if (DEFINED ENV{TRAILOFBITS_LIBRARIES})
+        target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill)
+      else()
+        # include directory was moved to public interface library for vcpkg
+        target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill_settings remill)
+      endif()
       target_include_directories(mcsema-print-runtime-amd64 PRIVATE
         "${REMILL_INCLUDE_LOCATION}" "${MCSEMA_SOURCE_DIR}"
       )
@@ -96,7 +101,12 @@ else()
       )
 
       # this is going to import the public include headers of remill
-      target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill_settings remill)
+      if (DEFINED ENV{TRAILOFBITS_LIBRARIES})
+        target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill)
+      else()
+        # include directory was moved to public interface library for vcpkg
+        target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill_settings remill)
+      endif()
 
       target_include_directories(mcsema-print-runtime-amd64 PRIVATE
         "${REMILL_INCLUDE_LOCATION}" "${MCSEMA_SOURCE_DIR}"
