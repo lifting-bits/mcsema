@@ -63,7 +63,8 @@ jobs:
       - name: Smoke Test
         shell: bash
         run: |
-          mcsema-lift-${{ matrix.llvm }}.0 --help
+          # --help return non-zero and fails...
+          mcsema-lift-${{ matrix.llvm }}.0 --version
 
   build_mac:
     strategy:
@@ -108,4 +109,5 @@ jobs:
       - name: Smoke Test
         shell: bash
         run: |
-          mcsema-lift-${{ matrix.llvm }}.0 --help
+          # --help return non-zero and fails...
+          mcsema-lift-${{ matrix.llvm }}.0 --version
