@@ -65,6 +65,7 @@ jobs:
         run: |
           # --help return non-zero and fails...
           mcsema-lift-${{ matrix.llvm }}.0 --version
+          mcsema-disass-2 --help
 
   build_mac:
     strategy:
@@ -111,3 +112,4 @@ jobs:
         run: |
           # --help return non-zero and fails...
           mcsema-lift-${{ matrix.llvm }}.0 --version
+          mcsema-disass-2 --help
