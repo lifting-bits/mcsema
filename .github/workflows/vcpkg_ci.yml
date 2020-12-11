@@ -1,0 +1,113 @@
+name: VCPKG Continuous Integration
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  schedule:
+    # run CI every day even if no PRs/merges occur
+    - cron:  '0 6 * * *'
+
+jobs:
+  build_linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - { name: 'ubuntu', tag: '18.04' }
+          - { name: 'ubuntu', tag: '20.04' }
+        llvm: [
+          '9',
+          '10'
+          ]
+
+    runs-on: ubuntu-20.04
+    container:
+      image: docker.pkg.github.com/trailofbits/cxx-common/vcpkg-builder-${{ matrix.image.name }}:${{ matrix.image.tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install utility tools
+        shell: bash
+        run: |
+          # TODO some of these should probably live in the Docker build image
+          apt-get update
+          apt-get install -y pixz xz-utils make
+
+      - name: Build and install remill
+        shell: bash
+        run: |
+          # Change to master after testing
+          git clone --depth=1 --branch master https://github.com/lifting-bits/remill.git
+          cd remill
+          ./scripts/build.sh --llvm-version ${{ matrix.llvm }}
+          cmake --build remill-build --target install -- -j "$(nproc)"
+      - name: Build and install anvill
+        shell: bash
+        run: |
+          # Change to master after testing
+          git clone --depth=1 --branch master https://github.com/lifting-bits/anvill.git
+          mkdir -p anvill/build && cd anvill/build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          cmake --build . --target install -- -j "$(nproc)"
+      - name: Build mcsema
+        shell: bash
+        run: |
+          mkdir build && cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          cmake --build . --target install -- -j "$(nproc)"
+      - name: Smoke Test
+        shell: bash
+        run: |
+          # --help return non-zero and fails...
+          mcsema-lift-${{ matrix.llvm }}.0 --version
+          mcsema-disass-2 --help
+
+  build_mac:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [
+          'macos-10.15',
+          'macos-11.0'
+          ]
+        llvm: [
+          '9',
+          '10'
+          ]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build and install remill
+        shell: bash
+        run: |
+          # Change to master after testing
+          git clone --depth=1 --branch master https://github.com/lifting-bits/remill.git
+          cd remill
+          ./scripts/build.sh --llvm-version ${{ matrix.llvm }}
+          cmake --build remill-build --target install -- -j "$(sysctl -n hw.logicalcpu)"
+      - name: Build and install anvill
+        shell: bash
+        run: |
+          # Change to master after testing
+          git clone --depth=1 --branch master https://github.com/lifting-bits/anvill.git
+          mkdir -p anvill/build && cd anvill/build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          cmake --build . --target install -- -j "$(sysctl -n hw.logicalcpu)"
+      - name: Build mcsema
+        shell: bash
+        run: |
+          mkdir build && cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          cmake --build . --target install -- -j "$(sysctl -n hw.logicalcpu)"
+      - name: Smoke Test
+        shell: bash
+        run: |
+          # --help return non-zero and fails...
+          mcsema-lift-${{ matrix.llvm }}.0 --version
+          mcsema-disass-2 --help
