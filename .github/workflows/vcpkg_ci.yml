@@ -110,4 +110,8 @@ jobs:
         run: |
           # --help return non-zero and fails...
           mcsema-lift-${{ matrix.llvm }}.0 --version
-          mcsema-disass-2 --help
+          # TODO Might want to use virtualenv for this whole Python installation process
+          # Will need to be updated based on the Python2 version used during installation
+          PYTHONPATH=/usr/local/lib/python2.7/site-packages mcsema-disass-2 --help
+          # Will need to be updated based on the Python3 version used during installation
+          PYTHONPATH=/usr/local/lib/python3.9/site-packages mcsema-disass-3 --help
