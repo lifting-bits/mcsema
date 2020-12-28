@@ -13,84 +13,93 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-MCSEMA_EXAMPLES_MAZE_SCRIPTS_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-MCSEMA_EXAMPLES_MAZE_DIR=$( cd "$( dirname "${MCSEMA_EXAMPLES_MAZE_SCRIPTS_DIR}" )" && pwd )
-MCSEMA_EXAMPLES_DIR=$( cd "$( dirname "${MCSEMA_EXAMPLES_MAZE_DIR}" )" && pwd )
-MCSEMA_DIR=$( cd "$( dirname "${MCSEMA_EXAMPLES_DIR}" )" && pwd )
-DISASSEMBLER=/opt/ida-6.9/idal64
+set -euo pipefail
 
-function Disassemble {
+SCRIPTS_DIR="$(dirname $(realpath ${BASH_SOURCE[0]}))"
+MAZE_DIR="$(dirname "$SCRIPTS_DIR")"
+DISASSEMBLER=/opt/idapro-7.5/idat64
 
-  printf "[+] Disassembling ${MCSEMA_EXAMPLES_MAZE_DIR}/bin/maze.amd64\n"
-  mcsema-disass \
-      --os linux \
-      --arch amd64 \
-      --disassembler "${DISASSEMBLER}" \
-      --log_file /tmp/log \
-      --entrypoint main \
-      --output "${MCSEMA_EXAMPLES_MAZE_DIR}/cfg/maze.amd64.cfg" \
-      --binary "${MCSEMA_EXAMPLES_MAZE_DIR}/bin/maze.amd64" \
-      --log_file /tmp/log.amd64
-
-  if [[ $? -ne 0 ]] ; then
-    printf "[x] Error disassembling ${MCSEMA_EXAMPLES_MAZE_DIR}/bin/maze.amd64\n"
-    return 1
-  else
-    printf " i  Saved CFG to ${MCSEMA_EXAMPLES_MAZE_DIR}/cfg/maze.amd64.cfg\n"
-  fi
-
-  printf "[+] Disassembling ${MCSEMA_EXAMPLES_MAZE_DIR}/bin/maze.aarch64\n"
-  mcsema-disass \
-      --os linux \
-      --arch aarch64 \
-      --disassembler "${DISASSEMBLER}" \
-      --log_file /tmp/log \
-      --entrypoint main \
-      --output "${MCSEMA_EXAMPLES_MAZE_DIR}/cfg/maze.aarch64.cfg" \
-      --binary "${MCSEMA_EXAMPLES_MAZE_DIR}/bin/maze.aarch64" \
-      --log_file /tmp/log.aarch64
-
-  if [[ $? -ne 0 ]] ; then
-    printf "[x] Error disassembling ${MCSEMA_EXAMPLES_MAZE_DIR}/bin/maze.aarch64\n"
-    return 1
-  else
-    printf " i  Saved CFG to ${MCSEMA_EXAMPLES_MAZE_DIR}/cfg/maze.aarch64.cfg\n"
-  fi
-
-  return 0
+msg() {
+    echo -e "[+] ${1-}" >&2
 }
 
-function main {
-  while [[ $# -gt 0 ]] ; do
-    key="$1"
+hurt() {
+    echo -e "[-] ${1-}" >&2
+}
 
-    case $key in
+die() {
+    echo -e "[!] ${1-}" >&2
+    exit 1
+}
 
-      # Change the default installation prefix.
-      --disassembler)
-        DISASSEMBLER=$(python -c "import os; import sys; sys.stdout.write(os.path.abspath('${2}'))")
-        printf "[+] New disassembler path is ${DISASSEMBLER}\n"
-        shift # past argument
-      ;;
+usage() {
+    cat <<EOF
+[!] Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] [--disassembler path]
 
-      *)
-        # unknown option
-        printf "[x] Unknown option: ${key}\n"
-        return 1
-      ;;
-    esac
+    Disassemble the binaries into CFG files.
 
-    shift # past argument or value
-  done
+    Available options:
 
-  if [[ ! -f "${DISASSEMBLER}" ]] ; then
-    printf "[x] Disassembler ${DISASSEMBLER} does not exist. Please specify it manually using --disassembler.\n"
-    return 1
-  fi
+    -h, --help      Print this help and exit
+    -v, --verbose   Print script debug info
+    --disassembler  Specify the backend disassembler
+EOF
+}
 
-  Disassemble
-  return $?
+parse_params() {
+    while :; do
+        case "${1-}" in
+        -h | --help) usage; exit ;;
+        -v | --verbose) set -x ;;
+        --disassembler)
+            DISASSEMBLER="$(realpath -m "${2-}")"
+            shift ;;
+        -?*) die "Unknown option: $1\n$(usage)" ;;
+        *) break ;;
+        esac
+        shift
+    done
+
+    if [ ! -f "$DISASSEMBLER" ]; then
+        die "Disassembler '${DISASSEMBLER}' does not exist"
+    fi
+    msg "Use disassembler ${DISASSEMBLER}"
+}
+
+disassemble() {
+    BIN="$1"
+    CFG="${MAZE_DIR}/cfg/$(basename "$BIN").cfg"
+    ARCH="$(basename "$BIN" | sed 's/^maze\.//')"
+    if file "$BIN" | grep ' pie ' >/dev/null 2>&1; then
+        PIE_FLAG='--pie-mode'
+    else
+        PIE_FLAG=''
+    fi
+
+    set +e
+    msg "Disassembling $BIN..."
+    mcsema-disass \
+        --os linux \
+        --arch "$ARCH" \
+        --disassembler "$DISASSEMBLER" \
+        --entrypoint main \
+        $PIE_FLAG \
+        --log_file "$BIN.log" \
+        --binary "$BIN" \
+        --output "$CFG"
+    if [ $? -ne 0 ] ; then
+        hurt "Failed to disassemble $BIN"
+    else
+        msg "CFG saved to $CFG"
+    fi
+    set -e
+}
+
+main() {
+    parse_params $@
+    disassemble "${MAZE_DIR}/bin/maze.x86"
+    disassemble "${MAZE_DIR}/bin/maze.amd64"
+    disassemble "${MAZE_DIR}/bin/maze.aarch64"
 }
 
 main $@
-exit $?

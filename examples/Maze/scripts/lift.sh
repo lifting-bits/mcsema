@@ -13,51 +13,90 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCRIPTS_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-MAZE_DIR=$( cd "$( dirname "${SCRIPTS_DIR}" )" && pwd )
-KLEE_WS_DIR=$(pwd)
+set -euo pipefail
 
-mkdir -p "${MAZE_DIR}/bc"
+SCRIPTS_DIR="$(dirname $(realpath ${BASH_SOURCE[0]}))"
+MAZE_DIR="$(dirname "$SCRIPTS_DIR")"
+LLVM_VER=10
 
-# Look for `libc.bc`. This file is automatically created by the `build_klee.sh`
-# script in Remill, so that we can make the lifted bitcode more dependable via
-# the `--library` option.
-LIB_ARGS=
-if [[ -f "${KLEE_WS_DIR}/libc.bc" ]] ; then
-  LIB_ARGS="--abi_libraries ${KLEE_WS_DIR}/libc.bc"
-else
-  printf "[x] WARNING: Could not find klee-uclibc library bitcode.\n"
-  LIB_ARGS="--abi_libraries libc"
-fi
+msg() {
+    echo -e "[+] ${1-}" >&2
+}
 
-printf "[+] Lifting ${MAZE_DIR}/cfg/maze.amd64.cfg\n"
+hurt() {
+    echo -e "[-] ${1-}" >&2
+}
 
-mcsema-lift-3.9 \
-    --os linux \
-    --arch amd64 \
-    --cfg "${MAZE_DIR}/cfg/maze.amd64.cfg" \
-    --output "${MAZE_DIR}/bc/maze.amd64.bc" \
-    --explicit_args \
-    ${LIB_ARGS}
+die() {
+    echo -e "[!] ${1-}" >&2
+    exit 1
+}
 
-if [[ $? -ne 0 ]] ; then
-  printf "[x] Could not lift ${MAZE_DIR}/cfg/maze.amd64.cfg\n"
-else
-  printf " i  Saved bitcode to ${MAZE_DIR}/bc/maze.amd64.bc\n"
-fi
+usage() {
+    cat <<EOF
+[!] Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] [--llvm LLVM_version]
 
-printf "[+] Lifting ${MAZE_DIR}/cfg/maze.aarch64.cfg\n"
+    Lift the CFG files to LLVM bitcode.
 
-mcsema-lift-3.9 \
-    --os linux \
-    --arch aarch64 \
-    --cfg "${MAZE_DIR}/cfg/maze.aarch64.cfg" \
-    --output "${MAZE_DIR}/bc/maze.aarch64.bc" \
-    --explicit_args \
-    ${LIB_ARGS}
+    Available options:
 
-if [[ $? -ne 0 ]] ; then
-  printf "[x] Could not lift ${MAZE_DIR}/cfg/maze.aarch64.cfg\n"
-else
-  printf " i  Saved bitcode to ${MAZE_DIR}/bc/maze.aarch64.bc\n"
-fi
+    -h, --help      Print this help and exit
+    -v, --verbose   Print script debug info
+    --llvm          Specify LLVM version (9 or 10, default: 10)
+EOF
+}
+
+parse_params() {
+    while :; do
+        case "${1-}" in
+        -h | --help) usage; exit ;;
+        -v | --verbose) set -x ;;
+        --llvm)
+            LLVM_VER="${2-}"
+            if [ "$LLVM_VER" != "9" -a "$LLVM_VER" != "10" ]; then
+                die "Invalid LLVM version: $LLVM_VER\n$(usage)"
+            fi
+            shift
+            ;;
+        -?*) die "Unknown option: $1\n$(usage)" ;;
+        *) break ;;
+        esac
+        shift
+    done
+
+    export MCSEMA_LIFT="mcsema-lift-${LLVM_VER}.0"
+    if ! command -v "${MCSEMA_LIFT}" >/dev/null 2>&1; then
+        die "[!] Cannot find ${MCSEMA_LIFT}"
+    fi
+}
+
+lift() {
+    CFG="$1"
+    BC="$MAZE_DIR/bc/$(basename "$CFG" | sed 's/\.cfg$/\.bc/')"
+    ARCH="$(basename "$CFG" | sed -e 's/\.cfg$//' -e 's/^maze\.//')"
+
+    set +e
+    msg "Lifting $CFG..."
+    "$MCSEMA_LIFT" \
+        --os linux \
+        --arch "$ARCH" \
+        --explicit_args \
+        --cfg "$CFG" \
+        --output "$BC"
+    if [ $? -ne 0 ] ; then
+        hurt "Failed to lift $CFG"
+    else
+        msg "Bitcode saved to $BC"
+    fi
+    set -e
+}
+
+main() {
+    parse_params $@
+    mkdir -p "${MAZE_DIR}/bc"
+    lift "${MAZE_DIR}/cfg/maze.x86.cfg"
+    lift "${MAZE_DIR}/cfg/maze.amd64.cfg"
+    lift "${MAZE_DIR}/cfg/maze.aarch64.cfg"
+}
+
+main $@

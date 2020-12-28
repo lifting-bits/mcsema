@@ -1,0 +1,17 @@
+diff --git a/lib/Core/Executor.cpp b/lib/Core/Executor.cpp
+index e3186bbf..2eca8d91 100644
+--- a/lib/Core/Executor.cpp
++++ b/lib/Core/Executor.cpp
+@@ -2096,7 +2096,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
+         // checking the type, since C defaults to returning int for
+         // undeclared functions.
+         if (!caller->use_empty()) {
+-          terminateStateOnExecError(state, "return void when caller expected a result");
++          result = ConstantExpr::alloc(0, Expr::Int64);
++          bindLocal(kcaller, state, result);
++          klee_warning("Injected fake return for function: %s",
++                       ri->getFunction()->getName().str().c_str());
++          //terminateStateOnExecError(state, "return void when caller expected a result");
+         }
+       }
+     }      
