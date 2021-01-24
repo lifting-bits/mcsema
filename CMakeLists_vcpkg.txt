@@ -65,7 +65,7 @@ endif()
 #
 
 find_package(remill CONFIG REQUIRED)
-list(APPEND PROJECT_LIBRARIES remill)
+list(APPEND PROJECT_LIBRARIES remill_settings remill)
 get_target_property(REMILL_INCLUDE_LOCATION remill_settings INTERFACE_INCLUDE_DIRECTORIES)
 
 # protobuf
