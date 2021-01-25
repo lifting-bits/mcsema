@@ -19,7 +19,8 @@ find_package(remill COMPONENTS VCPKG_DEPS QUIET)
 
 include(cmake/vcpkg_helper.cmake)
 
-project(mcsema)
+project(mcsema C CXX ASM)
+
 include(GNUInstallDirs)
 cmake_minimum_required(VERSION 3.14)
 
