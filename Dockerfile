@@ -43,7 +43,7 @@ RUN apt-get update && \
     pip3 install ccsyspath
 
 # needed for 20.04 support until we migrate to py3
-RUN https://bootstrap.pypa.io/2.7/get-pip.py --output get-pip.py && python2.7 get-pip.py
+RUN curl https://bootstrap.pypa.io/2.7/get-pip.py --output get-pip.py && python2.7 get-pip.py
 RUN update-alternatives --install /usr/bin/python2 python2 /usr/bin/python2.7 1
 
 COPY --from=anvill /opt/trailofbits/remill /opt/trailofbits/remill
