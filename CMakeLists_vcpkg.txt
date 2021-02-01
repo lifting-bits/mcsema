@@ -19,7 +19,8 @@ find_package(remill COMPONENTS VCPKG_DEPS QUIET)
 
 include(cmake/vcpkg_helper.cmake)
 
-project(mcsema)
+project(mcsema C CXX ASM)
+
 include(GNUInstallDirs)
 cmake_minimum_required(VERSION 3.14)
 
@@ -65,7 +66,7 @@ endif()
 #
 
 find_package(remill CONFIG REQUIRED)
-list(APPEND PROJECT_LIBRARIES remill)
+list(APPEND PROJECT_LIBRARIES remill_settings remill)
 get_target_property(REMILL_INCLUDE_LOCATION remill_settings INTERFACE_INCLUDE_DIRECTORIES)
 
 # protobuf
