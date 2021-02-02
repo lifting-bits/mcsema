@@ -17,79 +17,30 @@ set(DEFAULT_BC_COMPILER_FLAGS
   -ffreestanding -fno-common -fno-builtin -fno-exceptions -fno-rtti
   -fno-asynchronous-unwind-tables -Wno-unneeded-internal-declaration
   -Wno-unused-function -Wgnu-inline-cpp-without-extern -std=c++14
+  -Wno-pass-failed=transform-warning
   ${EXTRA_BC_SYSROOT}
 )
 
-set(CLANG_CXX_EXECUTABLE_NAME "clang++")
-set(LLVMLINK_EXECUTABLE_NAME "llvm-link")
+find_package(Clang CONFIG REQUIRED)
+get_target_property(CLANG_PATH clang LOCATION)
+get_target_property(LLVMLINK_PATH llvm-link LOCATION)
 
-if(DEFINED WIN32)
-  set(CLANG_CXX_EXECUTABLE_NAME "${CLANG_CXX_EXECUTABLE_NAME}.exe")
-  set(LLVMLINK_EXECUTABLE_NAME "${LLVMLINK_EXECUTABLE_NAME}.exe")
-endif()
+file(WRITE "${CMAKE_BINARY_DIR}/emitllvm.test.cpp" "int main(int argc, char* argv[]){return 0;}\n\n")
 
-if(DEFINED ENV{LLVM_INSTALL_PREFIX})
-  message(STATUS "Setting LLVM_INSTALL_PREFIX from the environment variable...")
-  set(LLVM_INSTALL_PREFIX $ENV{LLVM_INSTALL_PREFIX})
-endif()
+execute_process(COMMAND "${CLANG_PATH}" "-emit-llvm" "-c" "emitllvm.test.cpp" "-o" "emitllvm.test.cpp.bc"
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+  RESULT_VARIABLE AOUT_IS_NOT_BC
+  OUTPUT_QUIET ERROR_QUIET
+)
 
-if (DEFINED CXX_COMMON_REPOSITORY_ROOT)
-  if (NOT DEFINED LLVM_INSTALL_PREFIX)
-    set(LLVM_INSTALL_PREFIX "${CXX_COMMON_REPOSITORY_ROOT}/llvm" CACHE PATH "Path to LLVM install prefix")
-  endif()
-endif()
-
-if (DEFINED LLVM_INSTALL_PREFIX)
-  message(STATUS "LLVM bin dir: ${LLVM_INSTALL_PREFIX}/bin")
-  # clang path
-  find_program(CLANG_PATH
-    NAMES "${CLANG_CXX_EXECUTABLE_NAME}"
-    HINTS "${LLVM_INSTALL_PREFIX}/bin"
-    NO_DEFAULT_PATH
-  )
-
-  # llvm-link path
-  find_program(LLVMLINK_PATH
-    NAMES "${LLVMLINK_EXECUTABLE_NAME}"
-    HINTS "${LLVM_INSTALL_PREFIX}/bin"
-    NO_DEFAULT_PATH
-  )
+if(NOT "${AOUT_IS_NOT_BC}" STREQUAL "0")
+  message(SEND_ERROR "The following compiler is not suitable to generate bitcode: ${CLANG_PATH}")
 else()
-  # clang path
-  if("${CMAKE_CXX_COMPILER}" STREQUAL "${CLANG_CXX_EXECUTABLE_NAME}")
-    set(CLANG_PATH "${CMAKE_CXX_COMPILER}")
+  message(STATUS "The following compiler has been selected to compile the bitcode: ${CLANG_PATH}")
+  message(STATUS "The following linker has been selected to link the bitcode: ${LLVMLINK_PATH}")
 
-  else()
-    find_program(CLANG_PATH
-      NAMES "${CLANG_CXX_EXECUTABLE_NAME}"
-      PATHS "/usr/bin" "/usr/local/bin" "${LLVM_INSTALL_PREFIX}/bin" "${LLVM_TOOLS_BINARY_DIR}" "C:/Program Files/LLVM/bin" "C:/Program Files (x86)/LLVM/bin"
-    )
-  endif()
-
-  # llvm-link path
-  find_program(LLVMLINK_PATH
-    NAMES "${LLVMLINK_EXECUTABLE_NAME}"
-    PATHS "/usr/bin" "/usr/local/bin" "${LLVM_INSTALL_PREFIX}/bin" "${LLVM_TOOLS_BINARY_DIR}" "C:/Program Files/LLVM/bin" "C:/Program Files (x86)/LLVM/bin"
-  )
-endif()
-
-if((NOT "${CLANG_PATH}" MATCHES "CLANG_PATH-NOTFOUND") AND (NOT "${LLVMLINK_PATH}" MATCHES "LLVMLINK_PATH-NOTFOUND"))
-  file(WRITE "${CMAKE_BINARY_DIR}/emitllvm.test.cpp" "int main(int argc, char* argv[]){return 0;}\n\n")
-
-  execute_process(COMMAND "${CLANG_PATH}" "-emit-llvm" "-c" "emitllvm.test.cpp" "-o" "emitllvm.test.cpp.bc"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
-    RESULT_VARIABLE AOUT_IS_NOT_BC
-    OUTPUT_QUIET ERROR_QUIET
-  )
-
-  if(NOT "${AOUT_IS_NOT_BC}" STREQUAL "0")
-    message(SEND_ERROR "The following compiler is not suitable to generate bitcode: ${CLANG_PATH}")
-  else()
-    message(STATUS "The following compiler has been selected to compile the bitcode: ${CLANG_PATH}")
-
-    set(CMAKE_BC_COMPILER "${CLANG_PATH}" CACHE PATH "Bitcode Compiler")
-    set(CMAKE_BC_LINKER "${LLVMLINK_PATH}" CACHE PATH "Bitcode Linker")
-  endif()
+  set(CMAKE_BC_COMPILER "${CLANG_PATH}" CACHE PATH "Bitcode Compiler")
+  set(CMAKE_BC_LINKER "${LLVMLINK_PATH}" CACHE PATH "Bitcode Linker")
 endif()
 
 #

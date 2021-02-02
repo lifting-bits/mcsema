@@ -12,5 +12,8 @@ include("${MCSEMA_SOURCE_DIR}/cmake/git_watcher.cmake")
 
 # Create a library out of the compiled post-configure file.
 add_library(McSemaVersion STATIC ${POST_CONFIGURE_FILE})
+if (NOT DEFINED ENV{TRAILOFBITS_LIBRARIES})
+  target_link_libraries(McSemaVersion PRIVATE remill_settings)
+endif()
 target_include_directories(McSemaVersion PUBLIC ${MCSEMA_SOURCE_DIR})
 add_dependencies(McSemaVersion check_git_${PROJECT_NAME})

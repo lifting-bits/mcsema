@@ -19,10 +19,24 @@ if (NOT USE_SYSTEM_DEPENDENCIES)
 
   # Set default triplet to Release VCPKG build unless we can't find it
   if (NOT DEFINED VCPKG_TARGET_TRIPLET)
+    set(_project_arch "x64")
+    if (UNIX)
+      execute_process(COMMAND uname -m
+                      OUTPUT_VARIABLE _SYSTEM_ARCH
+                      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    else()
+      message(WARNING "No detection of architecture for this platform. Assuming x64")
+    endif()
+    if (_SYSTEM_ARCH MATCHES "^[Aa][Aa][Rr][Cc][Hh]64$")
+      set(_project_arch "arm64")
+    endif()
+
     if (APPLE)
-      set(_project_vcpkg_triplet "x64-osx-rel")
+      set(_project_vcpkg_triplet "${_project_arch}-osx-rel")
     elseif(UNIX)
-      set(_project_vcpkg_triplet "x64-linux-rel")
+      set(_project_vcpkg_triplet "${_project_arch}-linux-rel")
+    elseif(WIN32)
+      set(_project_vcpkg_triplet "${_project_arch}-windows-static-md-rel")
     else()
       message(FATAL_ERROR "Could not detect default release triplet")
     endif()
