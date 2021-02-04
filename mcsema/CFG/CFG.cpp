@@ -455,7 +455,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
 
   google::protobuf::io::IstreamInputStream pstream(&fstream);
   google::protobuf::io::CodedInputStream cstream(&pstream);
-  cstream.SetTotalBytesLimit(512 * 1024 * 1024, -1);
+  cstream.SetTotalBytesLimit(512 * 1024 * 1024);
   Module cfg;
   CHECK(cfg.ParseFromCodedStream(&cstream))
       << "Unable to read module from CFG file " << file_name;
