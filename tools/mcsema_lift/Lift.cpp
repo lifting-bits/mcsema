@@ -305,7 +305,11 @@ struct ABILibsLoader {
 
     for (auto &alias : abi_lib->aliases()) {
       if (auto fn = llvm::dyn_cast<llvm::Function>(alias.getAliasee())) {
+#if LLVM_VERSION_NUMBER < LLVM_VERSION(11, 0)
         CloneFunction(*fn, alias.getName());
+#else
+        CloneFunction(*fn, alias.getName().str());
+#endif
       }
     }
 
