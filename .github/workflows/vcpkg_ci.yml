@@ -42,7 +42,7 @@ jobs:
         shell: bash
         run: |
           # Change to master after testing
-          git clone --depth=1 --branch compat-llvm-11-mcsema https://github.com/lifting-bits/remill.git
+          git clone --depth=1 --branch master https://github.com/lifting-bits/remill.git
           cd remill
           ./scripts/build.sh --llvm-version ${{ matrix.llvm }}
           cmake --build remill-build --target install -- -j "$(nproc)"
