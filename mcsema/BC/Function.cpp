@@ -46,16 +46,14 @@
 #include <remill/Arch/Instruction.h>
 #include <remill/BC/ABI.h>
 #include <remill/BC/Annotate.h>
+#include <remill/BC/Compat/CallSite.h>
+#include <remill/BC/Compat/Cloning.h>
 #include <remill/BC/Compat/Error.h>
 #include <remill/BC/Compat/ScalarTransforms.h>
 #include <remill/BC/IntrinsicTable.h>
 #include <remill/BC/Lifter.h>
 #include <remill/BC/Util.h>
 #include <remill/BC/Version.h>
-
-#if LLVM_VERSION_NUMBER < LLVM_VERSION(11, 0)
-#include <llvm/IR/CallSite.h>
-#endif
 
 #include <memory>
 #include <unordered_map>
@@ -1678,23 +1676,13 @@ static llvm::Function *LiftFunction(const NativeModule *cfg_module,
   return lifted_func;
 }
 
-#if LLVM_VERSION_NUMBER < LLVM_VERSION(11, 0)
-using Calls_t = std::vector<llvm::CallSite>;
+using Calls_t = std::vector<remill::compat::llvm::CallSite>;
 
-static bool ShouldInline(const llvm::CallSite &cs) {
-#else
-using Calls_t = std::vector<llvm::CallBase*>;
-
-static bool ShouldInline(const llvm::CallBase *cs) {
-#endif
+static bool ShouldInline(const remill::compat::llvm::CallSite &cs) {
   if (!cs) {
     return false;
   }
-#if LLVM_VERSION_NUMBER < LLVM_VERSION(11, 0)
   auto callee = cs.getCalledFunction();
-#else
-  auto callee = cs->getCalledFunction();
-#endif
   return callee &&
          remill::HasOriginType<remill::Semantics, remill::ExtWrapper>(callee);
 }
@@ -1703,11 +1691,7 @@ static Calls_t InlinableCalls(llvm::Function &func) {
   Calls_t out;
   for (auto &bb : func) {
     for (auto &inst : bb) {
-#if LLVM_VERSION_NUMBER < LLVM_VERSION(11, 0)
-      auto cs = llvm::CallSite(&inst);
-#else
-      auto cs = llvm::dyn_cast<llvm::CallBase>(&inst);
-#endif
+      auto cs = remill::compat::llvm::CallSite(&inst);
       if (ShouldInline(cs)) {
         out.push_back(std::move(cs));
       }
@@ -1718,15 +1702,9 @@ static Calls_t InlinableCalls(llvm::Function &func) {
 
 static void InlineCalls(llvm::Function &func) {
   for (auto &cs : InlinableCalls(func)) {
-#if LLVM_VERSION_NUMBER < LLVM_VERSION(11, 0)
     if (auto call = llvm::dyn_cast<llvm::CallInst>(cs.getInstruction())) {
       llvm::InlineFunctionInfo info;
       llvm::InlineFunction(call, info);
-#else
-    if (auto call = llvm::dyn_cast<llvm::CallInst>(cs)) {
-      llvm::InlineFunctionInfo info;
-      llvm::InlineFunction(*call, info);
-#endif
     }
   }
 }
