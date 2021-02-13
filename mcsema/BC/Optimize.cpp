@@ -1539,7 +1539,12 @@ static void GlobalizeStateStructures(void) {
                 llvm::PointerType::get(itp->getType(), 0));
             ptr = TryGetRegAlias(ptr, offset);
             itp->replaceAllUsesWith(
-                new llvm::LoadInst(ptr, load->getName(), load));
+#if LLVM_VERSION_NUMBER < LLVM_VERSION(11, 0)
+                new llvm::LoadInst(ptr, load->getName(), load)
+#else
+                new llvm::LoadInst(ptr->getType(), ptr, load->getName(), load)
+#endif
+                );
             to_remove.push_back(itp);
           }
         }

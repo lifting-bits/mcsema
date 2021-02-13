@@ -25,7 +25,7 @@ jobs:
     needs: [VersionFile]
     strategy:
       matrix:
-        llvm: ["900", "1000"]
+        llvm: ["900", "1000", "1100"]
         ubuntu: ["20.04", "18.04"]
     steps:
     - uses: actions/checkout@v2

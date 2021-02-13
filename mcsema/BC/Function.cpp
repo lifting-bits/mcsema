@@ -25,7 +25,6 @@
 #pragma clang diagnostic ignored "-Wswitch-enum"
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <llvm/IR/CallSite.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfo.h>
@@ -47,6 +46,8 @@
 #include <remill/Arch/Instruction.h>
 #include <remill/BC/ABI.h>
 #include <remill/BC/Annotate.h>
+#include <remill/BC/Compat/CallSite.h>
+#include <remill/BC/Compat/Cloning.h>
 #include <remill/BC/Compat/Error.h>
 #include <remill/BC/Compat/ScalarTransforms.h>
 #include <remill/BC/IntrinsicTable.h>
@@ -211,7 +212,11 @@ static llvm::Function *GetValueTracer(void) {
     if (reg->type == gWordType && reg != pc_reg) {
       ss << reg->name << format;
       args.push_back(
+#if LLVM_VERSION_NUMBER < LLVM_VERSION(11, 0)
           new llvm::LoadInst(reg->AddressOf(state_ptr, block), "", block));
+#else
+          new llvm::LoadInst(reg->type, reg->AddressOf(state_ptr, block), "", block));
+#endif
     }
   }
   ss << '\n';
@@ -1671,9 +1676,9 @@ static llvm::Function *LiftFunction(const NativeModule *cfg_module,
   return lifted_func;
 }
 
-using Calls_t = std::vector<llvm::CallSite>;
+using Calls_t = std::vector<remill::compat::llvm::CallSite>;
 
-static bool ShouldInline(const llvm::CallSite &cs) {
+static bool ShouldInline(const remill::compat::llvm::CallSite &cs) {
   if (!cs) {
     return false;
   }
@@ -1686,7 +1691,7 @@ static Calls_t InlinableCalls(llvm::Function &func) {
   Calls_t out;
   for (auto &bb : func) {
     for (auto &inst : bb) {
-      auto cs = llvm::CallSite(&inst);
+      auto cs = remill::compat::llvm::CallSite(&inst);
       if (ShouldInline(cs)) {
         out.push_back(std::move(cs));
       }
