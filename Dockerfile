@@ -18,9 +18,7 @@ FROM ${BUILD_BASE} as base
 ARG UBUNTU_VERSION
 ARG LIBRARIES
 RUN apt-get update && \
-    apt-get install -qqy --no-install-recommends python2.7 zlib1g curl ca-certificates && \
-    curl https://bootstrap.pypa.io/2.7/get-pip.py --output get-pip.py && python2.7 get-pip.py && \
-    update-alternatives --install /usr/bin/python2 python2 /usr/bin/python2.7 1 && \
+    apt-get install -qqy --no-install-recommends python3 python3-pip python3-setuptools python3-six zlib1g curl ca-certificates && \
     if [ "${UBUNTU_VERSION}" = "18.04" ] ; then \
       apt-get install -qqy --no-install-recommends libtinfo5 ; \
     else \
@@ -37,14 +35,10 @@ FROM trailofbits/anvill:llvm${LLVM_VERSION}-${DISTRO_BASE}-${ARCH} as anvill
 FROM trailofbits/cxx-common:llvm${LLVM_VERSION}-${DISTRO_BASE}-${ARCH} as deps
 ARG LIBRARIES
 RUN apt-get update && \
-    apt-get install -qqy python2.7 python3 python3-pip libc6-dev wget liblzma-dev zlib1g-dev libtinfo-dev curl git build-essential ninja-build libselinux1-dev libbsd-dev ccache && \
+    apt-get install -qqy python3 python3-pip libc6-dev wget liblzma-dev zlib1g-dev libtinfo-dev curl git build-essential ninja-build libselinux1-dev libbsd-dev ccache && \
     if [ "$(uname -m)" = "x86_64" ]; then dpkg --add-architecture i386 && apt-get update && apt-get install -qqy gcc-multilib g++-multilib zip zlib1g-dev:i386; fi && \
     rm -rf /var/lib/apt/lists/* && \
     pip3 install ccsyspath
-
-# needed for 20.04 support until we migrate to py3
-RUN curl https://bootstrap.pypa.io/2.7/get-pip.py --output get-pip.py && python2.7 get-pip.py
-RUN update-alternatives --install /usr/bin/python2 python2 /usr/bin/python2.7 1
 
 COPY --from=anvill /opt/trailofbits/remill /opt/trailofbits/remill
 COPY --from=anvill /opt/trailofbits/anvill /opt/trailofbits/anvill
@@ -61,9 +55,13 @@ FROM deps as build
 
 COPY . ./
 
+# Need to move python version-specific installation directory to general
+# version directory since we don't know exactly which Python3 version Ubutnu
+# ships with to set the environment variable PYTHONPATH in dist image
 RUN mkdir -p ./build && cd ./build && \
     cmake -G Ninja -DCMAKE_PREFIX_PATH="/opt/trailofbits/remill;/opt/trailofbits/anvill" -DMCSEMA_DISABLED_ABI_LIBRARIES:STRING="" -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/mcsema .. && \
-    cmake --build . --target install
+    cmake --build . --target install && \
+    mv "/opt/trailofbits/mcsema/lib/python$(python3 --version 2>&1 | awk '{ print $2 }' | cut -d '.' -f 1-2)" /opt/trailofbits/mcsema/lib/python3
 
 # WORKDIR tests/test_suite_generator
 # RUN mkdir -p build && \
@@ -75,7 +73,7 @@ RUN mkdir -p ./build && cd ./build && \
 #     cmake --build . --target install
 # 
 # RUN cd test_suite && \
-#     PATH="/opt/trailofbits/mcsema/bin:${PATH}" python2.7 start.py
+#     PATH="/opt/trailofbits/mcsema/bin:${PATH}" python3 start.py
 
 FROM base as dist
 ARG LLVM_VERSION
@@ -89,7 +87,7 @@ COPY --from=build /opt/trailofbits/mcsema /opt/trailofbits/mcsema
 COPY scripts/docker-lifter-entrypoint.sh /opt/trailofbits/mcsema
 ENV LLVM_VERSION=llvm${LLVM_VERSION} \
     PATH="/opt/trailofbits/mcsema/bin:${PATH}" \
-    PYTHONPATH="/opt/trailofbits/mcsema/lib/python2.7/site-packages"
+    PYTHONPATH="/opt/trailofbits/mcsema/lib/python3/site-packages"
 ENTRYPOINT ["/opt/trailofbits/mcsema/docker-lifter-entrypoint.sh"]
 
 ################################
