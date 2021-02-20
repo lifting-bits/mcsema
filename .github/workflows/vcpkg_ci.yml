@@ -36,7 +36,7 @@ jobs:
         run: |
           # TODO some of these should probably live in the Docker build image
           apt-get update
-          apt-get install -y pixz xz-utils make
+          apt-get install -y pixz xz-utils make rpm
 
       - name: Build and install remill
         shell: bash
