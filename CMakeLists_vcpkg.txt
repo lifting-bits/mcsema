@@ -156,7 +156,7 @@ add_dependencies(${MCSEMA_LIFT}
 
 # anvill
 find_package(anvill CONFIG REQUIRED)
-list(APPEND PROJECT_LIBRARIES anvill-${REMILL_LLVM_VERSION})
+list(APPEND PROJECT_LIBRARIES anvill)
 
 # mcsema-disass
 
