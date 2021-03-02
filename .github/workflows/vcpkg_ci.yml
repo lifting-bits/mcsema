@@ -66,13 +66,15 @@ jobs:
           # --help return non-zero and fails...
           mcsema-lift-${{ matrix.llvm }}.0 --version
           mcsema-disass-2 --help
+          mcsema-lift-${{ matrix.llvm }}.0 --arch amd64 --os linux --cfg ./tests/test_suite_generator/generated/prebuilt_cfg/amd64/linux/cfg/hello_world --output hello_world.bc
+          mcsema-lift-${{ matrix.llvm }}.0 --arch x86 --os linux --cfg ./tests/test_suite_generator/generated/prebuilt_cfg/x86/linux/cfg/hello_world --output hello_world.bc
 
   build_mac:
     strategy:
       fail-fast: false
       matrix:
         os: [
-          'macos-11.0'
+          'macos-10.15'
           ]
         llvm: [
           '11'

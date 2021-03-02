@@ -1542,7 +1542,7 @@ static void GlobalizeStateStructures(void) {
 #if LLVM_VERSION_NUMBER < LLVM_VERSION(11, 0)
                 new llvm::LoadInst(ptr, load->getName(), load)
 #else
-                new llvm::LoadInst(ptr->getType(), ptr, load->getName(), load)
+                new llvm::LoadInst(ptr->getType()->getPointerElementType(), ptr, load->getName(), load)
 #endif
                 );
             to_remove.push_back(itp);
