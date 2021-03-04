@@ -25,7 +25,7 @@ jobs:
     needs: [VersionFile]
     strategy:
       matrix:
-        llvm: ["900", "1000", "1100"]
+        llvm: ["9", "10", "11"]
         ubuntu: ["20.04", "18.04"]
     steps:
     - uses: actions/checkout@v2
@@ -37,6 +37,10 @@ jobs:
       run: |
         docker run --rm docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest --version
         docker run --rm --entrypoint=mcsema-disass docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest --help
+
+        docker run --rm -v $(pwd)/tests/test_suite_generator/generated/prebuilt_cfg/amd64/linux/cfg:/work docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest --arch amd64 --os linux --cfg /work/hello_world --output /work/hello_world.bc
+        docker run --rm -v $(pwd)/tests/test_suite_generator/generated/prebuilt_cfg/x86/linux/cfg:/work docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest --arch amd64 --os linux --cfg /work/hello_world --output /work/hello_world.bc
+
     - name: Push Image for LLVM ${{ matrix.llvm }} on ${{ matrix.ubuntu }}
       if: github.event_name == 'push' && github.ref == 'refs/heads/master'
       run: |
@@ -45,23 +49,12 @@ jobs:
         docker login -u "${DOCKER_HUB_USER}" -p "${DOCKER_HUB_TOKEN}"
         docker tag docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest trailofbits/mcsema:llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64
         docker push trailofbits/mcsema:llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64
+
       env:
         GH_USER: ${{ github.actor }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         DOCKER_HUB_USER: ${{  secrets.DOCKER_HUB_USER  }}
         DOCKER_HUB_TOKEN: ${{  secrets.DOCKER_HUB_TOKEN  }}
-    - name: Compress Artifacts LLVM ${{ matrix.llvm }} on ${{ matrix.ubuntu }}
-      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-      run: |
-        mkdir -p artifacts
-        cp -v scripts/emit-artifact.sh ./artifacts/
-        docker run -v "$(pwd)/artifacts:/out" --rm --entrypoint /bin/bash docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest -c "/out/emit-artifact.sh /out/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64.tar.xz"
-        ls -l artifacts/
-    - uses: actions/upload-artifact@v1
-      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-      with:
-        name: mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64.tar.xz
-        path: artifacts/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64.tar.xz
   CreateRelease:
     needs: [Docker_Linux, VersionFile]
     runs-on: ubuntu-latest
