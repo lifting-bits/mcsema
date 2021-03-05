@@ -37,13 +37,6 @@ set(MCSEMA_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
 
 option(MCSEMA_ENABLE_RUNTIME "Should runtimes for re-compilation of bitcode be produced?" ON)
 
-find_package(Python2 QUIET)
-if(Python2_FOUND)
-  option(MCSEMA_INSTALL_PYTHON2_LIBS "Install Python 2 libraries" ON)
-else()
-  option(MCSEMA_INSTALL_PYTHON2_LIBS "Install Python 2 libraries")
-endif()
-
 find_package(Python3 QUIET)
 if(Python3_FOUND)
   option(MCSEMA_INSTALL_PYTHON3_LIBS "Install Python 3 libraries" ON)
@@ -179,23 +172,6 @@ set(MCSEMA_PYTHON_SOURCES
     tools/mcsema_disass/ida7/x86_util.py
 )
 
-if(MCSEMA_INSTALL_PYTHON2_LIBS)
-  add_custom_target(build_mcsema_disass_python2
-    DEPENDS ${MCSEMA_PYTHON_SOURCES})
-
-  add_custom_command(
-      TARGET build_mcsema_disass_python2 POST_BUILD
-      COMMAND which python2 && python2 setup.py build --force
-      COMMENT "Building McSema Python 2 mcsema-disass"
-      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tools")
-
-  add_dependencies(${MCSEMA_LIFT}
-    build_mcsema_disass_python2)
-
-  add_dependencies(build_mcsema_disass_python2
-    protobuf_python_module_ida)
-endif()
-
 if(MCSEMA_INSTALL_PYTHON3_LIBS)
   add_custom_target(build_mcsema_disass_python3
     DEPENDS ${MCSEMA_PYTHON_SOURCES})
@@ -283,18 +259,11 @@ endif()
 set(python_package_installer "${CMAKE_CURRENT_SOURCE_DIR}/tools/setup_launcher")
 if(DEFINED WIN32)
   string(REPLACE "/" "\\" python_package_install_path "${install_folder}")
-  set(python_package_installer2 "${python_package_installer}.bat")
   set(python_package_installer3 "${python_package_installer}.bat")
   set(optional_interpreter "cmd.exe /C")
 else()
   set(python_package_install_path "${install_folder}")
-  set(python_package_installer2 "${python_package_installer}_py2.sh")
   set(python_package_installer3 "${python_package_installer}_py3.sh")
-endif()
-
-if(MCSEMA_INSTALL_PYTHON2_LIBS)
-  install(CODE
-    "execute_process(COMMAND ${optional_interpreter} \"${python_package_installer2}\" \"${python_package_install_path}\"\nWORKING_DIRECTORY \"${PROJECT_SOURCE_DIR}/tools\"\nRESULT_VARIABLE exit_code2)\n   if(NOT exit_code2 EQUAL 0)\n       message(FATAL_ERROR \"Failed to install the Python 2 package\")\n     endif()")
 endif()
 
 if(MCSEMA_INSTALL_PYTHON3_LIBS)
