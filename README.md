@@ -135,6 +135,9 @@ sudo apt-get install \
      cmake \
      python3 python3-pip python3-virtualenv \
      wget \
+     xz-utils pixz \
+     clang \
+     rpm \
      build-essential \
      gcc-multilib g++-multilib \
      libtinfo-dev \
@@ -142,24 +145,6 @@ sudo apt-get install \
      zip \
      zlib1g-dev \
      ccache
-```
-
-##### Ubuntu 14.04 and Ubuntu 16.04
-
-```bash
-sudo apt-get install realpath
-```
-
-##### Ubuntu 18.04
-
-```bash
-sudo apt-get install -qqy --no-install-recommends libtinfo5
-```
-
-##### Ubuntu 20.04
-
-```bash
-sudo apt-get install -qqy --no-install-recommends libtinfo6
 ```
 
 #### macOS pre-requisites
@@ -206,47 +191,44 @@ git clone --depth 1 --single-branch --branch master https://github.com/lifting-b
 git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/anvill.git
 git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/mcsema.git
 
-if [ -z "${VIRTUAL_ENV}" ]
-then
-  # no virtualenv; global install for all users requires sudo
-  function make_install { ;  sudo make install ; }
-else
-  # found a virtualenv; local install does not need root
-  function make_install { ;  make install ; }
-fi
+export CC="$(which clang)"
+export CXX="$(which clang++)"
 
 # Download cxx-common, build Remill. 
-./remill/scripts/build.sh --llvm-version 9.0
-cd remill-build
-make_install
-
-export TRAILOFBITS_LIBRARIES=`pwd`/remill-build/libraries
+./remill/scripts/build.sh --llvm-version 9 --download-dir ./
+pushd remill-build
+sudo cmake --build . --target install
+popd
 
 # Build and install Anvill
 mkdir anvill-build
 pushd anvill-build
-${TRAILOFBITS_LIBRARIES}/cmake/bin/cmake ../anvill
-make
-make_install
+# Set VCPKG_ROOT to whatever directory the remill script downloaded
+cmake -DVCPKG_ROOT=$(pwd)/../vcpkg_ubuntu-20.04_llvm-9_amd64 ../anvill
+sudo cmake --build . --target install
 popd
 
 # Build and install McSema
 mkdir mcsema-build
 pushd mcsema-build
-${TRAILOFBITS_LIBRARIES}/cmake/bin/cmake ../mcsema
-make
-make_install
+# Set VCPKG_ROOT to whatever directory the remill script downloaded
+cmake -DVCPKG_ROOT=$(pwd)/../vcpkg_ubuntu-20.04_llvm-9_amd64 ../mcsema
+sudo cmake --build . --target install
+
+# NOTE: Might need to do this for Python package
+pip install ../mcsema/tools
+
 popd
 ```
 
-Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcsema-lift-4.0` for lifting the disassembled binaries. If you specified `--llvm-version 3.6` to the `build.sh` script, then you would use `mcsema-lift-3.6`.
+Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcsema-lift-9.0` for lifting the disassembled binaries. If you specified `--llvm-version 9` to the `build.sh` script, then you would use `mcsema-lift-9.0`.
 
 #### Step 3: Verifying Your McSema Installation
 
-Step 2 specified `--llvm-version 9.0` to Remill's `build.sh` script. This means
-that Remill, Anvill, and McSema have all been built against a copy of LLVM 9.0.
+Step 2 specified `--llvm-version 9` to Remill's `build.sh` script. This means
+that Remill, Anvill, and McSema have all been built against a copy of LLVM 9.
 To enable you to use multiple LLVM versions simultaneously, we suffix our binaries
-with the LLVM version. Thus, you may use `mcsema-lift-9.0` to lift to LLVM 9.0 bitcode.
+with the LLVM version. Thus, you may use `mcsema-lift-9.0` to lift to LLVM 9 bitcode.
 
 Try running `mcsema-lift-9.0 --version` to see if McSema has been installed.
 
