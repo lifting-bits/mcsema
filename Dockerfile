@@ -63,7 +63,7 @@ COPY . ./
 # version directory since we don't know exactly which Python3 version Ubutnu
 # ships with to set the environment variable PYTHONPATH in dist image
 RUN mkdir -p ./build && cd ./build && \
-    cmake -G Ninja -Danvill_DIR=${LIBRARIES}/lib/cmake/anvill -Dremill_DIR=${LIBRARIES}/lib/cmake/remill -DCMAKE_VERBOSE_MAKEFILE=True -DVCPKG_ROOT=/tmp/vcpkg_ubuntu-${UBUNTU_VERSION}_llvm-${LLVM_VERSION}_${ARCH} -DCMAKE_INSTALL_PREFIX=${LIBRARIES} .. && \
+    cmake -G Ninja -Danvill_DIR=${LIBRARIES}/lib/cmake/anvill -Dremill_DIR=${LIBRARIES}/lib/cmake/remill -DMCSEMA_DISABLED_ABI_LIBRARIES:STRING="" -DCMAKE_VERBOSE_MAKEFILE=True -DVCPKG_ROOT=/tmp/vcpkg_ubuntu-${UBUNTU_VERSION}_llvm-${LLVM_VERSION}_${ARCH} -DCMAKE_INSTALL_PREFIX=${LIBRARIES} .. && \
     cmake --build . --target install
 RUN mv ${LIBRARIES}/lib/python3.* ${LIBRARIES}/lib/python3
 

@@ -53,31 +53,34 @@ function(add_runtime_helper target_name source_file address_bit_size)
   )
 endfunction()
 
+find_package(Clang CONFIG REQUIRED)
+get_target_property(CLANG_EXE clang LOCATION)
+
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.c ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.h
   DEPENDS ${source_file}
-  COMMAND env TRAILOFBITS_LIBRARIES=${CXX_COMMON_REPOSITORY_ROOT} python3 ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py
-  		--arch "amd64" --type "c" --input ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.pph --output ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.c 
+  COMMAND env CLANG_EXE="${CLANG_EXE}" python3 ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py
+  		--arch "amd64" --type "c" --input ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.pph --output ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.c
 )
 
 #add_custom_command(
 #  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc_x86.c ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.h
 #  DEPENDS ${source_file}
-#  COMMAND env TRAILOFBITS_LIBRARIES=${CXX_COMMON_REPOSITORY_ROOT} python3 ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py 
+#  COMMAND env CLANG_EXE="${CLANG_EXE}" python3 ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py
 #        --arch "x86" --type "c" --input ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.pph --output ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc_x86.c
 #)
 
 #add_custom_command(
 #  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libcpp_amd64.c
 #  DEPENDS ${source_file}
-#  COMMAND env TRAILOFBITS_LIBRARIES=${CXX_COMMON_REPOSITORY_ROOT} python ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py 
-#  		--arch "amd64" --type "cpp" --input ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.pph --output ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libcpp_amd64.c 
+#  COMMAND env CLANG_EXE="${CLANG_EXE}" python ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py
+#  		--arch "amd64" --type "cpp" --input ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.pph --output ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libcpp_amd64.c
 #)
 
 #add_custom_command(
 #  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libcpp_x86.c
 #  DEPENDS ${source_file}
-#  COMMAND env TRAILOFBITS_LIBRARIES=${CXX_COMMON_REPOSITORY_ROOT} python ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py 
+#  COMMAND env CLANG_EXE="${CLANG_EXE}" python ${CMAKE_CURRENT_SOURCE_DIR}/../generate_abi_wrapper.py
 #        --arch "x86" --type "cpp" --input ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libc.pph --output ${CMAKE_CURRENT_SOURCE_DIR}/ABI_libcpp_x86.c
 #)
 
