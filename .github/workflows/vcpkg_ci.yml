@@ -65,7 +65,8 @@ jobs:
         run: |
           # --help return non-zero and fails...
           mcsema-lift-${{ matrix.llvm }}.0 --version
-          mcsema-disass-2 --help
+          mcsema-disass --help
+
           mcsema-lift-${{ matrix.llvm }}.0 --arch amd64 --os linux --cfg ./tests/test_suite_generator/generated/prebuilt_cfg/amd64/linux/cfg/hello_world --output hello_world.bc
           mcsema-lift-${{ matrix.llvm }}.0 --arch x86 --os linux --cfg ./tests/test_suite_generator/generated/prebuilt_cfg/x86/linux/cfg/hello_world --output hello_world.bc
 
@@ -111,8 +112,5 @@ jobs:
         run: |
           # --help return non-zero and fails...
           mcsema-lift-${{ matrix.llvm }}.0 --version
-          # TODO Might want to use virtualenv for this whole Python installation process
-          # Will need to be updated based on the Python2 version used during installation
-          PYTHONPATH=/usr/local/lib/python2.7/site-packages mcsema-disass-2 --help
           # Will need to be updated based on the Python3 version used during installation
           PYTHONPATH=/usr/local/lib/python3.9/site-packages mcsema-disass-3 --help
