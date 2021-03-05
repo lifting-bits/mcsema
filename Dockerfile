@@ -1,9 +1,9 @@
-ARG LLVM_VERSION=1000
+ARG LLVM_VERSION=11
 ARG ARCH=amd64
 ARG UBUNTU_VERSION=18.04
 ARG DISTRO_BASE=ubuntu${UBUNTU_VERSION}
 ARG BUILD_BASE=ubuntu:${UBUNTU_VERSION}
-ARG LIBRARIES=/opt/trailofbits/libraries
+ARG LIBRARIES=/opt/trailofbits
 
 # Using this file:
 # 1. Clone the mcsema repo https://github.com/lifting-bits/mcsema
@@ -18,40 +18,44 @@ FROM ${BUILD_BASE} as base
 ARG UBUNTU_VERSION
 ARG LIBRARIES
 RUN apt-get update && \
-    apt-get install -qqy --no-install-recommends python3 python3-pip python3-setuptools python3-six zlib1g curl ca-certificates && \
-    if [ "${UBUNTU_VERSION}" = "18.04" ] ; then \
-      apt-get install -qqy --no-install-recommends libtinfo5 ; \
-    else \
-      apt-get install -qqy --no-install-recommends libtinfo6 ; \
-    fi && \
+    apt-get install -qqy --no-install-recommends python3 python3-pip python3-setuptools python3-six python3.8 zlib1g curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 
-# Will copy anvill installation from here
-FROM trailofbits/anvill:llvm${LLVM_VERSION}-${DISTRO_BASE}-${ARCH} as anvill
-
-
 # Build-time dependencies go here
-FROM trailofbits/cxx-common:llvm${LLVM_VERSION}-${DISTRO_BASE}-${ARCH} as deps
+FROM trailofbits/cxx-common-vcpkg-builder-ubuntu:${UBUNTU_VERSION} as deps
+ARG UBUNTU_VERSION
+ARG ARCH
+ARG LLVM_VERSION
 ARG LIBRARIES
 RUN apt-get update && \
-    apt-get install -qqy python3 python3-pip libc6-dev wget liblzma-dev zlib1g-dev libtinfo-dev curl git build-essential ninja-build libselinux1-dev libbsd-dev ccache && \
+    apt-get install -qqy python3 python3-pip libc6-dev wget liblzma-dev zlib1g-dev curl git build-essential ninja-build libselinux1-dev libbsd-dev ccache pixz xz-utils make rpm && \
     if [ "$(uname -m)" = "x86_64" ]; then dpkg --add-architecture i386 && apt-get update && apt-get install -qqy gcc-multilib g++-multilib zip zlib1g-dev:i386; fi && \
     rm -rf /var/lib/apt/lists/* && \
     pip3 install ccsyspath
 
-COPY --from=anvill /opt/trailofbits/remill /opt/trailofbits/remill
-COPY --from=anvill /opt/trailofbits/anvill /opt/trailofbits/anvill
+# Build dependencies
+RUN git clone --depth=1 --branch master https://github.com/lifting-bits/remill.git && \
+    cd remill && \
+    ./scripts/build.sh --llvm-version ${LLVM_VERSION} --prefix ${LIBRARIES} --download-dir /tmp
 
-ENV PATH="${LIBRARIES}/llvm/bin:${LIBRARIES}/cmake/bin:${LIBRARIES}/protobuf/bin:${PATH}" \
-    CC="${LIBRARIES}/llvm/bin/clang" \
-    CXX="${LIBRARIES}/llvm/bin/clang++" \
-    TRAILOFBITS_LIBRARIES="${LIBRARIES}"
+# Make this a separate RUN because the build script above downloads a lot
+RUN cd remill && \
+    cmake --build remill-build --target install -- -j "$(nproc)" && \
+    cd ../ && \
+    git clone --depth=1 --branch master https://github.com/lifting-bits/anvill.git && \
+    mkdir -p anvill/build && cd anvill/build && \
+    cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_INSTALL_PREFIX=${LIBRARIES} -Dremill_DIR=${LIBRARIES}/lib/cmake/remill -DVCPKG_ROOT=/tmp/vcpkg_ubuntu-${UBUNTU_VERSION}_llvm-${LLVM_VERSION}_${ARCH} .. && \
+    cmake --build . --target install -- -j "$(nproc)"
 
 WORKDIR /mcsema
 
 # Source code build
 FROM deps as build
+ARG UBUNTU_VERSION
+ARG ARCH
+ARG LLVM_VERSION
+ARG LIBRARIES
 
 COPY . ./
 
@@ -59,36 +63,35 @@ COPY . ./
 # version directory since we don't know exactly which Python3 version Ubutnu
 # ships with to set the environment variable PYTHONPATH in dist image
 RUN mkdir -p ./build && cd ./build && \
-    cmake -G Ninja -DCMAKE_PREFIX_PATH="/opt/trailofbits/remill;/opt/trailofbits/anvill" -DMCSEMA_DISABLED_ABI_LIBRARIES:STRING="" -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/mcsema .. && \
-    cmake --build . --target install && \
-    mv "/opt/trailofbits/mcsema/lib/python$(python3 --version 2>&1 | awk '{ print $2 }' | cut -d '.' -f 1-2)" /opt/trailofbits/mcsema/lib/python3
+    cmake -G Ninja -Danvill_DIR=${LIBRARIES}/lib/cmake/anvill -Dremill_DIR=${LIBRARIES}/lib/cmake/remill -DMCSEMA_DISABLED_ABI_LIBRARIES:STRING="" -DCMAKE_VERBOSE_MAKEFILE=True -DVCPKG_ROOT=/tmp/vcpkg_ubuntu-${UBUNTU_VERSION}_llvm-${LLVM_VERSION}_${ARCH} -DCMAKE_INSTALL_PREFIX=${LIBRARIES} .. && \
+    cmake --build . --target install
+RUN mv ${LIBRARIES}/lib/python3.* ${LIBRARIES}/lib/python3
 
 # WORKDIR tests/test_suite_generator
 # RUN mkdir -p build && \
 #     cd build && \
-#     cmake -DMCSEMALIFT_PATH=/opt/trailofbits/mcsema/bin \
+#     cmake -DMCSEMALIFT_PATH=/opt/trailofbits/bin \
 #           -DMCSEMA_PREBUILT_CFG_PATH="$(pwd)/../generated/prebuilt_cfg/" \
-#       -DMCSEMADISASS_PATH=/opt/trailofbits/mcsema/bin \
+#       -DMCSEMADISASS_PATH=/opt/trailofbits/bin \
 #       .. && \
 #     cmake --build . --target install
-# 
+#
 # RUN cd test_suite && \
-#     PATH="/opt/trailofbits/mcsema/bin:${PATH}" python3 start.py
+#     PATH="/opt/trailofbits/bin:${PATH}" python3 start.py
 
 FROM base as dist
+ARG LIBRARIES
 ARG LLVM_VERSION
 
 # Allow for mounting of local folder
 RUN mkdir -p /mcsema/local
 
-COPY --from=build /opt/trailofbits/remill /opt/trailofbits/remill
-COPY --from=build /opt/trailofbits/anvill /opt/trailofbits/anvill
-COPY --from=build /opt/trailofbits/mcsema /opt/trailofbits/mcsema
-COPY scripts/docker-lifter-entrypoint.sh /opt/trailofbits/mcsema
+COPY --from=build ${LIBRARIES} ${LIBRARIES}
+COPY scripts/docker-lifter-entrypoint.sh ${LIBRARIES}
 ENV LLVM_VERSION=llvm${LLVM_VERSION} \
-    PATH="/opt/trailofbits/mcsema/bin:${PATH}" \
-    PYTHONPATH="/opt/trailofbits/mcsema/lib/python3/site-packages"
-ENTRYPOINT ["/opt/trailofbits/mcsema/docker-lifter-entrypoint.sh"]
+    PATH="${LIBRARIES}/bin:${PATH}" \
+    PYTHONPATH="${LIBRARIES}/lib/python3/site-packages"
+ENTRYPOINT ["/opt/trailofbits/docker-lifter-entrypoint.sh"]
 
 ################################
 # Left to reader to install    #

@@ -13,27 +13,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-if (NOT DEFINED ENV{TRAILOFBITS_LIBRARIES})
-  message(STATUS "Using new vcpkg build system")
-  include(CMakeLists_vcpkg.txt)
-  return()
-endif()
+# Find remill first because its config has useful dependency-finding info that
+# needs to be found before the CMake `project` declaration
+find_package(remill COMPONENTS VCPKG_DEPS QUIET)
 
-project(mcsema)
+include(cmake/vcpkg_helper.cmake)
+
+project(mcsema C CXX ASM)
+
+include(GNUInstallDirs)
 cmake_minimum_required(VERSION 3.14)
 
-# remill
-if("${PLATFORM_NAME}" STREQUAL "windows")
-  set(REMILL_FINDPACKAGE_HINTS HINTS "${CMAKE_INSTALL_PREFIX}/remill/lib")
-endif()
-
-find_package(remill REQUIRED ${REMILL_FINDPACKAGE_HINTS})
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/settings.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/BCCompiler.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/ccache.cmake")
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 configureCcache()
 FindAndSelectClangCompiler()
@@ -54,8 +49,8 @@ if(NOT DEFINED WIN32)
   set(PROJECT_CXXFLAGS
     ${GLOBAL_CXXFLAGS}
     -Wconversion
-    -pedantic 
-    -Wno-unreachable-code-return 
+    -pedantic
+    -Wno-unreachable-code-return
   )
 endif()
 
@@ -63,8 +58,14 @@ endif()
 # libraries
 #
 
+find_package(remill CONFIG REQUIRED)
+list(APPEND PROJECT_LIBRARIES remill_settings remill)
+get_target_property(REMILL_INCLUDE_LOCATION remill_settings INTERFACE_INCLUDE_DIRECTORIES)
+
 # protobuf
-find_package(Protobuf REQUIRED)
+# Compatibility since we use older protobuf CMake functions
+set(protobuf_MODULE_COMPATIBLE ON CACHE BOOL "" FORCE)
+find_package(Protobuf CONFIG REQUIRED)
 list(APPEND PROJECT_LIBRARIES ${Protobuf_LIBRARIES})
 list(APPEND PROJECT_INCLUDEDIRECTORIES ${Protobuf_INCLUDE_DIR})
 list(APPEND PROJECT_DEFINITIONS "GOOGLE_PROTOBUF_NO_RTTI")
@@ -140,32 +141,15 @@ add_custom_command(
 list(APPEND PROJECT_INCLUDEDIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_dependencies(${MCSEMA_LIFT}
-  semantics
   protobuf_python_module_ida)
 
 #
 # libraries
 #
 
-# remill
-if(NOT TARGET remill)
-  if("${PLATFORM_NAME}" STREQUAL "windows")
-    set(REMILL_FINDPACKAGE_HINTS HINTS "${CMAKE_INSTALL_PREFIX}/remill/lib")
-  endif()
-
-  find_package(remill REQUIRED ${REMILL_FINDPACKAGE_HINTS})
-endif()
-
-list(APPEND PROJECT_LIBRARIES remill)
-
 # anvill
-if(NOT TARGET anvill-${REMILL_LLVM_VERSION})
-  find_package(anvill REQUIRED)
-  if(NOT anvill_FOUND)
-    message(FATAL_ERROR "McSema depends upon Anvill being installed")
-  endif()
-endif()
-list(APPEND PROJECT_LIBRARIES anvill-${REMILL_LLVM_VERSION})
+find_package(anvill CONFIG REQUIRED)
+list(APPEND PROJECT_LIBRARIES anvill)
 
 # mcsema-disass
 
@@ -191,7 +175,7 @@ set(MCSEMA_PYTHON_SOURCES
 if(MCSEMA_INSTALL_PYTHON3_LIBS)
   add_custom_target(build_mcsema_disass_python3
     DEPENDS ${MCSEMA_PYTHON_SOURCES})
-    
+
   add_custom_command(
       TARGET build_mcsema_disass_python3 POST_BUILD
       COMMAND which python3 && python3 setup.py build --force
