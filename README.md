@@ -72,7 +72,7 @@ Why would anyone translate binaries *back* to bitcode?
 | [CMake](https://cmake.org/) | 3.2+ |
 | [Remill](https://github.com/lifting-bits/remill) | Latest |
 | [Anvill](https://github.com/lifting-bits/anvill) | Latest |
-| [Python](https://www.python.org/) | 2.7, 3.8 | 
+| [Python](https://www.python.org/) | 3.8 |
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
 | [python-clang](https://pypi.org/project/clang/) | 3.5.0 |
@@ -133,7 +133,7 @@ sudo apt-get install \
      git \
      curl \
      cmake \
-     python2.7 python-pip python-virtualenv \
+     python3 python3-pip python3-virtualenv \
      wget \
      build-essential \
      gcc-multilib g++-multilib \
@@ -266,7 +266,7 @@ In order to verify that McSema works correctly as built, head on over to [the do
 2. Do **NOT** enable "Add to PATH"
 
 **Python**
-1. Get the latest Python 2.7 (X64) installer from the official download page: https://www.python.org/downloads/windows/
+1. Get the latest Python 3 (X64) installer from the official download page: https://www.python.org/downloads/windows/
 2. Enable "Add to PATH"
 
 **CMake**
@@ -344,7 +344,7 @@ You should now have the following directories: C:\mcsema, C:\remill.
 Make extra sure it only contains ASCII characters with no newlines! The following command should work fine under cmd:
 
 ```
-echo|set /p="C:\mcsema\Lib\site-packages" > "C:\Python27\Lib\site-packages\mcsema.pth"
+echo|set /p="C:\mcsema\Lib\site-packages" > "C:\Python3<version>\Lib\site-packages\mcsema.pth"
 ```
 
 **Install the libmagic DLL**
