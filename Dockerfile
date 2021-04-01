@@ -43,7 +43,8 @@ RUN git clone --depth=1 --branch master https://github.com/lifting-bits/remill.g
 RUN cd remill && \
     cmake --build remill-build --target install -- -j "$(nproc)" && \
     cd ../ && \
-    git clone --depth=1 --branch master https://github.com/lifting-bits/anvill.git && \
+    git clone --branch master https://github.com/lifting-bits/anvill.git && \
+    ( cd anvill && git checkout -b release_bc3183b bc3183b ) && \
     mkdir -p anvill/build && cd anvill/build && \
     cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_INSTALL_PREFIX=${LIBRARIES} -Dremill_DIR=${LIBRARIES}/lib/cmake/remill -DVCPKG_ROOT=/tmp/vcpkg_ubuntu-${UBUNTU_VERSION}_llvm-${LLVM_VERSION}_${ARCH} .. && \
     cmake --build . --target install -- -j "$(nproc)"
