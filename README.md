@@ -71,7 +71,7 @@ Why would anyone translate binaries *back* to bitcode?
 | [Git](https://git-scm.com/) | Latest |
 | [CMake](https://cmake.org/) | 3.2+ |
 | [Remill](https://github.com/lifting-bits/remill) | Latest |
-| [Anvill](https://github.com/lifting-bits/anvill) | Latest |
+| [Anvill](https://github.com/lifting-bits/anvill) | bc3183b |
 | [Python](https://www.python.org/) | 3.8 |
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
@@ -188,8 +188,11 @@ source bin/activate
 
 ```shell
 git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/remill.git
-git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/anvill.git
 git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/mcsema.git
+
+# Get a compatible anvill version
+git clone --branch master https://github.com/lifting-bits/anvill.git
+( cd anvill && git checkout -b release_bc3183b bc3183b )
 
 export CC="$(which clang)"
 export CXX="$(which clang++)"
