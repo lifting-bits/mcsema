@@ -71,8 +71,8 @@ Why would anyone translate binaries *back* to bitcode?
 | [Git](https://git-scm.com/) | Latest |
 | [CMake](https://cmake.org/) | 3.2+ |
 | [Remill](https://github.com/lifting-bits/remill) | Latest |
-| [Anvill](https://github.com/lifting-bits/anvill) | Latest |
-| [Python](https://www.python.org/) | 2.7, 3.8 | 
+| [Anvill](https://github.com/lifting-bits/anvill) | bc3183b |
+| [Python](https://www.python.org/) | 3.8 |
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
 | [python-clang](https://pypi.org/project/clang/) | 3.5.0 |
@@ -133,8 +133,11 @@ sudo apt-get install \
      git \
      curl \
      cmake \
-     python2.7 python-pip python-virtualenv \
+     python3 python3-pip python3-virtualenv \
      wget \
+     xz-utils pixz \
+     clang \
+     rpm \
      build-essential \
      gcc-multilib g++-multilib \
      libtinfo-dev \
@@ -142,24 +145,6 @@ sudo apt-get install \
      zip \
      zlib1g-dev \
      ccache
-```
-
-##### Ubuntu 14.04 and Ubuntu 16.04
-
-```bash
-sudo apt-get install realpath
-```
-
-##### Ubuntu 18.04
-
-```bash
-sudo apt-get install -qqy --no-install-recommends libtinfo5
-```
-
-##### Ubuntu 20.04
-
-```bash
-sudo apt-get install -qqy --no-install-recommends libtinfo6
 ```
 
 #### macOS pre-requisites
@@ -203,50 +188,50 @@ source bin/activate
 
 ```shell
 git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/remill.git
-git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/anvill.git
 git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/mcsema.git
 
-if [ -z "${VIRTUAL_ENV}" ]
-then
-  # no virtualenv; global install for all users requires sudo
-  function make_install { ;  sudo make install ; }
-else
-  # found a virtualenv; local install does not need root
-  function make_install { ;  make install ; }
-fi
+# Get a compatible anvill version
+git clone --branch master https://github.com/lifting-bits/anvill.git
+( cd anvill && git checkout -b release_bc3183b bc3183b )
+
+export CC="$(which clang)"
+export CXX="$(which clang++)"
 
 # Download cxx-common, build Remill. 
-./remill/scripts/build.sh --llvm-version 9.0
-cd remill-build
-make_install
-
-export TRAILOFBITS_LIBRARIES=`pwd`/remill-build/libraries
+./remill/scripts/build.sh --llvm-version 9 --download-dir ./
+pushd remill-build
+sudo cmake --build . --target install
+popd
 
 # Build and install Anvill
 mkdir anvill-build
 pushd anvill-build
-${TRAILOFBITS_LIBRARIES}/cmake/bin/cmake ../anvill
-make
-make_install
+# Set VCPKG_ROOT to whatever directory the remill script downloaded
+cmake -DVCPKG_ROOT=$(pwd)/../vcpkg_ubuntu-20.04_llvm-9_amd64 ../anvill
+sudo cmake --build . --target install
 popd
 
 # Build and install McSema
 mkdir mcsema-build
 pushd mcsema-build
-${TRAILOFBITS_LIBRARIES}/cmake/bin/cmake ../mcsema
-make
-make_install
+# Set VCPKG_ROOT to whatever directory the remill script downloaded
+cmake -DVCPKG_ROOT=$(pwd)/../vcpkg_ubuntu-20.04_llvm-9_amd64 ../mcsema
+sudo cmake --build . --target install
+
+# NOTE: Might need to do this for Python package
+pip install ../mcsema/tools
+
 popd
 ```
 
-Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcsema-lift-4.0` for lifting the disassembled binaries. If you specified `--llvm-version 3.6` to the `build.sh` script, then you would use `mcsema-lift-3.6`.
+Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcsema-lift-9.0` for lifting the disassembled binaries. If you specified `--llvm-version 9` to the `build.sh` script, then you would use `mcsema-lift-9.0`.
 
 #### Step 3: Verifying Your McSema Installation
 
-Step 2 specified `--llvm-version 9.0` to Remill's `build.sh` script. This means
-that Remill, Anvill, and McSema have all been built against a copy of LLVM 9.0.
+Step 2 specified `--llvm-version 9` to Remill's `build.sh` script. This means
+that Remill, Anvill, and McSema have all been built against a copy of LLVM 9.
 To enable you to use multiple LLVM versions simultaneously, we suffix our binaries
-with the LLVM version. Thus, you may use `mcsema-lift-9.0` to lift to LLVM 9.0 bitcode.
+with the LLVM version. Thus, you may use `mcsema-lift-9.0` to lift to LLVM 9 bitcode.
 
 Try running `mcsema-lift-9.0 --version` to see if McSema has been installed.
 
@@ -266,7 +251,7 @@ In order to verify that McSema works correctly as built, head on over to [the do
 2. Do **NOT** enable "Add to PATH"
 
 **Python**
-1. Get the latest Python 2.7 (X64) installer from the official download page: https://www.python.org/downloads/windows/
+1. Get the latest Python 3 (X64) installer from the official download page: https://www.python.org/downloads/windows/
 2. Enable "Add to PATH"
 
 **CMake**
@@ -344,7 +329,7 @@ You should now have the following directories: C:\mcsema, C:\remill.
 Make extra sure it only contains ASCII characters with no newlines! The following command should work fine under cmd:
 
 ```
-echo|set /p="C:\mcsema\Lib\site-packages" > "C:\Python27\Lib\site-packages\mcsema.pth"
+echo|set /p="C:\mcsema\Lib\site-packages" > "C:\Python3<version>\Lib\site-packages\mcsema.pth"
 ```
 
 **Install the libmagic DLL**

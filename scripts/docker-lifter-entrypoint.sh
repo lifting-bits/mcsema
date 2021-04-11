@@ -18,7 +18,7 @@
 # Needed to process multiple arguments to docker image
 
 V=""
-case ${LLVM_VERSION} in 
+case ${LLVM_VERSION} in
   llvm35*)
     V=3.5
   ;;
@@ -35,26 +35,29 @@ case ${LLVM_VERSION} in
     V=3.9
   ;;
   # There is an llvm401 that we treat as 4.0
-  llvm40*)
+  llvm4*)
     V=4.0
   ;;
-  llvm50*)
+  llvm5*)
     V=5.0
   ;;
-  llvm60*)
+  llvm6*)
     V=6.0
   ;;
-  llvm70*)
+  llvm7*)
     V=7.0
   ;;
-  llvm80*)
+  llvm8*)
     V=8.0
   ;;
-  llvm90*)
+  llvm9*)
     V=9.0
   ;;
-  llvm100*)
+  llvm10*)
     V=10.0
+  ;;
+  llvm11*)
+    V=11.0
   ;;
   *)
     echo "Unknown LLVM version: ${LLVM_VERSION}"

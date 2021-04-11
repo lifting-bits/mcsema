@@ -18,7 +18,8 @@ jobs:
           - { name: 'ubuntu', tag: '20.04' }
         llvm: [
           '9',
-          '10'
+          '10',
+          '11'
           ]
 
     runs-on: ubuntu-20.04
@@ -35,7 +36,7 @@ jobs:
         run: |
           # TODO some of these should probably live in the Docker build image
           apt-get update
-          apt-get install -y pixz xz-utils make
+          apt-get install -y pixz xz-utils make rpm
 
       - name: Build and install remill
         shell: bash
@@ -49,7 +50,8 @@ jobs:
         shell: bash
         run: |
           # Change to master after testing
-          git clone --depth=1 --branch master https://github.com/lifting-bits/anvill.git
+          git clone --branch master https://github.com/lifting-bits/anvill.git
+          ( cd anvill && git checkout -b release_bc3183b bc3183b )
           mkdir -p anvill/build && cd anvill/build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
           cmake --build . --target install -- -j "$(nproc)"
@@ -64,19 +66,20 @@ jobs:
         run: |
           # --help return non-zero and fails...
           mcsema-lift-${{ matrix.llvm }}.0 --version
-          mcsema-disass-2 --help
+          mcsema-disass --help
+
+          mcsema-lift-${{ matrix.llvm }}.0 --arch amd64 --os linux --cfg ./tests/test_suite_generator/generated/prebuilt_cfg/amd64/linux/cfg/hello_world --output hello_world.bc
+          mcsema-lift-${{ matrix.llvm }}.0 --arch x86 --os linux --cfg ./tests/test_suite_generator/generated/prebuilt_cfg/x86/linux/cfg/hello_world --output hello_world.bc
 
   build_mac:
     strategy:
       fail-fast: false
       matrix:
         os: [
-          'macos-10.15',
-          'macos-11.0'
+          'macos-10.15'
           ]
         llvm: [
-          '9',
-          '10'
+          '11'
           ]
 
     runs-on: ${{ matrix.os }}
@@ -95,7 +98,8 @@ jobs:
         shell: bash
         run: |
           # Change to master after testing
-          git clone --depth=1 --branch master https://github.com/lifting-bits/anvill.git
+          git clone --branch master https://github.com/lifting-bits/anvill.git
+          ( cd anvill && git checkout -b release_bc3183b bc3183b )
           mkdir -p anvill/build && cd anvill/build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
           cmake --build . --target install -- -j "$(sysctl -n hw.logicalcpu)"
@@ -110,8 +114,5 @@ jobs:
         run: |
           # --help return non-zero and fails...
           mcsema-lift-${{ matrix.llvm }}.0 --version
-          # TODO Might want to use virtualenv for this whole Python installation process
-          # Will need to be updated based on the Python2 version used during installation
-          PYTHONPATH=/usr/local/lib/python2.7/site-packages mcsema-disass-2 --help
           # Will need to be updated based on the Python3 version used during installation
           PYTHONPATH=/usr/local/lib/python3.9/site-packages mcsema-disass-3 --help

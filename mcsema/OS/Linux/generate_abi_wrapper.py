@@ -20,8 +20,8 @@ import logging
 from collections import defaultdict
 
 
-tob_path = os.environ['TRAILOFBITS_LIBRARIES']
-cc_path = tob_path + "/llvm/bin/clang"
+cc_path = os.environ['CLANG_EXE']
+assert cc_path, "Please specify environment variable 'CLANG_EXE' with path to clang executable"
 
 try:
   import ccsyspath

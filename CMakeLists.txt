@@ -13,27 +13,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-if (NOT DEFINED ENV{TRAILOFBITS_LIBRARIES})
-  message(STATUS "Using new vcpkg build system")
-  include(CMakeLists_vcpkg.txt)
-  return()
-endif()
+# Find remill first because its config has useful dependency-finding info that
+# needs to be found before the CMake `project` declaration
+find_package(remill COMPONENTS VCPKG_DEPS QUIET)
 
-project(mcsema)
+include(cmake/vcpkg_helper.cmake)
+
+project(mcsema C CXX ASM)
+
+include(GNUInstallDirs)
 cmake_minimum_required(VERSION 3.14)
 
-# remill
-if("${PLATFORM_NAME}" STREQUAL "windows")
-  set(REMILL_FINDPACKAGE_HINTS HINTS "${CMAKE_INSTALL_PREFIX}/remill/lib")
-endif()
-
-find_package(remill REQUIRED ${REMILL_FINDPACKAGE_HINTS})
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/settings.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/BCCompiler.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/ccache.cmake")
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 configureCcache()
 FindAndSelectClangCompiler()
@@ -41,13 +36,6 @@ FindAndSelectClangCompiler()
 set(MCSEMA_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
 
 option(MCSEMA_ENABLE_RUNTIME "Should runtimes for re-compilation of bitcode be produced?" ON)
-
-find_package(Python2 QUIET)
-if(Python2_FOUND)
-  option(MCSEMA_INSTALL_PYTHON2_LIBS "Install Python 2 libraries" ON)
-else()
-  option(MCSEMA_INSTALL_PYTHON2_LIBS "Install Python 2 libraries")
-endif()
 
 find_package(Python3 QUIET)
 if(Python3_FOUND)
@@ -61,8 +49,8 @@ if(NOT DEFINED WIN32)
   set(PROJECT_CXXFLAGS
     ${GLOBAL_CXXFLAGS}
     -Wconversion
-    -pedantic 
-    -Wno-unreachable-code-return 
+    -pedantic
+    -Wno-unreachable-code-return
   )
 endif()
 
@@ -70,8 +58,14 @@ endif()
 # libraries
 #
 
+find_package(remill CONFIG REQUIRED)
+list(APPEND PROJECT_LIBRARIES remill_settings remill)
+get_target_property(REMILL_INCLUDE_LOCATION remill_settings INTERFACE_INCLUDE_DIRECTORIES)
+
 # protobuf
-find_package(Protobuf REQUIRED)
+# Compatibility since we use older protobuf CMake functions
+set(protobuf_MODULE_COMPATIBLE ON CACHE BOOL "" FORCE)
+find_package(Protobuf CONFIG REQUIRED)
 list(APPEND PROJECT_LIBRARIES ${Protobuf_LIBRARIES})
 list(APPEND PROJECT_INCLUDEDIRECTORIES ${Protobuf_INCLUDE_DIR})
 list(APPEND PROJECT_DEFINITIONS "GOOGLE_PROTOBUF_NO_RTTI")
@@ -147,32 +141,15 @@ add_custom_command(
 list(APPEND PROJECT_INCLUDEDIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_dependencies(${MCSEMA_LIFT}
-  semantics
   protobuf_python_module_ida)
 
 #
 # libraries
 #
 
-# remill
-if(NOT TARGET remill)
-  if("${PLATFORM_NAME}" STREQUAL "windows")
-    set(REMILL_FINDPACKAGE_HINTS HINTS "${CMAKE_INSTALL_PREFIX}/remill/lib")
-  endif()
-
-  find_package(remill REQUIRED ${REMILL_FINDPACKAGE_HINTS})
-endif()
-
-list(APPEND PROJECT_LIBRARIES remill)
-
 # anvill
-if(NOT TARGET anvill-${REMILL_LLVM_VERSION})
-  find_package(anvill REQUIRED)
-  if(NOT anvill_FOUND)
-    message(FATAL_ERROR "McSema depends upon Anvill being installed")
-  endif()
-endif()
-list(APPEND PROJECT_LIBRARIES anvill-${REMILL_LLVM_VERSION})
+find_package(anvill CONFIG REQUIRED)
+list(APPEND PROJECT_LIBRARIES anvill)
 
 # mcsema-disass
 
@@ -195,27 +172,10 @@ set(MCSEMA_PYTHON_SOURCES
     tools/mcsema_disass/ida7/x86_util.py
 )
 
-if(MCSEMA_INSTALL_PYTHON2_LIBS)
-  add_custom_target(build_mcsema_disass_python2
-    DEPENDS ${MCSEMA_PYTHON_SOURCES})
-    
-  add_custom_command(
-      TARGET build_mcsema_disass_python2 POST_BUILD
-      COMMAND which python2 && python2 setup.py build --force
-      COMMENT "Building McSema Python 2 mcsema-disass"
-      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tools")
-
-  add_dependencies(${MCSEMA_LIFT}
-    build_mcsema_disass_python2)
-
-  add_dependencies(build_mcsema_disass_python2
-    protobuf_python_module_ida)
-endif()
-
 if(MCSEMA_INSTALL_PYTHON3_LIBS)
   add_custom_target(build_mcsema_disass_python3
     DEPENDS ${MCSEMA_PYTHON_SOURCES})
-    
+
   add_custom_command(
       TARGET build_mcsema_disass_python3 POST_BUILD
       COMMAND which python3 && python3 setup.py build --force
@@ -299,18 +259,11 @@ endif()
 set(python_package_installer "${CMAKE_CURRENT_SOURCE_DIR}/tools/setup_launcher")
 if(DEFINED WIN32)
   string(REPLACE "/" "\\" python_package_install_path "${install_folder}")
-  set(python_package_installer2 "${python_package_installer}.bat")
   set(python_package_installer3 "${python_package_installer}.bat")
   set(optional_interpreter "cmd.exe /C")
 else()
   set(python_package_install_path "${install_folder}")
-  set(python_package_installer2 "${python_package_installer}_py2.sh")
   set(python_package_installer3 "${python_package_installer}_py3.sh")
-endif()
-
-if(MCSEMA_INSTALL_PYTHON2_LIBS)
-  install(CODE
-    "execute_process(COMMAND ${optional_interpreter} \"${python_package_installer2}\" \"${python_package_install_path}\"\nWORKING_DIRECTORY \"${PROJECT_SOURCE_DIR}/tools\"\nRESULT_VARIABLE exit_code2)\n   if(NOT exit_code2 EQUAL 0)\n       message(FATAL_ERROR \"Failed to install the Python 2 package\")\n     endif()")
 endif()
 
 if(MCSEMA_INSTALL_PYTHON3_LIBS)
