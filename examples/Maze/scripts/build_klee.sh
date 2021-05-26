@@ -5,7 +5,7 @@
 set -euo pipefail
 
 LLVM_VER=10
-CXX_COMMON_VER=0.1.1
+CXX_COMMON_VER=0.1.4
 KLEE_UCLIBC_VER=1.2
 KLEE_VER=2.2
 
@@ -92,7 +92,7 @@ parse_params() {
 
 install_cxx_common() {
     pushd "$BUILD_DIR" >/dev/null
-    URL="https://github.com/trailofbits/cxx-common/releases/download/v${CXX_COMMON_VER}/vcpkg_ubuntu-20.04_llvm-${LLVM_VER}_amd64.tar.xz"
+    URL="https://github.com/lifting-bits/cxx-common/releases/download/v${CXX_COMMON_VER}/vcpkg_ubuntu-20.04_llvm-${LLVM_VER}_amd64.tar.xz"
     FILE="$(basename "$URL")"
     if [ ! -f "$FILE" ]; then
         msg "Downloading cxx-common..."

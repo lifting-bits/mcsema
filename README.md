@@ -289,7 +289,7 @@ The extension is in fact a ZIP archive; extract it and copy the VCTargets folder
 
 #### Step 4: Dependencies
 
-Its time to fetch library dependencies. You can either build them yourself using our [cxx-common](https://github.com/trailofbits/cxx-common) dependency manager or download a pre-built package.
+Its time to fetch library dependencies. You can either build them yourself using our [cxx-common](https://github.com/lifting-bits/cxx-common) dependency manager or download a pre-built package.
 
 There are two versions of LLVM used by Remill and McSema. One version (currently 7.0.1) builds remill and McSema. Another version (currently 5.0.1) is used to build the translation semantics.
 
