@@ -65,7 +65,7 @@ get_target_property(REMILL_INCLUDE_LOCATION remill_settings INTERFACE_INCLUDE_DI
 # protobuf
 # Compatibility since we use older protobuf CMake functions
 set(protobuf_MODULE_COMPATIBLE ON CACHE BOOL "" FORCE)
-find_package(Protobuf CONFIG REQUIRED)
+find_package(Protobuf REQUIRED)
 list(APPEND PROJECT_LIBRARIES ${Protobuf_LIBRARIES})
 list(APPEND PROJECT_INCLUDEDIRECTORIES ${Protobuf_INCLUDE_DIR})
 list(APPEND PROJECT_DEFINITIONS "GOOGLE_PROTOBUF_NO_RTTI")
