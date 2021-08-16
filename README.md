@@ -104,7 +104,7 @@ This will build the container for you and run it with your local directory mount
 
 ```sh
 # Build McSema container
-ARCH=amd64; UBUNTU=18.04; LLVM=800; docker build . \
+ARCH=amd64; UBUNTU=18.04; LLVM=9; docker build . \
   -t mcsema:llvm${LLVM}-ubuntu${UBUNTU}-${ARCH} \
   -f Dockerfile \
   --build-arg UBUNTU_VERSION=${UBUNTU} \
