@@ -55,7 +55,7 @@ The first step to using McSema is to disassemble a program binary and produce a 
 
 `mcsema-disass` is organized into a [frontend](/tools/mcsema_disass/__main__.py) and backend. The front-end command accepts a `--disassembler` command-line argument that tells it what disassembly engine to use. In practice, this will always be a path to IDA Pro.
 
-The front-end is responsible for invoking the backend and disassembly engine. The IDA Pro [backend](/tools/mcsema_disass/ida/get_cfg.py) is an IDA Python script invoked by `idal` or `idal64`, and will output a CFG file.
+The front-end is responsible for invoking the backend and disassembly engine. The IDA Pro [backend](/tools/mcsema_disass/ida7/get_cfg.py) is an IDA Python script invoked by `idal` or `idal64`, and will output a CFG file.
 
 ### CFG files, a closer look
 
