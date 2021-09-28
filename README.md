@@ -112,10 +112,10 @@ ARCH=amd64; UBUNTU=18.04; LLVM=9; docker build . \
   --build-arg ARCH=${ARCH}
 
 # Run McSema container lifter
-docker run --rm -it --ipc=host -v "$(pwd)":/mcsema/local mcsema:llvm${LLVM}-ubuntu{$UBUNTU}-${ARCH}
+docker run --rm -it --ipc=host -v "$(pwd)":/mcsema/local mcsema:llvm${LLVM}-ubuntu${UBUNTU}-${ARCH}
 
 # Run McSema container disassembler
-docker run --rm -it --entrypoint=mcsema-disass --ipc=host -v "$(pwd)":/mcsema/local mcsema:llvm${LLVM}-ubuntu{$UBUNTU}-${ARCH}
+docker run --rm -it --entrypoint=mcsema-disass --ipc=host -v "$(pwd)":/mcsema/local mcsema:llvm${LLVM}-ubuntu${UBUNTU}-${ARCH}
 ```
 
 ### Native Build
