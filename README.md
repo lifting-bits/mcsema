@@ -69,8 +69,8 @@ Why would anyone translate binaries *back* to bitcode?
 | Name | Version | 
 | ---- | ------- |
 | [Git](https://git-scm.com/) | Latest |
-| [CMake](https://cmake.org/) | 3.2+ |
-| [Remill](https://github.com/lifting-bits/remill) | Latest |
+| [CMake](https://cmake.org/) | 3.14+ |
+| [Remill](https://github.com/lifting-bits/remill) | 710013a |
 | [Anvill](https://github.com/lifting-bits/anvill) | bc3183b |
 | [Python](https://www.python.org/) | 3.8 |
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
