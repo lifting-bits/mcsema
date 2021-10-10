@@ -24,26 +24,21 @@ jobs:
 
     runs-on: ubuntu-20.04
     container:
-      image: docker.pkg.github.com/lifting-bits/cxx-common/vcpkg-builder-${{ matrix.image.name }}:${{ matrix.image.tag }}
+      image: ghcr.io/lifting-bits/cxx-common/vcpkg-builder-${{ matrix.image.name }}:${{ matrix.image.tag }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v2
-      - name: Install utility tools
-        shell: bash
-        run: |
-          # TODO some of these should probably live in the Docker build image
-          apt-get update
-          apt-get install -y pixz xz-utils make rpm
 
       - name: Build and install remill
         shell: bash
         run: |
           # Change to master after testing
-          git clone --depth=1 --branch master https://github.com/lifting-bits/remill.git
+          git clone --branch master https://github.com/lifting-bits/remill.git
           cd remill
+          git checkout -b release_710013a 710013a
           ./scripts/build.sh --llvm-version ${{ matrix.llvm }}
           cmake --build remill-build --target install -- -j "$(nproc)"
       - name: Build and install anvill
@@ -90,8 +85,9 @@ jobs:
         shell: bash
         run: |
           # Change to master after testing
-          git clone --depth=1 --branch master https://github.com/lifting-bits/remill.git
+          git clone --branch master https://github.com/lifting-bits/remill.git
           cd remill
+          git checkout -b release_710013a 710013a
           ./scripts/build.sh --llvm-version ${{ matrix.llvm }}
           cmake --build remill-build --target install -- -j "$(sysctl -n hw.logicalcpu)"
       - name: Build and install anvill
