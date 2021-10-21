@@ -21,17 +21,15 @@ import stat
 import subprocess
 
 def is_ELF_file(path):
-  try:
-    output = subprocess.check_output(['file', path])
-    return 'ELF' in output
-  except:
-    return False
+  output = subprocess.check_output(["file", path])
+  output = output.decode("utf-8")
+  return "ELF" in output
 
 def lift_binary(args, binary):
   lift_args = [
-      'python',
+      'python3',
       os.path.join(os.path.dirname(__file__), 'lift_program.py'),
-      '--libraries_dir', args.libraries_dir,
+      #'--libraries_dir', args.libraries_dir,
       '--llvm_version', args.llvm_version,
       '--disassembler', args.disassembler,
       '--workspace_dir', args.workspace_dir,
@@ -52,15 +50,18 @@ def lift_binary(args, binary):
   with open(sub_stdout_path, "w") as sub_stdout:
     with open(sub_stderr_path, "w") as sub_stderr:
       print(" ".join(lift_args))
-      return subprocess.call(lift_args, stdout=sub_stdout, stderr=sub_stderr)
+      ret_code = subprocess.call(lift_args, stdout=sub_stdout, stderr=sub_stderr)
+      if ret_code != 0:
+          print("ERROR:", binary_name)
+      return ret_code
 
 def main():
   arg_parser = argparse.ArgumentParser()
 
-  arg_parser.add_argument(
-      '--libraries_dir',
-      help='Path to directory in which the cxx-common libraries are unpacked',
-      required=True)
+ # arg_parser.add_argument(
+ #     '--libraries_dir',
+ #     help='Path to directory in which the cxx-common libraries are unpacked',
+ #     required=True)
 
   arg_parser.add_argument(
       '--llvm_version',
@@ -123,10 +124,8 @@ def main():
 
   ret_codes = {}
   pool = multiprocessing.Pool(args.num_workers)
-  #try:
   for binary in binaries:
     ret_codes[binary] = pool.apply_async(lift_binary, (args, binary))
-
   pool.close()
   pool.join()
 
