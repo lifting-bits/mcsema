@@ -29,13 +29,14 @@ except:
 
 def binary_info(binary):
   res = subprocess.check_output(['file', binary])
+  res = res.decode("utf-8")
   is_pie = 'LSB shared object' in res or 'Mach-O 64' in res or 'LSB pie executable' in res
   address_size = 64
 
   if 'aarch64' in res:
     arch = 'aarch64'
   elif 'x86-64' in res or 'x86_64' in res:
-    arch = 'amd64_avx'
+    arch = 'amd64'
   elif 'x86' in res:
     arch = 'x86_avx'
     address_size = 32
@@ -47,6 +48,7 @@ def binary_info(binary):
 def binary_libraries(binary):
   try:
     res = subprocess.check_output(['ldd', binary])
+    res = res.decode("utf-8")
   except:
     return
   for line in res.split("\n"):
@@ -68,6 +70,8 @@ def make_executable(path):
   os.chmod(path, st.st_mode | stat.S_IEXEC)
 
 def hash_file(path):
+  # NOTE (Carson) I wanted the output format in a specific way
+  return path
   hash = hashlib.md5()
   with open(path, "rb") as f:
     for block in iter(lambda: f.read(65536), b""):
@@ -165,7 +169,9 @@ def main():
   binary = os.path.join(obj_dir, path_hash)
   lifted_binary = os.path.join(lifted_obj_dir, path_hash)
   cfg = os.path.join(cfg_dir, "{}.cfg".format(path_hash))
-  bitcode = os.path.join(bc_dir, "{}.bc".format(path_hash))
+  bitcode = os.path.join(bc_dir, binary + ".bc")
+  if os.path.exists(bitcode):
+    return 0
   log = os.path.join(log_dir, "{}.log".format(path_hash))
 
   # Copy the binary into the workspace's object directory.
@@ -213,12 +219,12 @@ def main():
     da = 'binja'
   else:
     ida_version = {
-      "x86_avx": "idal",
-      "amd64_avx": "idal64",
-      "aarch64": "idal64"
+      "x86_avx": "idat",
+      "amd64": "idat64",
+      "aarch64": "idat64"
     }[arch]
     da = quote(os.path.join(args.disassembler, ida_version))
-
+    print(da, os.path.exists(da))
   # Disassemble the binary.
   disass_args = [
       'mcsema-disass',
@@ -236,10 +242,10 @@ def main():
   disass_args.extend(command_args)
 
   print(" ".join(disass_args))
+  print(disass_args)
   ret = subprocess.call(disass_args)
   if ret:
     return ret
-
   # Lift the binary.
   mcsema_lift_args = [
       'mcsema-lift-{}'.format(args.llvm_version),
@@ -260,6 +266,8 @@ def main():
   if ret:
     return ret
 
+  # NOTE (Carson), tried specifying legacy_mode, that caused other issues
+  return 0
   # Not compiling a binary.
   if args.legacy_mode:
     return 0
@@ -306,7 +314,6 @@ LD_LIBRARY_PATH={} {} "$@"
 
   make_executable(run_native)
   make_executable(run_lifted)
-
   return 0
 
 if __name__ == "__main__":
