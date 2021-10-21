@@ -152,7 +152,8 @@ def main():
   workspace_dir = tempfile.mkdtemp()
   temp_bin_path = os.path.join(workspace_dir, new_bin_name)
   shutil.copyfile(args.binary, temp_bin_path)
-  args.binary = temp_bin_path
+  # NOTE (Carson) I like the old bin name.
+  # args.binary = temp_bin_path
 
   ret = 1
   try:
