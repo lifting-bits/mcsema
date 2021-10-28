@@ -125,6 +125,8 @@ def main():
   ret_codes = {}
   pool = multiprocessing.Pool(args.num_workers)
   for binary in binaries:
+    if os.path.exists(binary + ".cfg"):
+        continue
     ret_codes[binary] = pool.apply_async(lift_binary, (args, binary))
   pool.close()
   pool.join()
