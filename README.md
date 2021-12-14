@@ -192,7 +192,7 @@ git clone --depth 1 --single-branch --branch master https://github.com/lifting-b
 # OR
 
 # The following steps are needed for LLVM versions (<=11)
-git clone --depth 100 https://github.com/lifting-bits/remill.git
+git clone https://github.com/lifting-bits/remill.git
 pushd .
 cd remill
 git checkout -b all_llvm 9006baf7db
