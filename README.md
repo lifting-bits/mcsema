@@ -185,9 +185,23 @@ source bin/activate
 ```
 
 #### Step 2: Clone the repository and its dependencies
+```shell
+# For latest LLVM versions (>=12)
+git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/remill.git
+
+# OR
+
+# The following steps are needed for LLVM versions (<=11)
+git clone --depth 100 https://github.com/lifting-bits/remill.git
+pushd .
+cd remill
+git checkout -b all_llvm 9006baf7db
+popd
+```
+
+After which;
 
 ```shell
-git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/remill.git
 git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/mcsema.git
 
 # Get a compatible anvill version
@@ -197,8 +211,9 @@ git clone --branch master https://github.com/lifting-bits/anvill.git
 export CC="$(which clang)"
 export CXX="$(which clang++)"
 
+
 # Download cxx-common, build Remill. 
-./remill/scripts/build.sh --llvm-version 9 --download-dir ./
+./remill/scripts/build.sh --llvm-version 11 --download-dir ./
 pushd remill-build
 sudo cmake --build . --target install
 popd
@@ -207,7 +222,7 @@ popd
 mkdir anvill-build
 pushd anvill-build
 # Set VCPKG_ROOT to whatever directory the remill script downloaded
-cmake -DVCPKG_ROOT=$(pwd)/../vcpkg_ubuntu-20.04_llvm-9_amd64 ../anvill
+cmake -DVCPKG_ROOT=$(pwd)/../vcpkg_ubuntu-20.04_llvm-11_amd64 ../anvill
 sudo cmake --build . --target install
 popd
 
@@ -215,13 +230,8 @@ popd
 mkdir mcsema-build
 pushd mcsema-build
 # Set VCPKG_ROOT to whatever directory the remill script downloaded
-cmake -DVCPKG_ROOT=$(pwd)/../vcpkg_ubuntu-20.04_llvm-9_amd64 ../mcsema
+cmake -DVCPKG_ROOT=$(pwd)/../vcpkg_ubuntu-20.04_llvm-11_amd64 ../mcsema
 sudo cmake --build . --target install
-
-# NOTE: Might need to do this for Python package
-pip install ../mcsema/tools
-
-popd
 ```
 
 Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcsema-lift-9.0` for lifting the disassembled binaries. If you specified `--llvm-version 9` to the `build.sh` script, then you would use `mcsema-lift-9.0`.
