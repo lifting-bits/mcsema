@@ -42,6 +42,7 @@ def execute(args, command_args):
   env["HOME"] = os.path.expanduser('~')
   env["IDA_PATH"] = os.path.dirname(args.disassembler)
   env["PYTHONPATH"] = os.path.dirname(ida_dir)
+  env["DISPLAY"] = ":0"
   if "SystemRoot" in os.environ:
     env["SystemRoot"] = os.environ["SystemRoot"]
 
