@@ -186,16 +186,19 @@ source bin/activate
 
 #### Step 2: Clone the repository and its dependencies
 ```shell
-# For latest LLVM versions (>=12)
-git clone --depth 1 --single-branch --branch master https://github.com/lifting-bits/remill.git
-
-# OR
-
-# The following steps are needed for LLVM versions (<=11)
 git clone https://github.com/lifting-bits/remill.git
 pushd .
 cd remill
+
+# For latest LLVM versions (>=12)
+git checkout -b release_93aba7c 93aba7c
+
+# OR
+
+# For LLVM versions (<=11)
 git checkout -b all_llvm 9006baf7db
+
+
 popd
 ```
 
