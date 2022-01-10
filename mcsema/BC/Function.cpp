@@ -1402,15 +1402,16 @@ static void LiftInstIntoFunction(TranslationContext &ctx,
             << " is not associated with a lifted subroutine, and it does not "
             << "have a known call target" << std::dec;
 
+        const auto ret_pc = FunctionReturnAddress(ctx);
+
         LiftSavedRegs(ctx, block);
         KillPCAndNextPC(ctx, block);
         LiftKilledRegs(ctx, block);
         LiftSubFuncCall(ctx, block, intrinsics.function_call,
                         PCValueKind::kConcretePC, ctx.inst.branch_taken_pc);
         LiftRestoredRegs(ctx, block);
-        RevivePCAndNextPC(ctx, block, ctx.inst.branch_not_taken_pc);
-        llvm::BranchInst::Create(
-            GetOrCreateBlock(ctx, ctx.inst.branch_not_taken_pc), block);
+        RevivePCAndNextPC(ctx, block, ret_pc);
+        llvm::BranchInst::Create(GetOrCreateBlock(ctx, ret_pc), block);
       }
       break;
     }

@@ -89,7 +89,7 @@ static void ExportFunctions(const NativeModule *cfg_module) {
         LOG(INFO) << "Exporting function " << cfg_func->name;
 
         //    remill::TieFunctions(ep, gModule->getFunction(cfg_func->lifted_name));
-        remill::Annotate<remill::EntrypointFunction>(ep);
+//        remill::Annotate<remill::EntrypointFunction>(ep);
         if (ep->getLinkage() != llvm::GlobalValue::ExternalWeakLinkage) {
           ep->setLinkage(llvm::GlobalValue::ExternalLinkage);
         }

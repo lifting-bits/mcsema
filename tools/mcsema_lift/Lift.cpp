@@ -223,7 +223,7 @@ struct ABILibsLoader {
     dest_func->copyAttributesFrom(&func);
     dest_func->setVisibility(func.getVisibility());
 
-    remill::Annotate<remill::AbiLibraries>(dest_func);
+//    remill::Annotate<remill::AbiLibraries>(dest_func);
   }
 
   bool ShouldCopy(llvm::Function &func, const std::string &name) {

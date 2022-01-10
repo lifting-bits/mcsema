@@ -931,7 +931,7 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
 
   ir.CreateRet(new_mem_ptr);
 
-  remill::Annotate<remill::McSemaHelper>(callback_func);
+//  remill::Annotate<remill::McSemaHelper>(callback_func);
 
   callback_func->removeFnAttr(llvm::Attribute::NoInline);
   callback_func->addFnAttr(llvm::Attribute::InlineHint);

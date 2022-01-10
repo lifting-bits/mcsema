@@ -76,7 +76,7 @@ llvm::Constant *NativeExternalFunction::Pointer(void) const {
       function->setLinkage(llvm::GlobalValue::ExternalLinkage);
     }
 
-    remill::Annotate<remill::CFGExternal>(function);
+//    remill::Annotate<remill::CFGExternal>(function);
 
     return function;
 
@@ -107,7 +107,7 @@ llvm::Constant *NativeExternalFunction::Pointer(void) const {
     function->addFnAttr(llvm::Attribute::NoInline);
     function->addFnAttr(llvm::Attribute::NoBuiltin);
 
-    remill::Annotate<remill::CFGExternal>(function);
+//    remill::Annotate<remill::CFGExternal>(function);
     return function;
   }
 }
