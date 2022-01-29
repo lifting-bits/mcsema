@@ -35,9 +35,14 @@ RUN apt-get update && \
     pip3 install ccsyspath
 
 # Build dependencies
-RUN git clone --depth=1 --branch master https://github.com/lifting-bits/remill.git && \
-    cd remill && \
-    ./scripts/build.sh --llvm-version ${LLVM_VERSION} --prefix ${LIBRARIES} --download-dir /tmp
+RUN git clone https://github.com/lifting-bits/remill.git
+RUN if [ "$LLVM_VERSION" -gt 11 ]; then \
+    cd remill && git checkout -b release_93aba7c 93aba7c && \
+    ./scripts/build.sh --llvm-version ${LLVM_VERSION} --prefix ${LIBRARIES} --download-dir /tmp; \
+    else \
+    cd remill && git checkout -b all_llvm 9006baf7db && \
+    ./scripts/build.sh --llvm-version ${LLVM_VERSION} --prefix ${LIBRARIES} --download-dir /tmp; \
+    fi
 
 # Make this a separate RUN because the build script above downloads a lot
 RUN cd remill && \
