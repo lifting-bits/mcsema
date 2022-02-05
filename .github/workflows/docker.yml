@@ -1,0 +1,15 @@
+name: Dockerfile Continuous Integration
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build_docker:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build Dockerfile
+        run: docker build -t mcsema .
