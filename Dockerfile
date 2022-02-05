@@ -1,6 +1,6 @@
 ARG LLVM_VERSION=11
 ARG ARCH=amd64
-ARG UBUNTU_VERSION=18.04
+ARG UBUNTU_VERSION=20.04
 ARG DISTRO_BASE=ubuntu${UBUNTU_VERSION}
 ARG BUILD_BASE=ubuntu:${UBUNTU_VERSION}
 ARG LIBRARIES=/opt/trailofbits
@@ -35,8 +35,8 @@ RUN apt-get update && \
     pip3 install ccsyspath
 
 # Build dependencies
-RUN git clone --depth=1 --branch master https://github.com/lifting-bits/remill.git && \
-    cd remill && \
+RUN git clone --branch master https://github.com/lifting-bits/remill.git && \
+    cd remill && git checkout -b release_710013a 710013a && \
     ./scripts/build.sh --llvm-version ${LLVM_VERSION} --prefix ${LIBRARIES} --download-dir /tmp
 
 # Make this a separate RUN because the build script above downloads a lot
