@@ -50,12 +50,18 @@ namespace Version {
     return "@GIT_COMMIT_SUBJECT@";
   }
   std::string GetCommitBody() {
-    return @GIT_COMMIT_BODY@;
+    return "@GIT_COMMIT_BODY@";
   }
+  std::string Describe() {
+      return "@GIT_DESCRIBE@";
+  }
+  std::string Branch() {
+      return "@GIT_BRANCH@";
+  }
+
+  // Extra for mcsema
   std::string GetVersionString() {
     return "@VERSION_STRING@";
   }
-
-
 }  // namespace Version
 }  // namespace mcsema
