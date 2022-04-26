@@ -32,6 +32,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Fix git permissions
+        shell: bash
+        run: git config --global --add safe.directory "/__w/mcsema/mcsema"
+
       - name: Build and install remill
         shell: bash
         run: |
