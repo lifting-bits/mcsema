@@ -1,0 +1,1 @@
+Throws on first attempt to create static variable.

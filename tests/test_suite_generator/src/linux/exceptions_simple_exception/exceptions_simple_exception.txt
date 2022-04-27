@@ -1,0 +1,1 @@
+Simple throw and catch test on several types.
